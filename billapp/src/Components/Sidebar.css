@@ -1,0 +1,73 @@
+/* Sidebar styles */
+.sidebar-fixed {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 70px;
+    height: 100vh;
+    background-color: #000000;
+    color: white;
+    overflow-x: hidden;
+    transition: width 0.3s ease;
+    z-index: 1000;
+    border-radius: 0px 0px 50px 0px ;
+  }
+  
+  .sidebar-fixed:hover {
+    width: 220px;
+  }
+  
+  .sidebar-header-bg {
+    background-color: #000000;
+    color: white;
+  }
+  
+  .sidebar-fixed .sidebar-nav {
+    padding-left: 0;
+    margin-top: 20px;
+  }
+  
+  .sidebar-fixed .nav-item {
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    color: rgb(240, 241, 247);
+    cursor: pointer;
+    transition: background-color 0.9s;
+  }
+  
+  .sidebar-fixed .nav-item i {
+    font-size: 1.2rem;
+    width: 30px;
+    text-align: center;
+  }
+  
+  .sidebar-fixed .nav-item span {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    white-space: nowrap;
+  }
+  
+  .sidebar-fixed:hover .nav-item span {
+    opacity: 1;
+    margin-left: 10px;
+  }
+  
+  .sidebar-fixed .nav-item:hover {
+    background-color: #465cd8;
+    border-radius: 10px;
+  }
+  
+  /* Optional: logo image size */
+  .icon-image, .compunylogo-image {
+    width: 40px;
+    height: auto;
+  }
+  
+  .sidebar-fixed .nav-item.active {
+    background-color: #465cd8!important;
+    font-weight: bold;
+    border-left: 4px solid #fff;
+    border-radius: 10px;
+  }
+  
