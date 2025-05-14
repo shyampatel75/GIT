@@ -7,12 +7,14 @@ const Signup = () => {
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
+  const [mobile, setMobile] = useState("");
   const [firstName, setFirstName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSignup = (e) => {
+  const handleSignup = async(e) => {
     e.preventDefault();
 
     if (password !== confirmPassword) {
@@ -20,13 +22,42 @@ const Signup = () => {
       return;
     }
 
-    // You can add backend API call here to register user
-    alert("Signup successful!");
+  try {
+      const response = await fetch("http://localhost:8000/api/auth/register/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          first_name: firstName,
+          mobile,
+          password,
+          password2: confirmPassword,
+        }),
+      });
 
-    // Simulate authentication
-    localStorage.setItem("isAuthenticated", "true");
-    navigate("/dashboard");
-  };
+      const data = await response.json();
+
+      if (!response.ok) {
+      // Handle validation errors
+      const errorMsg = Object.entries(data)
+        .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(' ') : value}`)
+        .join('\n') || "Registration failed";
+      setError(errorMsg);
+      return;
+    }
+ alert("Account created successfully! Please log in.");
+    navigate("/dashboard"); // 👈 Redirect to login page
+
+  } catch (err) {
+    setError("Network error. Please try again.");
+    console.error("Registration error:", err);
+  }
+};
+    
+
+  
 
   return (
     <section className="vh-100" style={{ backgroundColor: "#eee" }}>
@@ -69,7 +100,19 @@ const Signup = () => {
                 />
               </div>
 
-
+              <div className="form-outline mb-2">
+                <label className="form-label">Mobile Number</label>
+                <input
+                  type="tel"
+                  className="form-control form-control-lg"
+                  placeholder="Enter your mobile number"
+                  value={mobile}
+                  onChange={(e) => setMobile(e.target.value)}
+                  required
+                  pattern="[0-9]{10}"
+                  title="Please enter a 10-digit mobile number"
+                />
+              </div>
 
               <div className="form-outline mb-2 position-relative">
                 <label className="form-label">Password</label>
@@ -124,7 +167,7 @@ const Signup = () => {
       </div>
 
       <div className="d-flex flex-column flex-md-row text-center text-md-start justify-content-between py-4 px-4 px-xl-5 bg-primary">
-        <div className="text-white mb-3 mb-md-0">Copyright © 2020</div>
+        <div className="text-white mb-3 mb-md-0">Copyright © 2025</div>
         <div>
           <a href="#!" className="text-white me-4">
             <i className="fab fa-facebook-f"></i>

@@ -16,9 +16,9 @@ const Banking = () => {
   const [companyAmount, setCompanyAmount] = useState("");
   const [companyNotice, setCompanyNotice] = useState("");
 
-  const [salarynewname, setName] = useState("");
+  const [salarynewname, setSalaryNewName] = useState("");
   const [salaryName, setSalaryName] = useState("");
-  const [salaryAmount, setSalaryAmount] = useState("");
+  const [salary, setSalaryAmount] = useState(""); // Correct usage
   const [salaryDate, setSalaryDate] = useState("");
   const [salaryInvoices, setSalaryInvoices] = useState([]);
   const [selectedSalaryInvoice, setSelectedSalaryInvoice] = useState("");
@@ -30,11 +30,10 @@ const Banking = () => {
   const [allInvoices, setAllInvoices] = useState([]);
 
   const [showDepositForm, setShowDepositForm] = useState(false);
-  const [depositInvoice, setDepositInvoice] = useState("");
   const [depositFormAmount, setDepositFormAmount] = useState("");
   const [depositFormDate, setDepositFormDate] = useState("");
 
-
+  const [employees, setEmployees] = useState([]);
 
   useEffect(() => {
     if ([1, 2, 3].includes(visibleButton)) {
@@ -46,7 +45,7 @@ const Banking = () => {
           setBuyerNames(uniqueNames);
           setAllInvoices(data);
         })
-        .catch((error) => console.error("Error fetching names:", error));
+        .catch((error) => console.error("Error fetching invoices:", error));
     }
   }, [visibleButton]);
 
@@ -62,6 +61,15 @@ const Banking = () => {
     setSelectedSalaryInvoice("");
   }, [salaryName, allInvoices]);
 
+  useEffect(() => {
+    if (visibleButton === 3) {
+      fetch("http://localhost:8000/api/banking/employee/")
+        .then((res) => res.json())
+        .then((data) => setEmployees(data))
+        .catch((error) => console.error("Failed to fetch employees:", error));
+    }
+  }, [visibleButton]);
+
   const handleBuyerSubmit = async () => {
     if (!selectedBuyer || !selectedDate || !depositAmount) {
       alert("Please fill all required fields.");
@@ -74,8 +82,8 @@ const Banking = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           buyer_name: selectedBuyer,
-          invoice_id: selectedInvoice,  // Changed from 'invoice'
-          transaction_date: selectedDate,  // Changed from 'selected_date'
+          invoice_id: selectedInvoice,
+          transaction_date: selectedDate,
           notice: buyerNotice,
           deposit_amount: parseFloat(depositAmount)
         }),
@@ -83,7 +91,6 @@ const Banking = () => {
 
       if (response.ok) {
         alert("Transaction saved successfully!");
-        // Reset form
         setSelectedBuyer("");
         setSelectedInvoice("");
         setSelectedDate("");
@@ -118,9 +125,7 @@ const Banking = () => {
       });
 
       if (response.ok) {
-        const data = await response.json();
         alert("Company bill saved successfully!");
-        // Reset form
         setCompanyName("");
         setCompanyDate("");
         setCompanyAmount("");
@@ -136,7 +141,7 @@ const Banking = () => {
   };
 
   const handleSalarySubmit = async () => {
-    if (!salarynewname || !salaryName || !salaryAmount || !salaryDate) {
+    if (!salaryName || !salary || !salaryDate) {
       alert("Please fill all salary fields.");
       return;
     }
@@ -144,7 +149,7 @@ const Banking = () => {
     const data = {
       salary_newname: salarynewname,
       salary_name: salaryName,
-      salary_amount: parseFloat(salaryAmount),
+      salary_amount: parseFloat(salary),
       salary_date: salaryDate,
       salary_invoice: selectedSalaryInvoice || null,
     };
@@ -202,10 +207,8 @@ const Banking = () => {
   const handleDepositSubmit = async () => {
     try {
       const response = await fetch('http://localhost:8000/api/add-deposit/', {
-        method: 'POST',  // Ensure this is POST, not GET
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount: depositFormAmount,
           date: depositFormDate,
@@ -213,13 +216,7 @@ const Banking = () => {
       });
 
       if (response.ok) {
-        const data = await response.json();
-        console.log('Deposit saved:', data);
-
-        // Show success alert
         alert('Deposit saved successfully!');
-
-        // Reset form state
         setShowDepositForm(false);
         setDepositFormAmount('');
         setDepositFormDate('');
@@ -231,52 +228,22 @@ const Banking = () => {
     }
   };
 
-
   return (
     <div className="p-6 max-w-md mx-auto" style={{ paddingLeft: "100px" }}>
-      <div className="d-flex  bd-highlight mb-4">
+      <div className="d-flex bd-highlight mb-4">
         <div className="p-2 bd-highlight position-relative">
           {showDepositForm && (
-            <div
-              className="card p-3 position-absolute bg-white shadow"
-              style={{ zIndex: 999,  left:"7px" ,top:"50px" }}
-            >
-              <input
-                type="number"
-                placeholder="Amount"
-                className="form-control mb-2"
-                value={depositFormAmount}
-                onChange={(e) => setDepositFormAmount(e.target.value)}
-              />
-              <input
-                type="date"
-                className="form-control mb-2"
-                value={depositFormDate}
-                onChange={(e) => setDepositFormDate(e.target.value)}
-              />
-
+            <div className="card p-3 position-absolute bg-white shadow" style={{ zIndex: 999, left: "7px", top: "50px" }}>
+              <input type="number" placeholder="Amount" className="form-control mb-2" value={depositFormAmount} onChange={(e) => setDepositFormAmount(e.target.value)} />
+              <input type="date" className="form-control mb-2" value={depositFormDate} onChange={(e) => setDepositFormDate(e.target.value)} />
               <div className="d-flex justify-content-between">
-                <button className="btn btn-success me-2" onClick={handleDepositSubmit}>
-                  Submit
-                </button>
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => setShowDepositForm(false)}
-                >
-                  Cancel
-                </button>
+                <button className="btn btn-success me-2" onClick={handleDepositSubmit}>Submit</button>
+                <button className="btn btn-secondary" onClick={() => setShowDepositForm(false)}>Cancel</button>
               </div>
             </div>
           )}
-
-          <button
-            className="btn btn-secondary"
-            onClick={() => setShowDepositForm(!showDepositForm)}
-          >
-            Add Deposit
-          </button>
+          <button className="btn btn-secondary" onClick={() => setShowDepositForm(!showDepositForm)}>Add Deposit</button>
         </div>
-
       </div>
 
       <div className="d-flex justify-content-around gap-2 mb-4 my-4">
@@ -290,117 +257,53 @@ const Banking = () => {
         {visibleButton === 1 && (
           <>
             <h3 className="mb-2 font-semibold">Company Bill</h3>
-            <select
-              className="border px-4 py-2 rounded w-full mb-3"
-              value={selectedBuyer}
-              onChange={(e) => setSelectedBuyer(e.target.value)}
-              required
-            >
+            <select className="border px-4 py-2 rounded w-full mb-3" value={selectedBuyer} onChange={(e) => setSelectedBuyer(e.target.value)} required>
               <option value="">-- Select Company Bill --</option>
               {buyerNames.map((name, index) => (
                 <option key={index} value={name}>{name}</option>
               ))}
             </select>
-
-            <select
-              className="border px-4 py-2 rounded w-full mb-3"
-              value={selectedInvoice}
-              onChange={(e) => setSelectedInvoice(e.target.value)}
-            >
+            <select className="border px-4 py-2 rounded w-full mb-3" value={selectedInvoice} onChange={(e) => setSelectedInvoice(e.target.value)}>
               <option value="">-- Select Invoice (Optional) --</option>
               {buyerInvoices.map(inv => (
                 <option key={inv.id} value={inv.invoice_number}>{inv.invoice_number}</option>
               ))}
             </select>
-
-            <input
-              type="date"
-              className="border px-4 py-2 rounded w-full mb-3"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              required
-            />
-
-            <input
-              type="text"
-              placeholder="Notice (Optional)"
-              className="border px-4 py-2 rounded w-full mb-3"
-              value={buyerNotice}
-              onChange={(e) => setBuyerNotice(e.target.value)}
-            />
-
-            <input
-              type="number"
-              placeholder="Deposit Amount*"
-              className="border px-4 py-2 rounded w-full mb-3"
-              value={depositAmount}
-              onChange={(e) => setDepositAmount(e.target.value)}
-              required
-            />
-
-            <button
-              className="bg-blue-600 text-white px-4 py-2 rounded"
-              onClick={handleBuyerSubmit}
-            >
-              Submit Buyer Transaction
-            </button>
+            <input type="date" className="border px-4 py-2 rounded w-full mb-3" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} required />
+            <input type="text" placeholder="Notice (Optional)" className="border px-4 py-2 rounded w-full mb-3" value={buyerNotice} onChange={(e) => setBuyerNotice(e.target.value)} />
+            <input type="number" placeholder="Deposit Amount*" className="border px-4 py-2 rounded w-full mb-3" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} required />
+            <button className="bg-blue-600 text-white px-4 py-2 rounded" onClick={handleBuyerSubmit}>Submit Buyer Transaction</button>
           </>
         )}
+
         {visibleButton === 2 && (
           <>
             <h3 className="mb-2 font-semibold">Buyer Bill</h3>
-            <input
-              type="text"
-              placeholder="Buyer Name*"
-              className="border px-4 py-2 rounded w-full mb-3"
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              required
-            />
-
-            <input
-              type="date"
-              className="border px-4 py-2 rounded w-full mb-3"
-              value={companyDate}
-              onChange={(e) => setCompanyDate(e.target.value)}
-              required
-            />
-
-            <input
-              type="number"
-              placeholder="Amount*"
-              className="border px-4 py-2 rounded w-full mb-3"
-              value={companyAmount}
-              onChange={(e) => setCompanyAmount(e.target.value)}
-              required
-            />
-
-            <input
-              type="text"
-              placeholder="Notice (Optional)"
-              className="border px-4 py-2 rounded w-full mb-3"
-              value={companyNotice}
-              onChange={(e) => setCompanyNotice(e.target.value)}
-            />
-
-            <button
-              className="bg-green-600 text-white px-4 py-2 rounded"
-              onClick={handleCompanySubmit}
-            >
-              Submit Buyer Bill
-            </button>
+            <input type="text" placeholder="Buyer Name*" className="border px-4 py-2 rounded w-full mb-3" value={companyName} onChange={(e) => setCompanyName(e.target.value)} required />
+            <input type="date" className="border px-4 py-2 rounded w-full mb-3" value={companyDate} onChange={(e) => setCompanyDate(e.target.value)} required />
+            <input type="number" placeholder="Amount*" className="border px-4 py-2 rounded w-full mb-3" value={companyAmount} onChange={(e) => setCompanyAmount(e.target.value)} required />
+            <input type="text" placeholder="Notice (Optional)" className="border px-4 py-2 rounded w-full mb-3" value={companyNotice} onChange={(e) => setCompanyNotice(e.target.value)} />
+            <button className="bg-green-600 text-white px-4 py-2 rounded" onClick={handleCompanySubmit}>Submit Buyer Bill</button>
           </>
         )}
 
         {visibleButton === 3 && (
           <>
             <h3 className="mb-2 font-semibold">Salary</h3>
-            <input type="text" placeholder="Enter your name" className="border px-4 py-2 rounded w-full mb-3" value={salarynewname} onChange={(e) => setName(e.target.value)} />
-            <select className="border px-4 py-2 rounded w-full mb-3" value={salaryName} onChange={(e) => setSalaryName(e.target.value)}>
+            <select className="border px-4 py-2 rounded w-full mb-3" value={salaryName} onChange={(e) => {
+              const selected = e.target.value;
+              setSalaryName(selected);
+              const emp = employees.find(emp => emp.name === selected);
+              if (emp) {
+                setSalaryAmount(emp.salary || "");
+              }
+            }}>
               <option value="">-- Select Employee --</option>
-              {buyerNames.map((name, index) => <option key={index} value={name}>{name}</option>)}
+              {employees.map((emp, index) => (
+                <option key={index} value={emp.name}>{emp.name}</option>
+              ))}
             </select>
-            <input type="number" placeholder="Enter amount" className="border px-4 py-2 rounded w-full mb-3" value={salaryAmount} onChange={(e) => setSalaryAmount(e.target.value)} />
+            <input type="number" placeholder="Enter amount" className="border px-4 py-2 rounded w-full mb-3" value={salary} onChange={(e) => setSalaryAmount(e.target.value)} />
             <input type="date" className="border px-4 py-2 rounded w-full mb-3" value={salaryDate} onChange={(e) => setSalaryDate(e.target.value)} />
             <button className="bg-yellow-600 text-white px-4 py-2 rounded" onClick={handleSalarySubmit}>Submit</button>
           </>

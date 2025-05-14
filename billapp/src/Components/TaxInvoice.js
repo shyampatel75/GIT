@@ -299,78 +299,72 @@ const Taxinvoice = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
   // Update the handleSubmit function
+ // Update the handleSubmit function
   const handleSubmit = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  // ✅ Only validate buyer_name
-  if (!formData.buyer_name || formData.buyer_name.trim() === "") {
-    alert("Please enter the buyer's name.");
-    return;
-  }
+    // Format dates
+    const formattedInvoiceDate = formatToISO(formData.invoice_date);
+    const formattedDeliveryDate = formatToISO(formData.delivery_note_date);
 
-  // ✅ Format dates if provided (but don't require them)
-  const formattedInvoiceDate = formData.invoice_date
-    ? formatToISO(formData.invoice_date)
-    : "";
-
-  const formattedDeliveryDate = formData.delivery_note_date
-    ? formatToISO(formData.delivery_note_date)
-    : "";
-
-  if (
-    (formData.invoice_date && !formattedInvoiceDate) ||
-    (formData.delivery_note_date && !formattedDeliveryDate)
-  ) {
-    alert("Please enter valid dates in DD-MM-YYYY or YYYY-MM-DD format.");
-    return;
-  }
-
-  try {
-    const fullInvoiceNumber = `${String(invoice_Number).padStart(2, "0")}-${invoiceYear}`;
-
-    const payload = {
-      ...formData,
-      invoice_number: fullInvoiceNumber,
-      invoice_date: formattedInvoiceDate,
-      delivery_note_date: formattedDeliveryDate,
-      country: selectedCountry.name,
-      currency: selectedCountry.currency,
-    };
-
-    console.log("Payload being sent:", payload);
-
-    const saveResponse = await fetch("http://localhost:8000/api/create/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const responseData = await saveResponse.json();
-
-    if (!saveResponse.ok) {
-      console.error("Server validation errors:", responseData);
-      const errorMessages = Object.values(responseData.errors || {}).flat().join(", ");
-      throw new Error(errorMessages || "Failed to save invoice");
+    if (!formattedInvoiceDate || !formattedDeliveryDate) {
+      alert("Please enter valid dates in DD-MM-YYYY or YYYY-MM-DD format.");
+      return;
     }
 
-    console.log("Invoice saved successfully:", responseData);
+    try {
+      // Use the current invoice_Number state to construct the full invoice number
+      const fullInvoiceNumber = `${String(invoice_Number).padStart(2, "0")}-${invoiceYear}`;
 
-    await generatePDF(fullInvoiceNumber);
+      // Prepare payload with the constructed invoice number
+      const payload = {
+        ...formData,
+        invoice_number: fullInvoiceNumber,
+        invoice_date: formattedInvoiceDate,
+        delivery_note_date: formattedDeliveryDate,
+        country: selectedCountry.name,
+        currency: selectedCountry.currency,
+      };
 
-    setinvoice_Number(prev => {
-      const nextNum = prev + 1;
-      localStorage.setItem('lastInvoiceNumber', nextNum.toString());
-      return nextNum;
-    });
+      console.log("Payload being sent:", payload);
 
-    alert("Invoice created and PDF downloaded successfully!");
-  } catch (error) {
-    console.error("Invoice processing error:", error);
-    alert(`Error: ${error.message}`);
-  }
-};
+      // Save invoice
+      const saveResponse = await fetch("http://localhost:8000/api/create/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const responseData = await saveResponse.json();
+
+      if (!saveResponse.ok) {
+        console.error("Server validation errors:", responseData);
+        const errorMessages = Object.values(responseData.errors || {}).flat().join(", ");
+        throw new Error(errorMessages || "Failed to save invoice");
+      }
+
+      console.log("Invoice saved successfully:", responseData);
+
+      // Generate PDF with the current invoice number
+      await generatePDF(fullInvoiceNumber);
+
+      // Increment the invoice number for next use
+      setinvoice_Number(prev => {
+        const nextNum = prev + 1;
+        // Store in localStorage to persist across reloads
+        localStorage.setItem('lastInvoiceNumber', nextNum.toString());
+        return nextNum;
+      });
+
+      alert("Invoice created and PDF downloaded successfully!");
+
+    } catch (error) {
+      console.error("Invoice processing error:", error);
+      alert(`Error: ${error.message}`);
+    }
+  };
 
 
 

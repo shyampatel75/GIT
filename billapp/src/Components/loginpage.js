@@ -7,16 +7,50 @@ const Login = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (email === "admin@example.com" && password === "admin123") {
-      localStorage.setItem("isAuthenticated", "true");
+
+const handleLogin = async (e) => {
+  e.preventDefault();
+  setError(""); 
+
+  try {
+    const response = await fetch('http://localhost:8000/api/auth/login/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email:email.trim(),
+        password: password
+      }),
+    });
+if (!response.ok) {
+  const errorText = await response.text();
+  console.error("Error:", errorText);  // This will show HTML error page content
+  setError("Login failed. Please check your credentials.");
+  return;
+}
+    const data = await response.json();
+
+
+    if (response.ok) {
+      localStorage.setItem('access_token', data.access);
+      localStorage.setItem('refresh_token', data.refresh);
       navigate("/dashboard");
     } else {
-      alert("Invalid credentials");
+         // Handle known error formats
+      console.error("Login failed:", data);
+      const errorMsg = data?.detail || data?.non_field_errors?.join(" ") || "Login failed";
+      setError(errorMsg);
     }
-  };
+
+  } catch (err) {
+    console.error("Login error:", err);
+    setError("Network error. Please try again.");
+  }
+};
+
 
   const [showPassword, setShowPassword] = useState(false);
   return (
