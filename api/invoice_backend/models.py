@@ -1,68 +1,125 @@
-# bills/models.py
-
 from django.db import models
 from django.utils import timezone
-from django.contrib.auth.models import User
 from datetime import date
+from django.contrib.auth.models import AbstractUser, Group, Permission
+from django.utils.translation import gettext_lazy as _
+from django.conf import settings
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
+from django.contrib.auth import get_user_model
+# models.py
+class CustomUserManager(BaseUserManager):
+    def create_user(self, email, first_name, mobile, password=None, **extra_fields):
+        if not email:
+            raise ValueError('Users must have an email address')
+        email = self.normalize_email(email)
+        user = self.model(
+            email=email,
+            first_name=first_name,
+            mobile=mobile,
+            **extra_fields
+        )
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, first_name, mobile, password, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        return self.create_user(email, first_name, mobile, password, **extra_fields)
+
+class CustomUser(AbstractBaseUser, PermissionsMixin):
+    email = models.EmailField(unique=True)
+    first_name = models.CharField(max_length=100)
+    mobile = models.CharField(max_length=10)
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+    is_superuser = models.BooleanField(default=False)
+
+    objects = CustomUserManager()
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['first_name', 'mobile']
+
+    def __str__(self):
+        return self.email
+
+
 
 
 class Invoice(models.Model):
+    # Buyer Info (required fields)
+    buyer_name = models.CharField(max_length=255)
+    buyer_address = models.TextField()
+    buyer_gst = models.CharField(max_length=20)
+    
+    # Consignee Info (optional)
+    consignee_name = models.CharField(max_length=255, blank=True, null=True)
+    consignee_address = models.TextField(blank=True, null=True)
+    consignee_gst = models.CharField(max_length=20, blank=True, null=True)
 
-    # Buyer Info
-    buyer_name = models.CharField(max_length=255, default='Unknown')
-    buyer_address = models.TextField(default='Not Provided')
-    buyer_gst = models.CharField(max_length=20, default='UNKNOWN')
-
-
-    # Consignee Info
-    consignee_name = models.CharField(max_length=255, default='Unknown')
-    consignee_address = models.TextField(default='Not Provided')
-    consignee_gst = models.CharField(max_length=20, default='UNKNOWN')
-
-    # Invoice details
-    financial_year = models.CharField(max_length=9, default='2025-2026')  # E.g., "2025-2026"
-
+    # Invoice details (date is required)
+    financial_year = models.CharField(max_length=9, default='2025-2026')
     invoice_number = models.CharField(max_length=20, default="01-2025/2026")
-
-    invoice_date = models.DateField(default=timezone.now)
-    delivery_note = models.CharField(max_length=255, default='Not Provided')
-    payment_mode = models.CharField(max_length=100, default='Cash')
-    delivery_note_date = models.DateField(default=timezone.now)
-    destination = models.CharField(max_length=255, default='Not Provided')
-    Terms_to_delivery = models.CharField(max_length=255, default='Not Provided')
+    invoice_date = models.DateField()
+    
+    # Optional fields
+    delivery_note = models.CharField(max_length=255, blank=True, null=True,default='')
+    payment_mode = models.CharField(max_length=100, blank=True, null=True,default='')
+    delivery_note_date = models.DateField(blank=True, null=True)
+    destination = models.CharField(max_length=255, blank=True, null=True,default='')
+    Terms_to_delivery = models.CharField(max_length=255, blank=True, null=True,default='')
     
     # Country and Currency Info
     country = models.CharField(max_length=255, default='India')
     currency = models.CharField(max_length=10, default='INR')
 
     # Product details
-    Particulars = models.CharField(max_length=255, default='Consultancy')
-    hsn_code = models.CharField(max_length=10, default='0000')
-    total_hours = models.FloatField(default=0.0)
-    rate = models.FloatField(default=0.0)
-    base_amount = models.FloatField(default=0.0)
+    Particulars = models.CharField(max_length=255, blank=True, null=True,default='Consultancy')
+    hsn_code = models.CharField(max_length=10, blank=True, null=True,default='0000')
+    total_hours = models.FloatField(blank=True, null=True, default=0.0)
+    rate = models.FloatField(blank=True, null=True, default=0.0)
+    base_amount = models.FloatField()
 
     # Tax details
-    cgst = models.FloatField(default=0.0)
-    sgst = models.FloatField(default=0.0)
-    total_with_gst = models.FloatField(default=0.0)
-    amount_in_words = models.CharField(max_length=255, blank=True)
-    taxtotal = models.FloatField(default=0.0)
+    cgst = models.FloatField(blank=True, null=True, default=0.0)
+    sgst = models.FloatField(blank=True, null=True, default=0.0)
+    total_with_gst = models.FloatField()
+    amount_in_words = models.CharField(max_length=255, blank=True, null=True)
+    taxtotal = models.FloatField(blank=True, null=True, default=0.0)
 
     # Remarks
-    remark = models.TextField(default='No remarks')
+    remark = models.TextField(blank=True, null=True,default='')
 
-    # Created at timestamp
-    created_at = models.DateTimeField(default=timezone.now)
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
-    def _str_(self):
+    def __str__(self):
         return self.invoice_number
 
+    def save(self, *args, **kwargs):
+        # Calculate totals before saving
+        if not self.base_amount:
+            if self.total_hours and self.rate:
+                self.base_amount = self.total_hours * self.rate
+        
+        if self.country == 'India' and self.base_amount:
+            self.cgst = (self.base_amount * 9) / 100
+            self.sgst = (self.base_amount * 9) / 100
+            self.taxtotal = self.cgst + self.sgst
+            self.total_with_gst = self.base_amount + self.taxtotal
+        else:
+            self.cgst = 0
+            self.sgst = 0
+            self.taxtotal = 0
+            self.total_with_gst = self.base_amount
+        
+        super().save(*args, **kwargs)
 
 
 class Setting(models.Model):
     # Seller Info
-    company_name = models.CharField(max_length=255, default='Unknown')
+    seller_name = models.CharField(max_length=255, default='Unknown')
     seller_address = models.TextField(default='Not Provided')
     seller_email = models.EmailField(default='noemail@example.com')
     seller_pan = models.CharField(max_length=20, default='UNKNOWN')
@@ -78,10 +135,21 @@ class Setting(models.Model):
 
     # Company Logo
     logo = models.ImageField(upload_to='', null=True, blank=True)
-
     last_invoice_number = models.IntegerField(default=0)
 
-    def _str_(self):
+
+    # Link to user who owns these settings
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True
+    )
+
+    def __str__(self):
+        return f"{self.seller_name} - Settings"
+
+    def __str__(self):
         return f"{self.seller_name} - Settings"
 
 
@@ -91,7 +159,7 @@ class Statement(models.Model):
     notice = models.TextField(blank=True, null=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
 
-    def _str_(self):
+    def __str__(self):
         return f"Statement ({self.date}) - Invoice {self.invoice.invoice_number}"
 
     @property
@@ -108,7 +176,7 @@ class Deposit(models.Model):
     deposit_date = models.DateField()
     amount = models.DecimalField(max_digits=10, decimal_places=2)
 
-    def _str_(self):
+    def __str__(self):
         return f"₹{self.amount} on {self.deposit_date} for Statement {self.statement.id}"
 
 class Buyer(models.Model):
@@ -139,7 +207,7 @@ class Salary(models.Model):
     salary_amount = models.DecimalField(max_digits=10, decimal_places=2)
     salary_date = models.DateField()
 
-    def _str_(self):
+    def __str__(self):
         return f"{self.salary_name} Salary"
 
 
@@ -148,29 +216,8 @@ class Other(models.Model):
     other_notice = models.TextField()
     other_amount = models.DecimalField(max_digits=10, decimal_places=2)
 
-    def _str_(self):
+    def ___str_(self):
         return f"Other transaction on {self.other_date}"
-
-# for profile page 
-
-class UserProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    email = models.EmailField(unique=True)
-    mobile_number = models.CharField(max_length=15)
-    profile_picture1 = models.ImageField(upload_to='profile_pictures/', null=True, blank=True)
-    profile_picture2 = models.ImageField(upload_to='profile_pictures/', null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def _str_(self):
-        return self.name
-
-    class Meta:
-        verbose_name = 'User Profile'
-        verbose_name_plural = 'User Profiles'
-
-
-
 
 class BankingDeposit(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -178,3 +225,30 @@ class BankingDeposit(models.Model):
 
     def __str__(self):
         return f"{self.amount} on {self.date}"
+
+class Employee(models.Model):
+    name = models.CharField(max_length=100)
+    joining_date = models.DateField()
+    salary = models.DecimalField(max_digits=10, decimal_places=2)
+    email = models.EmailField()
+    number = models.CharField(max_length=15)
+    
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Employee"
+        verbose_name_plural = "Employees"
+
+
+User = get_user_model()
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    image1 = models.ImageField(upload_to='profile_images/', null=True, blank=True)
+    image2 = models.ImageField(upload_to='profile_images/', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Profile for {self.user.email}"

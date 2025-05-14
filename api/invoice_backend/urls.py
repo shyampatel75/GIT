@@ -1,7 +1,8 @@
 from django.urls import path
 from . import views
 from .views import InvoiceDetailView, StatementListAPIView, DepositListAPIView, create_company_transaction, create_buyer_transaction, create_salary_transaction, create_other_transaction
-from .views import UserProfileCreateView, UserProfileDetailView
+from .views import register_user,login_user,get_current_user, MyTokenObtainPairView,user_profile_view
+
 
 urlpatterns = [
     # Invoice paths
@@ -47,22 +48,16 @@ urlpatterns = [
     path('banking/other/', views.create_other_transaction, name='create-other-transaction'),
     path('banking/other/<int:pk>/', views.other_transaction_detail, name='other-transaction-detail'),  # GET for single
 
+    path('banking/employee/', views.employee_list_create, name='employee-list-create'),
+    path('employees/<int:pk>/', views.employee_detail, name='employee-detail'),
 
     path('add-deposit/', views.add_bankingdeposit, name='add-deposit'),
 
+    path('profile/', user_profile_view, name='user-profile'),
 
-   
-    path('banking/company/<int:pk>/', views.company_transaction_detail),
-    path('banking/buyer/<int:pk>/', views.buyer_transaction_detail),
-    path('banking/salary/<int:pk>/', views.salary_transaction_detail),
-    path('banking/other/<int:pk>/', views.other_transaction_detail),
+    path('auth/register/', views.register_user, name='register'),
+    # path('auth/login/', views.login_user, name='login'),
+    path('auth/me/', views.get_current_user, name='current-user'),
+    path('auth/login/', MyTokenObtainPairView.as_view(), name='login'),
 
-
-    # for profile page 
-
-   
-
-
-    path('profile/create/', UserProfileCreateView.as_view(), name='profile-create'),
-    path('profile/me/', UserProfileDetailView.as_view(), name='profile-detail'),
 ]

@@ -1,26 +1,80 @@
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status, generics, permissions
-from .models import Invoice, Setting, UserProfile
-from .models import Statement, Deposit
-from .models import CompanyBill, Buyer, Salary, Other,BankingDeposit
-from .serializers import InvoiceSerializer, SettingSerializer, StatementSerializer, DepositSerializer,CompanyBillSerializer, BuyerSerializer, SalarySerializer, OtherSerializer,BankingDepositSerializer,UserProfileSerializer
+from .models import Invoice, Setting,Statement, Deposit,CompanyBill, Buyer, Salary, Other,BankingDeposit,Employee
+from .serializers import InvoiceSerializer, SettingSerializer, StatementSerializer, DepositSerializer,CompanyBillSerializer, BuyerSerializer, SalarySerializer, OtherSerializer,BankingDepositSerializer,EmployeeSerializer
 from django.contrib.auth.models import User
 from datetime import datetime
-from django.http import JsonResponse
+from django.http import JsonResponse,FileResponse,Http404,HttpResponseBadRequest
 from rest_framework import status
 from django.views.decorators.csrf import csrf_exempt
-from django.http import FileResponse,Http404
 from django.http import HttpResponse
-from django.shortcuts import get_object_or_404
 from django.template.loader import get_template
-import os
-import json
 import io
 from xhtml2pdf import pisa
 import traceback
-from django.http import HttpResponseBadRequest
-from django.core.files.storage import default_storage
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .serializers import MyTokenObtainPairSerializer, RegisterSerializer, UserSerializer
+from django.contrib.auth import get_user_model
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework_simplejwt.tokens import RefreshToken
+from .models import UserProfile
+from .serializers import UserProfileSerializer
+
+
+class MyTokenObtainPairView(TokenObtainPairView):
+    serializer_class = MyTokenObtainPairSerializer
+# ========================
+# 🔐 Authentication APIs (Function-Based)
+# ========================
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def register_user(request):
+    try:
+        serializer = RegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            return Response({
+                'user': UserSerializer(user).data,
+                'message': 'User created successfully'
+            }, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())  # This will print the full traceback in terminal
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# views.py
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def login_user(request):
+    serializer = MyTokenObtainPairSerializer(data=request.data)
+    try:
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            'user': UserSerializer(user).data,
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+            'message': 'Login successful'
+        })
+    except Exception as e:
+        print(f"Login error: {e}")
+        return Response({'error': str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+    
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_current_user(request):
+    """Get current authenticated user"""
+    serializer = UserSerializer(request.user)
+    return Response(serializer.data)
+
+
+
+
 
 # ========================
 # 📦 Invoice APIs
@@ -42,8 +96,6 @@ class DepositListAPIView(generics.ListAPIView):
         statement_id = self.kwargs['statement_id']
         return Deposit.objects.filter(statement_id=statement_id) 
     
-
-
 def download_invoice_pdf(request, invoice_id):
     try:
         invoice = Invoice.objects.get(pk=invoice_id)
@@ -70,9 +122,6 @@ def download_invoice_pdf(request, invoice_id):
         print("Unexpected Error in download_invoice_pdf:", str(e))
         print(traceback.format_exc())
         return HttpResponse(f'Error: {str(e)}', status=500)
-
-
-
 
 def get_next_invoice_number():
     current_year = datetime.now().year
@@ -140,16 +189,24 @@ def create_invoice(request):
             data['invoice_number'] = invoice_number
             data['financial_year'] = financial_year
 
+        # Calculate base amount if rate and hours are provided
+        if data.get('rate') and data.get('total_hours'):
+            try:
+                rate = float(data['rate'])
+                hours = float(data['total_hours'])
+                data['base_amount'] = rate * hours
+            except (ValueError, TypeError):
+                pass
+
         serializer = InvoiceSerializer(data=data)
         if serializer.is_valid():
             invoice = serializer.save()
 
-             # Update the last_invoice_number in the settings after creating the invoice
+            # Update the last_invoice_number in the settings
             setting = Setting.objects.first()
             if setting:
                 setting.last_invoice_number = int(invoice.invoice_number.split('-')[0])
                 setting.save()
-
 
             return Response({
                 "status": "success",
@@ -157,10 +214,12 @@ def create_invoice(request):
                 "data": serializer.data,
                 "next_invoice_number": get_next_invoice_number()[0]
             }, status=status.HTTP_201_CREATED)
+            
         return Response({
             "status": "error",
             "errors": serializer.errors
         }, status=status.HTTP_400_BAD_REQUEST)
+        
     except Exception as e:
         return Response({
             "status": "error",
@@ -269,9 +328,8 @@ def signup_user(request):
 
     user = User.objects.create_user(username=username, email=email, password=password)
     user.save()
+
     return Response({'message': 'User created successfully'}, status=status.HTTP_201_CREATED)
-
-
 
 def get_next_invoice_number():
     current_year = datetime.now().year
@@ -300,9 +358,6 @@ def get_next_invoice_number():
         next_num = 1
     
     return f"{next_num:02d}-{financial_year}", financial_year
-
-
-
 
 # ========================
 # 👥 Banking Transaction APIs
@@ -456,6 +511,7 @@ def other_transaction_detail(request, pk):
     elif request.method == 'DELETE':
         transaction.delete()
         return Response({"detail": "Deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+    
 @api_view(['GET', 'POST'])
 def add_bankingdeposit(request):
     if request.method == 'POST':
@@ -472,18 +528,84 @@ def add_bankingdeposit(request):
         serializer = BankingDepositSerializer(deposits, many=True)
         return Response(serializer.data)
 
-# for profile page 
 
+@api_view(['GET', 'POST'])
+def employee_list_create(request):
+    if request.method == 'GET':
+        employees = Employee.objects.all()
+        serializer = EmployeeSerializer(employees, many=True)
+        return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        serializer = EmployeeSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class UserProfileCreateView(generics.CreateAPIView):
-    queryset = UserProfile.objects.all()
-    serializer_class = UserProfileSerializer
-    permission_classes = [permissions.AllowAny]
+@api_view(['GET', 'PUT', 'DELETE'])
+def employee_detail(request, pk):
+    try:
+        employee = Employee.objects.get(pk=pk)
+    except Employee.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
 
-class UserProfileDetailView(generics.RetrieveUpdateAPIView):
-    queryset = UserProfile.objects.all()
-    serializer_class = UserProfileSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    if request.method == 'GET':
+        serializer = EmployeeSerializer(employee)
+        return Response(serializer.data)
 
-    def get_object(self):
-        return self.request.user.profile
+    elif request.method == 'PUT':
+        serializer = EmployeeSerializer(employee, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        employee.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)  
+    
+      
+@api_view(['GET', 'POST', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def user_profile_view(request):
+    try:
+        profile, created = UserProfile.objects.get_or_create(user=request.user)
+        
+        if request.method == 'GET':
+            serializer = UserProfileSerializer(profile, context={'request': request})
+            return Response(serializer.data)
+        
+        elif request.method == 'POST':
+            # Delete old images if new ones are uploaded
+            if 'image1' in request.FILES:
+                if profile.image1:  # Check if there's an existing image
+                    profile.image1.delete()  # Delete old image
+                profile.image1 = request.FILES['image1']  # Assign new image
+            
+            if 'image2' in request.FILES:
+                if profile.image2:
+                    profile.image2.delete()
+                profile.image2 = request.FILES['image2']
+            
+            # Save the profile with new images
+            profile.save()
+            
+            # Serialize and return the updated profile
+            serializer = UserProfileSerializer(profile, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+            
+        elif request.method == 'DELETE':
+            # Clean up files before deleting profile
+            if profile.image1:
+                profile.image1.delete()
+            if profile.image2:
+                profile.image2.delete()
+            profile.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+            
+    except Exception as e:
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
