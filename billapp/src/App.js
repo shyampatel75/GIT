@@ -25,6 +25,7 @@ import Profile from "./Components/Profile.js";
 import ClientInvoices from "./Components/ClientInvoices.js";
 import Buyer from "./Components/Buyer.js";
 import EditInvoice from "./Components/EditInvoice.js";
+import Employee from "./Components/Employee.js";
 
 
 
@@ -68,6 +69,7 @@ const AppContent = () => {
           <Route path="/client-invoices" element={<ClientInvoices />} />
           <Route path="/buyer" element={<Buyer />} />
           <Route path="/edit-invoice/:invoiceId" element={<EditInvoice />} />
+          <Route path="/employee" element={<Employee />} />
 
         </Routes>
       </div>

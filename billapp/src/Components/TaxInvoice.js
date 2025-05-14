@@ -23,7 +23,7 @@ const Taxinvoice = () => {
   const [countries, setCountries] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedCountry, setSelectedCountry] = useState({
-    name: "India",  
+    name: "India",
     currency: "₹",
   });
   const [isOpen, setIsOpen] = useState(false);
@@ -38,10 +38,9 @@ const Taxinvoice = () => {
   const [destination, setDestination] = useState("");
   const [billToAddress, setBillToAddress] = useState("");
   const [gstConsultancy, setGstConsultancy] = useState("");
-  // const [remark, setremark] = useState("");
-  // At the top of your component with other state declarations
+
   const [invoice_Number, setinvoice_Number] = useState(() => {
-    // Initialize from localStorage or default to 1
+
     const savedNumber = localStorage.getItem('lastInvoiceNumber');
     return savedNumber ? parseInt(savedNumber) : 1;
   });
@@ -88,7 +87,7 @@ const Taxinvoice = () => {
     country: "",
     currency: "",
     Particulars: "",
-    hsn_code: "",
+    hsn_code: "9983",
     total_hours: "",
     rate: "",
     base_amount: "",
@@ -265,14 +264,14 @@ const Taxinvoice = () => {
   const filteredCountries = countries.filter((country) =>
     country.name.toLowerCase().includes(search.toLowerCase())
   );
-  const handleSelectChange = (event) => {
-    const selectedValue = event.target.value;
-    setSelectedHsn(selectedValue); // update the select box
-    setFormData((prev) => ({
-      ...prev,
-      hsn_code: selectedValue, // update the form data too
+  const handleSelectChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prevData) => ({
+      ...prevData,
+      [name]: value,
     }));
   };
+
   useEffect(() => {
     if (selectedCountry) {
       setFormData((prev) => ({
@@ -301,70 +300,77 @@ const Taxinvoice = () => {
   };
   // Update the handleSubmit function
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    // Format dates
-    const formattedInvoiceDate = formatToISO(formData.invoice_date);
-    const formattedDeliveryDate = formatToISO(formData.delivery_note_date);
+  // ✅ Only validate buyer_name
+  if (!formData.buyer_name || formData.buyer_name.trim() === "") {
+    alert("Please enter the buyer's name.");
+    return;
+  }
 
-    if (!formattedInvoiceDate || !formattedDeliveryDate) {
-      alert("Please enter valid dates in DD-MM-YYYY or YYYY-MM-DD format.");
-      return;
+  // ✅ Format dates if provided (but don't require them)
+  const formattedInvoiceDate = formData.invoice_date
+    ? formatToISO(formData.invoice_date)
+    : "";
+
+  const formattedDeliveryDate = formData.delivery_note_date
+    ? formatToISO(formData.delivery_note_date)
+    : "";
+
+  if (
+    (formData.invoice_date && !formattedInvoiceDate) ||
+    (formData.delivery_note_date && !formattedDeliveryDate)
+  ) {
+    alert("Please enter valid dates in DD-MM-YYYY or YYYY-MM-DD format.");
+    return;
+  }
+
+  try {
+    const fullInvoiceNumber = `${String(invoice_Number).padStart(2, "0")}-${invoiceYear}`;
+
+    const payload = {
+      ...formData,
+      invoice_number: fullInvoiceNumber,
+      invoice_date: formattedInvoiceDate,
+      delivery_note_date: formattedDeliveryDate,
+      country: selectedCountry.name,
+      currency: selectedCountry.currency,
+    };
+
+    console.log("Payload being sent:", payload);
+
+    const saveResponse = await fetch("http://localhost:8000/api/create/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const responseData = await saveResponse.json();
+
+    if (!saveResponse.ok) {
+      console.error("Server validation errors:", responseData);
+      const errorMessages = Object.values(responseData.errors || {}).flat().join(", ");
+      throw new Error(errorMessages || "Failed to save invoice");
     }
 
-    try {
-      // Use the current invoice_Number state to construct the full invoice number
-      const fullInvoiceNumber = `${String(invoice_Number).padStart(2, "0")}-${invoiceYear}`;
+    console.log("Invoice saved successfully:", responseData);
 
-      // Prepare payload with the constructed invoice number
-      const payload = {
-        ...formData,
-        invoice_number: fullInvoiceNumber,
-        invoice_date: formattedInvoiceDate,
-        delivery_note_date: formattedDeliveryDate,
-        country: selectedCountry.name,
-        currency: selectedCountry.currency,
-      };
+    await generatePDF(fullInvoiceNumber);
 
-      console.log("Payload being sent:", payload);
+    setinvoice_Number(prev => {
+      const nextNum = prev + 1;
+      localStorage.setItem('lastInvoiceNumber', nextNum.toString());
+      return nextNum;
+    });
 
-      // Save invoice
-      const saveResponse = await fetch("http://localhost:8000/api/create/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const responseData = await saveResponse.json();
-
-      if (!saveResponse.ok) {
-        console.error("Server validation errors:", responseData);
-        const errorMessages = Object.values(responseData.errors || {}).flat().join(", ");
-        throw new Error(errorMessages || "Failed to save invoice");
-      }
-
-      console.log("Invoice saved successfully:", responseData);
-
-      // Generate PDF with the current invoice number
-      await generatePDF(fullInvoiceNumber);
-
-      // Increment the invoice number for next use
-      setinvoice_Number(prev => {
-        const nextNum = prev + 1;
-        // Store in localStorage to persist across reloads
-        localStorage.setItem('lastInvoiceNumber', nextNum.toString());
-        return nextNum;
-      });
-
-      alert("Invoice created and PDF downloaded successfully!");
-
-    } catch (error) {
-      console.error("Invoice processing error:", error);
-      alert(`Error: ${error.message}`);
-    }
-  };
+    alert("Invoice created and PDF downloaded successfully!");
+  } catch (error) {
+    console.error("Invoice processing error:", error);
+    alert(`Error: ${error.message}`);
+  }
+};
 
 
 
@@ -375,10 +381,10 @@ const Taxinvoice = () => {
       alert("PDF content not found.");
       return;
     }
-  
+
     const originalVisibility = input.style.visibility;
     input.style.visibility = "visible";
-  
+
     try {
       const logoImg = input.querySelector("img");
       if (logoImg && !logoImg.complete) {
@@ -387,26 +393,26 @@ const Taxinvoice = () => {
           logoImg.onerror = reject;
         });
       }
-  
+
       const canvas = await html2canvas(input, {
         scale: 2,
         useCORS: true,
         logging: true,
         allowTaint: true
       });
-  
+
       const pdf = new jsPDF("p", "mm", "a4");
       const margin = 2;
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-  
+
       const contentWidth = pageWidth - 1 * margin;
       let contentHeight = (canvas.height * contentWidth) / canvas.width;
-  
+
       if (contentHeight + margin > pageHeight) {
         contentHeight = pageHeight - margin; // Set bottom padding to 0
       }
-  
+
       pdf.addImage(
         canvas.toDataURL("image/png"),
         "PNG",
@@ -415,7 +421,7 @@ const Taxinvoice = () => {
         contentWidth,
         contentHeight
       );
-  
+
       pdf.save(`Invoice_${invoiceNumber}.pdf`);
     } catch (error) {
       console.error("PDF generation error:", error);
@@ -424,8 +430,8 @@ const Taxinvoice = () => {
       input.style.visibility = originalVisibility;
     }
   };
-  
-  
+
+
 
 
   const getNextInvoiceNumber = async () => {
@@ -458,89 +464,6 @@ const Taxinvoice = () => {
       return null;
     }
   };
-
-
-
-  // const generatePDF = async () => {
-  //   const input = pdfRef.current;
-
-  //   if (!input) {
-  //     alert("PDF content not found.");
-  //     return;
-  //   }
-
-  //   // 📌 Get auto-incremented invoice number
-  //   const finalInvoiceNumber = await getNextInvoiceNumber();
-
-  //   // Prepare form data for backend
-  //   const updatedFormData = {
-  //     ...formData,
-  //     invoice_number: finalInvoiceNumber,
-  //     invoice_date: new Date().toISOString().split("T")[0],
-  //     financial_year: finalInvoiceNumber.split("-")[1],
-  //   };
-
-  //   // Show content temporarily for screenshot
-  //   input.style.visibility = "visible";
-
-  //   // ✅ Wait for logo image to load (if any)
-  //   const logoImg = input.querySelector("img");
-  //   const waitForImageLoad = logoImg
-  //     ? new Promise((resolve, reject) => {
-  //         if (logoImg.complete) {
-  //           resolve();
-  //         } else {
-  //           logoImg.onload = resolve;
-  //           logoImg.onerror = reject;
-  //         }
-  //       })
-  //     : Promise.resolve();
-
-  //   // 🌟 Generate PDF after ensuring everything is ready
-  //   waitForImageLoad
-  //     .then(() => {
-  //       setTimeout(() => {
-  //         html2canvas(input, { scale: 2, useCORS: true })
-  //           .then((canvas) => {
-  //             const imgData = canvas.toDataURL("image/png");
-  //             const pdf = new jsPDF("p", "mm", "a4");
-  //             const imgWidth = 190;
-  //             const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-  //             pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
-  //             pdf.save(`Invoice-${formData.buyer_name}-${finalInvoiceNumber}.pdf`);
-
-
-  //             input.style.visibility = "hidden";
-
-  //             // Save to backend
-  //             return fetch("http://localhost:8000/api/invoices/", {
-  //               method: "POST",
-  //               headers: {
-  //                 "Content-Type": "application/json",
-  //               },
-  //               body: JSON.stringify(updatedFormData),
-  //             });
-  //           })
-  //           .then((res) => {
-  //             if (!res.ok) {
-  //               throw new Error("Failed to save invoice to backend.");
-  //             }
-  //             return res.json();
-  //           })
-  //           .then((data) => {
-  //             console.log("Invoice saved successfully:", data);
-  //           })
-  //           .catch((error) => {
-  //             console.error("PDF generation/save error:", error);
-  //           });
-  //       }, 100);
-  //     })
-  //     .catch((err) => {
-  //       console.error("Logo image failed to load:", err);
-  //       alert("Logo image couldn't be loaded for PDF.");
-  //     });
-  // };
 
 
   // Auto calculate total with GST and tax fields
@@ -578,6 +501,11 @@ const Taxinvoice = () => {
     }
   };
 
+  useEffect(() => {
+    calculateTotal(); // Whenever formData.base_amount changes, recalculate
+  }, [formData.base_amount]);
+
+
   if (!data) return <p className="text-center mt-4">Loading settings...</p>;
   return (
     <div style={{ paddingLeft: "70px", fontFamily: "Arial, sans-serif" }} onSubmit={handleSubmit}>
@@ -588,12 +516,12 @@ const Taxinvoice = () => {
           <div className="row date-tables">
             <div className="col-6">
               {/* Seller Info */}
-              <table className="table table-bordered black-bordered" style={{ border: "2px solid" }}>
+              <table className="table table-bordered black-bordered" >
                 <tbody>
-                  <tr style={{ border: "2px solid" }} >
+                  <tr>
                     <td className="gray-background" >
                       <strong style={{ fontSize: "15px", fontfamily: "Arial, sans-serif" }}>
-                        Grabsolve Infotech:
+                        {data.company_name}
                       </strong>
                     </td>
                   </tr>
@@ -607,7 +535,7 @@ const Taxinvoice = () => {
                       <br />
                     </td>
                   </tr>
-                  <tr style={{ border: "2px solid" }}>
+                  <tr >
                     <td className="gray-background">
                       <strong>  GSTIN/UIN:</strong>{data.seller_gstin}
                     </td>
@@ -632,6 +560,8 @@ const Taxinvoice = () => {
                         className="billToTitle"
                         value={formData.buyer_name}
                         onChange={handleChange}
+                        required
+                        style={{ border: !formData.buyer_name ? '1px solid red' : '' }}
                       />
                       <br />
                       Address:
@@ -766,7 +696,7 @@ const Taxinvoice = () => {
                     <td>Delivery Note Date</td>
                     <td>
                       <input
-                        type="text"
+                        type="date" // ✅ Use "date" for a date picker
                         name="delivery_note_date"
                         className="deliveryNote"
                         value={formData.delivery_note_date}
@@ -774,6 +704,7 @@ const Taxinvoice = () => {
                       />
                     </td>
                   </tr>
+
                   <tr>
                     <td>Destination</td>
                     <td>
@@ -876,15 +807,15 @@ const Taxinvoice = () => {
 
           <div className="row">
             <div className="col-xs-12">
-              <table className="table table-bordered black-bordered">
+              <table className="table table-bordered black-bordered" style={{ textAlign: "center" }}>
                 <thead>
-                  <tr className="trbody">
-                    <th>SI No.</th>
-                    <th>Particulars</th>
-                    <th>HSN/SAC</th>
-                    <th>Hours</th>
-                    <th>Rate</th>
-                    <th>Amount</th>
+                  <tr className="trbody" >
+                    <th style={{ backgroundColor: "#f1f3f4" }}>SI No.</th>
+                    <th style={{ backgroundColor: "#f1f3f4" }}>Particulars</th>
+                    <th style={{ backgroundColor: "#f1f3f4" }}>HSN/SAC</th>
+                    <th style={{ backgroundColor: "#f1f3f4" }}>Hours</th>
+                    <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                    <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -899,17 +830,19 @@ const Taxinvoice = () => {
                         type="text"
                       />
                     </td>
-                    <td style={{ width: "130px" }}>
+                    <td style={{ width: "130px", paddingTop: "16px" }}>
                       <select
                         name="hsn_code"
                         id="hns_select"
                         onChange={handleSelectChange}
                         value={formData.hsn_code}
+                        style={{ height: "46px" }}
                       >
                         <option value="9983">9983</option>
                         <option value="8523">8523</option>
                       </select>
                     </td>
+
                     <td style={{ width: "10%" }}>
                       <input
                         type="number"
@@ -939,16 +872,14 @@ const Taxinvoice = () => {
                         {selectedCountry.currency}
                       </span>
                       <input
-                        style={{ width: "90%" }}
+                        style={{ width: "80%" }}
                         id="baseAmount"
                         name="base_amount"
                         type="number"
                         value={formData.base_amount}
-                        onChange={(e) => {
-                          handleChange(e); // Update formData
-                          calculateTotal(); // Recalculate totals like GST
-                        }}
+                        onChange={handleChange}
                       />
+
                     </td>
                   </tr>
                   {selectedCountry.name === "India" && (
@@ -961,16 +892,8 @@ const Taxinvoice = () => {
                       <td></td>
                       <td>9%</td>
                       <td id="cgst">
-                        <span className="currency-sym">₹</span>
-                        <input
-                          style={{ width: "90%" }}
-                          name="cgst"
-                          type="number"
-                          step="0.01"
-                          placeholder="CGST"
-                          value={formData.cgst}
-                          readOnly
-                        />
+                        <span className="currency-sym">{selectedCountry.currency}  </span>
+                        {formData.cgst}
                       </td>
                     </tr>
                   )}
@@ -985,16 +908,8 @@ const Taxinvoice = () => {
                       <td></td>
                       <td>9%</td>
                       <td id="sgst">
-                        <span className="currency-sym">₹</span>
-                        <input
-                          style={{ width: "90%" }}
-                          name="sgst"
-                          type="number"
-                          step="0.01"
-                          placeholder="SGST"
-                          value={formData.sgst}
-                          readOnly
-                        />
+                        <span className="currency-sym">{selectedCountry.currency} </span>
+                        {formData.sgst}
                       </td>
                     </tr>
                   )}
@@ -1007,15 +922,7 @@ const Taxinvoice = () => {
                         <span className="currency-sym">
                           {selectedCountry.currency}
                         </span>
-                        <input
-                          style={{ width: "90%" }}
-                          name="total_with_gst"
-                          type="number"
-                          step="0.01"
-                          placeholder="Total with GST"
-                          value={formData.total_with_gst}
-                          readOnly
-                        />
+                        {formData.total_with_gst}
                       </strong>
                     </td>
                   </tr>
@@ -1049,25 +956,25 @@ const Taxinvoice = () => {
                 <table className="table table-bordered invoice-table">
                   <thead>
                     <tr>
-                      <th rowSpan="2">HSN/SAC</th>
-                      <th rowSpan="2">Taxable Value</th>
-                      <th colSpan="2">Central Tax</th>
-                      <th colSpan="2">State Tax</th>
-                      <th colSpan="2" rowSpan="2">
+                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Central Tax</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">State Tax</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2" rowSpan="2">
                         Total Tax Amount
                       </th>
                     </tr>
                     <tr>
-                      <th>Rate</th>
-                      <th>Amount</th>
-                      <th>Rate</th>
-                      <th>Amount</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
                       <td>
-                        <span className="hns_select_text">{selectedHsn}</span>
+                        <span className="hns_select_text">{formData.hsn_code}</span>
                       </td>
                       <td className="taxable-value">{formData.base_amount}</td>
                       <td>9%</td>
@@ -1162,7 +1069,7 @@ const Taxinvoice = () => {
           // // left: "-9999px",
           // // visibility: "hidden",
           fontFamily: "Arial, sans-serif",
-          color:"#575757"
+          color: "#575757"
         }}
         className="bg-white p-4 rounded shadow mt-4"
       >
@@ -1381,15 +1288,15 @@ const Taxinvoice = () => {
 
             <div className="row">
               <div className="col-xs-12">
-                <table className="table table-bordered black-bordered" style={{textAlign:"center"}}>
+                <table className="table table-bordered black-bordered" style={{ textAlign: "center" }}>
                   <thead>
                     <tr className="trbody" >
-                      <th style={{ backgroundColor: "#f1f3f4"}}>SI No.</th>
-                      <th style={{ backgroundColor: "#f1f3f4"}}>Particulars</th>
-                      <th style={{ backgroundColor: "#f1f3f4"}}>HSN/SAC</th>
-                      <th style={{ backgroundColor: "#f1f3f4"}}>Hours</th>
-                      <th style={{ backgroundColor: "#f1f3f4"}}>Rate</th>
-                      <th style={{ backgroundColor: "#f1f3f4"}}>Amount</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>SI No.</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Particulars</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>HSN/SAC</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Hours</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
                     </tr>
                   </thead>
 
@@ -1483,25 +1390,25 @@ const Taxinvoice = () => {
                   <table className="table table-bordered invoice-table">
                     <thead>
                       <tr>
-                        <th style={{ backgroundColor: "#f1f3f4"}} rowSpan="2">HSN/SAC</th>
-                        <th style={{ backgroundColor: "#f1f3f4"}} rowSpan="2">Taxable Value</th>
-                        <th style={{ backgroundColor: "#f1f3f4"}} colSpan="2">Central Tax</th>
-                        <th style={{ backgroundColor: "#f1f3f4"}} colSpan="2">State Tax</th>
-                        <th style={{ backgroundColor: "#f1f3f4"}} colSpan="2" rowSpan="2">
+                        <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
+                        <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
+                        <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Central Tax</th>
+                        <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">State Tax</th>
+                        <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2" rowSpan="2">
                           Total Tax Amount
                         </th>
                       </tr>
                       <tr>
-                        <th style={{ backgroundColor: "#f1f3f4"}}>Rate</th>
-                        <th style={{ backgroundColor: "#f1f3f4"}}>Amount</th>
-                        <th style={{ backgroundColor: "#f1f3f4"}}>Rate</th>
-                        <th style={{ backgroundColor: "#f1f3f4"}}>Amount</th>
+                        <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                        <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                        <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                        <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr>
                         <td>
-                          <span className="hns_select_text">{selectedHsn}</span>
+                          <span className="hns_select_text">{formData.hsn_code}</span>
                         </td>
                         <td className="taxable-value">
                           {formData.base_amount}
@@ -1583,7 +1490,7 @@ const Taxinvoice = () => {
               </div>
             </div>
           </div>
-          <p className="text-center" style={{marginBottom: "0px"}}>This is a Computer Generated Invoice</p>
+          <p className="text-center" style={{ marginBottom: "0px" }}>This is a Computer Generated Invoice</p>
         </div>
       </div>
       <div className="pdfbutton">

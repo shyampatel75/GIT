@@ -38,7 +38,7 @@ const EditInvoice = () => {
         consignee_name: "",
         consignee_address: "",
         consignee_gst: "",
-        invoice_Number: "",
+        invoice_number: "",
         invoice_date: "",
         delivery_note: "",
         payment_mode: "",
@@ -126,7 +126,7 @@ const EditInvoice = () => {
                     consignee_name: data.consignee_name || "",
                     consignee_address: data.consignee_address || "",
                     consignee_gst: data.consignee_gst || "",
-                    invoice_Number: data.invoice_Number || "",
+                    invoice_number: data.invoice_number || "",
                     invoice_date: data.invoice_date || "",
                     delivery_note: data.delivery_note || "",
                     payment_mode: data.payment_mode || "",
@@ -201,38 +201,38 @@ const EditInvoice = () => {
     };
 
     const generatePDF = () => {
-    const input = invoiceRef.current;
-    html2canvas(input, {
-        scale: 2,
-        useCORS: true,
-    }).then((canvas) => {
-        const imgData = canvas.toDataURL("image/png");
-        const pdf = new jsPDF("p", "mm", "a4");
+        const input = invoiceRef.current;
+        html2canvas(input, {
+            scale: 2,
+            useCORS: true,
+        }).then((canvas) => {
+            const imgData = canvas.toDataURL("image/png");
+            const pdf = new jsPDF("p", "mm", "a4");
 
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        const margin = 10;
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const margin = 10;
 
-        const usableWidth = pdfWidth - margin * 2;
-        const usableHeight = pdfHeight - margin * 2;
+            const usableWidth = pdfWidth - margin * 2;
+            const usableHeight = pdfHeight - margin * 2;
 
-        const imgProps = pdf.getImageProperties(imgData);
-        let imgWidth = usableWidth;
-        let imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+            const imgProps = pdf.getImageProperties(imgData);
+            let imgWidth = usableWidth;
+            let imgHeight = (imgProps.height * imgWidth) / imgProps.width;
 
-        // If image height exceeds usable height, scale it down
-        if (imgHeight > usableHeight) {
-            imgHeight = usableHeight;
-            imgWidth = (imgProps.width * imgHeight) / imgProps.height;
-        }
+            // If image height exceeds usable height, scale it down
+            if (imgHeight > usableHeight) {
+                imgHeight = usableHeight;
+                imgWidth = (imgProps.width * imgHeight) / imgProps.height;
+            }
 
-        const x = margin + (usableWidth - imgWidth) / 2;
-        const y = margin + (usableHeight - imgHeight) / 2;
+            const x = margin + (usableWidth - imgWidth) / 2;
+            const y = margin + (usableHeight - imgHeight) / 2;
 
-        pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
-        pdf.save(`Invoice_${invoiceId}.pdf`);
-    });
-};
+            pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
+            pdf.save(`Invoice_${invoiceId}.pdf`);
+        });
+    };
 
 
     const copyBillToShip = (e) => {
@@ -546,10 +546,9 @@ const EditInvoice = () => {
                                             <input
                                                 type="text"
                                                 style={{ width: "75%", margin: "1px 5px 1px 5px" }}
-                                                name="invoice_Number"
-                                                className="invoice_Number"
-                                              value={`${String(formData.invoice_Number ?? 1).toString().padStart(2, "0")}-${invoiceYear}`}
-
+                                                name="invoice_number"
+                                                className="invoice_number"
+                                                value={formData.invoice_number}
                                                 readOnly
                                             />
                                         </td>
@@ -648,7 +647,7 @@ const EditInvoice = () => {
                                     className="border border-gray-300 p-2 rounded flex items-center justify-between cursor-pointer bg-white"
                                     onClick={() => setIsOpen(!isOpen)}
                                 >
-                                    <div className="flex items-center" style={{ height: "30px"}}>
+                                    <div className="flex items-center" style={{ height: "30px" }}>
                                         {selectedCountry.flag && (
                                             <img
                                                 src={selectedCountry.flag}
@@ -1090,7 +1089,7 @@ const EditInvoice = () => {
                         <div className="col-6">
                             <table className="table black-bordered">
                                 <tbody>
-                                    <tr><td>Invoice No.</td><td>{`${String(formData.invoice_Number).padStart(2, "0")}-${invoiceYear}`}</td></tr>
+                                    <tr><td>Invoice No.</td><td>{`${String(formData.invoice_number).padStart(2, "0")}-${invoiceYear}`}</td></tr>
                                     <tr><td>Date</td><td>{formData.invoice_date}</td></tr>
                                     <tr><td>Delivery Note</td><td>{formData.delivery_note}</td></tr>
                                     <tr><td>Mode/Terms of Payment</td><td>{formData.payment_mode}</td></tr>
@@ -1108,7 +1107,7 @@ const EditInvoice = () => {
 
                             <div className="relative w-72">
                                 <p><strong>Country and currency:</strong></p>
-                                <div className="flex items-center"  style={{border:"1px solid black", padding:"10px", borderRadius:"10px" }}>
+                                <div className="flex items-center" style={{ border: "1px solid black", padding: "10px", borderRadius: "10px" }}>
                                     {selectedCountry.flag && (
                                         <img src={selectedCountry.flag} alt="flag" style={{ width: "20px", marginRight: "8px" }} />
                                     )}
@@ -1165,23 +1164,23 @@ const EditInvoice = () => {
                     </div>
 
                     <div className="row">
-              <div className="col-xs-12">
-                <div className="table-bordered black-bordered amount-box">
-                  <div>
-                    <p>
-                      <strong>Amount Chargeable (in words):</strong>
-                    </p>
-                    <h4 className="total-in-words">
-                      <span className="currency-text">INR</span>{" "}
-                      {numberToWords(Math.floor(formData.total_with_gst))}
-                    </h4>
-                    <div className="top-right-corner">
-                      <span>E. & O.E</span>
+                        <div className="col-xs-12">
+                            <div className="table-bordered black-bordered amount-box">
+                                <div>
+                                    <p>
+                                        <strong>Amount Chargeable (in words):</strong>
+                                    </p>
+                                    <h4 className="total-in-words">
+                                        <span className="currency-text">INR</span>{" "}
+                                        {numberToWords(Math.floor(formData.total_with_gst))}
+                                    </h4>
+                                    <div className="top-right-corner">
+                                        <span>E. & O.E</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                  </div>
-                </div>
-              </div>
-            </div>
 
                     {selectedCountry.name === "India" && (
                         <div className="row" style={{ padding: "10px" }}>

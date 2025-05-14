@@ -57,7 +57,7 @@ const BalanceSheet = () => {
   }
 
   return (
-    <div className="p-6 md:pl-24">
+    <div className="p-6 md:pl-24" style={{ paddingLeft: "100px" }}>
       <h1 className="text-2xl font-bold mb-6">Balance Sheet</h1>
 
       {/* Total Deposits */}
@@ -66,13 +66,14 @@ const BalanceSheet = () => {
         <p className="text-xl font-mono">₹ {totalDepositAmount.toFixed(2)}</p>
       </div>
 
-      {/* Grid Layout for Buyers and Invoices */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Buyer Transactions */}
-        <div>
+      {/* Flex Layout for Buyers and Invoices */}
+      <div className="d-flex flex-row mb-6">
+        {/* Buyer Transactions (Left) */}
+        <div className="w-50 pr-4">
           {buyerTransactions.length > 0 ? (
-            <div className="overflow-x-auto shadow-md rounded-lg">
-              <table className="w-full bg-white border border-gray-200">
+            <div>
+              <h2 className="text-lg font-semibold mb-2">Buyer Deposits</h2>
+              <table className="w-100 bg-white border border-gray-200">
                 <thead className="bg-gray-100">
                   <tr>
                     <th className="py-3 px-4 border-b text-left">Buyer Name</th>
@@ -104,46 +105,44 @@ const BalanceSheet = () => {
           )}
         </div>
 
-        {/* Invoices */}
-        <div>
+        {/* Invoices (Right) */}
+        {/* Invoices (Right) */}
+        <div className="w-50 pl-4">
           {invoices.length > 0 ? (
-            <div className="overflow-x-auto shadow-md rounded-lg">
-              <table className="w-full bg-white border border-gray-200">
+            <div>
+              <h2 className="text-lg font-semibold mb-2">Buyer Invoices</h2>
+              <table className="w-100 bg-white border border-gray-200">
                 <thead>
                   <tr className="bg-gray-100">
                     <th className="py-3 px-4 border-b text-left">Invoice Date</th>
                     <th className="py-3 px-4 border-b text-left">Buyer Name</th>
-                    <th className="py-3 px-4 border-b text-right">Total with GST</th>
+                    <th className="py-3 px-4 border-b text-right">Remaining (₹)</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {invoices.map((invoice) => (
-                    <tr key={invoice.id} className="hover:bg-gray-50">
-                      <td className="py-3 px-4 border-b">
-                        {invoice.invoice_date
-                          ? new Date(invoice.invoice_date).toLocaleDateString()
-                          : "N/A"}
-                      </td>
-                      <td className="py-3 px-4 border-b">
-                        {invoice.buyer_name || "N/A"}
-                      </td>
-                      <td className="py-3 px-4 border-b text-right font-mono">
-                        {invoice.currency || "₹"}{" "}
-                        {Number(invoice.total_with_gst || 0).toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
+                  {invoices.map((invoice) => {
+                    const invoiceAmount = Number(invoice.total_with_gst || 0);
+                    const buyerDepositTotal = buyerTransactions
+                      .filter((t) => t.buyer_name === invoice.buyer_name)
+                      .reduce((sum, t) => sum + Number(t.deposit_amount || 0), 0);
+                    const remaining = invoiceAmount - buyerDepositTotal;
+
+                    return (
+                      <tr key={invoice.id} className="hover:bg-gray-50">
+                        <td className="py-3 px-4 border-b">
+                          {invoice.invoice_date
+                            ? new Date(invoice.invoice_date).toLocaleDateString()
+                            : "N/A"}
+                        </td>
+                        <td className="py-3 px-4 border-b">{invoice.buyer_name || "N/A"}</td>
+
+                        <td className="py-3 px-4 border-b text-right font-mono text-red-600 font-semibold">
+                          ₹ {remaining.toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
-                <tfoot>
-                  <tr className="bg-gray-50 font-semibold">
-                    <td className="py-3 px-4 border-t" colSpan="2">
-                      Total
-                    </td>
-                    <td className="py-3 px-4 border-t text-right font-mono">
-                      {invoices[0]?.currency || "₹"} {totalInvoiceAmount.toFixed(2)}
-                    </td>
-                  </tr>
-                </tfoot>
               </table>
             </div>
           ) : (
@@ -152,14 +151,7 @@ const BalanceSheet = () => {
             </div>
           )}
         </div>
-      </div>
 
-      {/* Net Balance */}
-      <div className="mt-6 p-4 bg-yellow-100 border border-yellow-400 rounded">
-        <h2 className="text-lg font-semibold">Net Balance (Deposits - Invoices):</h2>
-        <p className="text-xl font-mono">
-          ₹ {(totalDepositAmount - totalInvoiceAmount).toFixed(2)}
-        </p>
       </div>
     </div>
   );

@@ -16,6 +16,8 @@ const Dashboard = () => {
     { label: "Buyer", icon: "bi-cart-fill", path: "/buyer" }, // Added Buyer button
     { label: "Settings", icon: "bi-gear-fill", path: "/setting" },
     { label: "Profile", icon: "bi-person-circle", path: "/profile" },
+    { label: "Employee", icon: "bi-person-badge-fill", path: "/employee" }, // 👈 New button
+
   ];
 
   const handleButtonClick = (path) => {

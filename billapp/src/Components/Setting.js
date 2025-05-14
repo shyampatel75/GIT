@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
+import "./setting.css";
 
 export default function SettingsPage() {
   const [formData, setFormData] = useState({
-    seller_name: "",
+    company_name: "",
     seller_address: "",
     seller_pan: "",
     seller_gstin: "",
@@ -34,7 +35,7 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     const formDataToSend = new FormData();
-    formDataToSend.append("seller_name", formData.seller_name);
+    formDataToSend.append("company_name", formData.company_name);
     formDataToSend.append("seller_address", formData.seller_address);
     formDataToSend.append("seller_pan", formData.seller_pan);
     formDataToSend.append("seller_gstin", formData.seller_gstin);
@@ -81,7 +82,7 @@ export default function SettingsPage() {
 
         setFormData((prev) => ({
           ...prev,
-          seller_name: setting.seller_name || "",
+          company_name: setting.company_name || "",
           seller_address: setting.seller_address || "",
           seller_pan: setting.seller_pan || "",
           seller_gstin: setting.seller_gstin || "",
@@ -103,180 +104,188 @@ export default function SettingsPage() {
     fetchSettings();
   }, []);
   return (
-    <div
-      className="p-6 max-w-xl mx-auto bg-white shadow-md rounded-xl"
-      style={{ paddingLeft: "100px" }}
-    >
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Address
-          </label>
-          <textarea
-            name="seller_address"
-            className="mt-1 block w-full border rounded px-3 py-2"
-            value={formData.seller_address}
-            onChange={handleChange}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            PAN Number
-          </label>
-          <input
-            type="text"
-            name="seller_pan"
-            className="mt-1 block w-full border rounded px-3 py-2"
-            value={formData.seller_pan}
-            onChange={handleChange}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            GST Number
-          </label>
-          <input
-            type="text"
-            name="seller_gstin"
-            className="mt-1 block w-full border rounded px-3 py-2"
-            value={formData.seller_gstin}
-            onChange={handleChange}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Email
-          </label>
-          <input
-            type="email"
-            name="seller_email"
-            className="mt-1 block w-full border rounded px-3 py-2"
-            value={formData.seller_email}
-            onChange={handleChange}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Bank Name
-          </label>
-          <input
-            type="text"
-            name="bank_name"
-            className="mt-1 block w-full border rounded px-3 py-2"
-            value={formData.bank_name}
-            onChange={handleChange}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Account Number
-          </label>
-          <input
-            type="text"
-            name="account_number"
-            className="mt-1 block w-full border rounded px-3 py-2"
-            value={formData.account_number}
-            onChange={handleChange}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            IFSC Code
-          </label>
-          <input
-            type="text"
-            name="ifsc_code"
-            className="mt-1 block w-full border rounded px-3 py-2"
-            value={formData.ifsc_code}
-            onChange={handleChange}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            A/c Holder's Name:
-          </label>
-          <input
-            type="text"
-            name="bank_account_holder"
-            className="mt-1 block w-full border rounded px-3 py-2"
-            value={formData.bank_account_holder}
-            onChange={handleChange}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Branch
-          </label>
-          <input
-            type="text"
-            name="branch"
-            className="mt-1 block w-full border rounded px-3 py-2"
-            value={formData.branch}
-            onChange={handleChange}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            SWIFT Code:
-          </label>
-          <input
-            type="text"
-            name="swift_code"
-            className="mt-1 block w-full border rounded px-3 py-2"
-            value={formData.swift_code}
-            onChange={handleChange}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Upload Stamp / Signature
-          </label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleImageChange}
-            className="mt-1 block w-full"
-          />
-          {formData.stampPreview && (
-            <div className="mt-4">
-              <p className="text-sm text-gray-600">Uploaded Logo Preview:</p>
-              <img
-                src={formData.stampPreview}
-                alt="Uploaded Logo"
-                className="mt-2 h-24 object-contain border rounded"
-                style={{ height: "100px", width: "200px" }}
+    <div style={{ paddingLeft: "100px" }}>
+      <h1 className="hedding"> Your Company ditels</h1>
+      <div className="formbody">
+        <div class="form-box">
+          <div className="form-row">
+            <div className="fastinput">
+              <label className="block text-sm font-medium text-gray-700">
+                Company name
+              </label>
+              <input
+                type="text"
+                name="company_name"
+                value={formData.company_name}
+                onChange={handleChange}
               />
             </div>
-          )}
+            <div className="fastinput">
+              <label className="block text-sm font-medium text-gray-700">
+                PAN Number
+              </label>
+              <input
+                type="text"
+                name="seller_pan"
 
-        </div>
-        {/* {formData.stampPreview && (
-          <div className="mt-4">
-            <p className="text-sm text-gray-600">Uploaded Logo Preview:</p>
-            <img
-              src={formData.stampPreview}
-              alt="Uploaded Logo"
-              className="mt-2 h-24 object-contain border rounded"
-              style={{ height: "100px", width: "200px" }}
-            />
+                value={formData.seller_pan}
+                onChange={handleChange}
+              />
+            </div>
           </div>
-        )} */}
+          <div className="form-row">
+            <div className="input-group">
+              <label htmlFor="seller_address" className="input-label">
+                Seller Address
+              </label>
+              <textarea
+                id="seller_address"
+                name="seller_address"
+                value={formData.seller_address}
+                onChange={handleChange}
+                className="textarea-field"
+                rows={4}
+                placeholder="Enter seller address"
+              ></textarea>
+            </div>
+          </div>
 
-        <button
-          className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          onClick={handleSave}
-        >
-          Salvar
-        </button>
+          <div className="form-row">
+            <div className="fastinput">
+              <label className="block text-sm font-medium text-gray-700">
+                GST Number
+              </label>
+              <input
+                type="text"
+                name="seller_gstin"
+
+                value={formData.seller_gstin}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="fastinput">
+              <label className="block text-sm font-medium text-gray-700">
+                Email
+              </label>
+              <input
+                type="email"
+                name="seller_email"
+                value={formData.seller_email}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="fastinput">
+              <label className="block text-sm font-medium text-gray-700">
+                Bank Name
+              </label>
+              <input
+                type="text"
+                name="bank_name"
+                value={formData.bank_name}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="fastinput">
+              <label className="block text-sm font-medium text-gray-700">
+                Account Number
+              </label>
+              <input
+                type="text"
+                name="account_number"
+                value={formData.account_number}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="fastinput">
+              <label className="block text-sm font-medium text-gray-700">
+                IFSC Code
+              </label>
+              <input
+                type="text"
+                name="ifsc_code"
+                value={formData.ifsc_code}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="fastinput">
+              <label className="block text-sm font-medium text-gray-700">
+                A/c Holder's Name:
+              </label>
+              <input
+                type="text"
+                name="bank_account_holder"
+                value={formData.bank_account_holder}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="fastinput">
+              <label className="block text-sm font-medium text-gray-700">
+                Branch
+              </label>
+              <input
+                type="text"
+                name="branch"
+                value={formData.branch}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="fastinput">
+              <label className="block text-sm font-medium text-gray-700">
+                SWIFT Code:
+              </label>
+              <input
+                type="text"
+                name="swift_code"
+
+                value={formData.swift_code}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="upload-container">
+              <div className="upload-input">
+                <label className="upload-label">
+                  Upload Stamp
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="upload-file"
+                />
+              </div>
+              {formData.stampPreview && (
+                <div className="upload-preview">
+                  <p className="preview-text">Uploaded Logo Preview:</p>
+                  <img
+                    src={formData.stampPreview}
+                    alt="Uploaded Logo"
+                    className="preview-image"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+          <button
+            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 updet"
+            onClick={handleSave}
+          >
+            Update
+          </button>
+        </div>
+      </div>
+      <div>
       </div>
     </div>
+
   );
 }

@@ -289,14 +289,14 @@ const Banking = () => {
       <div className="mt-4">
         {visibleButton === 1 && (
           <>
-            <h3 className="mb-2 font-semibold">Buyer Transaction</h3>
+            <h3 className="mb-2 font-semibold">Company Bill</h3>
             <select
               className="border px-4 py-2 rounded w-full mb-3"
               value={selectedBuyer}
               onChange={(e) => setSelectedBuyer(e.target.value)}
               required
             >
-              <option value="">-- Select Buyer --</option>
+              <option value="">-- Select Company Bill --</option>
               {buyerNames.map((name, index) => (
                 <option key={index} value={name}>{name}</option>
               ))}
@@ -309,7 +309,7 @@ const Banking = () => {
             >
               <option value="">-- Select Invoice (Optional) --</option>
               {buyerInvoices.map(inv => (
-                <option key={inv.id} value={inv.invoice_number}>Invoice #{inv.invoice_number}</option>
+                <option key={inv.id} value={inv.invoice_number}>{inv.invoice_number}</option>
               ))}
             </select>
 
@@ -348,10 +348,10 @@ const Banking = () => {
         )}
         {visibleButton === 2 && (
           <>
-            <h3 className="mb-2 font-semibold">Company Bill</h3>
+            <h3 className="mb-2 font-semibold">Buyer Bill</h3>
             <input
               type="text"
-              placeholder="Company Name*"
+              placeholder="Buyer Name*"
               className="border px-4 py-2 rounded w-full mb-3"
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
@@ -387,7 +387,7 @@ const Banking = () => {
               className="bg-green-600 text-white px-4 py-2 rounded"
               onClick={handleCompanySubmit}
             >
-              Submit Company Bill
+              Submit Buyer Bill
             </button>
           </>
         )}
