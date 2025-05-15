@@ -58,6 +58,15 @@ const EditInvoice = () => {
 
     const [settingsData, setSettingsData] = useState(null);
 
+
+    const payload = {
+        delivery_note_date: formData.invoice_date, // Already in YYYY-MM-DD format
+        // Output should be like "2025-05-15"
+
+        // ... other fields
+    };
+    console.log("Sending date:", formData.invoice_date);
+
     // Fetch countries data
     useEffect(() => {
         const fetchCountries = async () => {
@@ -174,7 +183,6 @@ const EditInvoice = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            // Update form data with selected currency
             const updatedFormData = {
                 ...formData,
                 currency: selectedCountry.currencyCode
@@ -188,18 +196,40 @@ const EditInvoice = () => {
                 body: JSON.stringify(updatedFormData),
             });
 
-            if (res.ok) {
-                alert("Invoice updated successfully!");
-                generatePDF();
-            } else {
-                alert("Failed to update invoice.");
+            if (!res.ok) {
+                const errorData = await res.json(); // Get the detailed error message
+                console.error("Server error details:", errorData);
+                alert(`Failed to update invoice: ${errorData.message || JSON.stringify(errorData)}`);
+                return;
             }
+
+            alert("Invoice updated successfully!");
+            generatePDF();
         } catch (err) {
             console.error("Update error:", err);
             alert("An error occurred while updating the invoice.");
         }
     };
 
+    const formatDateForServer = (dateString) => {
+        if (!dateString) return null;
+        const date = new Date(dateString);
+        return date.toISOString().split('T')[0]; // YYYY-MM-DD format
+    };
+
+    // Add default values for required fields
+    const updatedFormData = {
+        buyer_name: formData.buyer_name || "",
+        buyer_address: formData.buyer_address || "",
+        // ... all other fields with fallback values
+        currency: selectedCountry.currencyCode
+    };
+
+    const testPayload = {
+        invoice_number: formData.invoice_number,
+        buyer_name: formData.buyer_name,
+        total_with_gst: formData.total_with_gst
+    };
     const generatePDF = () => {
         const input = invoiceRef.current;
         html2canvas(input, {
@@ -401,6 +431,14 @@ const EditInvoice = () => {
             .catch((err) => console.error("Error fetching settings:", err));
     }, []);
 
+    const formatDate = (dateString) => {
+        if (!dateString) return ''; // Prevent error on empty/null value
+
+        const date = new Date(dateString);
+        if (isNaN(date)) return ''; // Invalid date fallback
+
+        return date.toISOString().split('T')[0]; // 'YYYY-MM-DD'
+    };
 
 
 
@@ -559,10 +597,12 @@ const EditInvoice = () => {
                                             <input
                                                 type="date"
                                                 id="datePicker"
-                                                value={formData.invoice_date}
+                                                value={formatDate(formData.invoice_date)}
                                                 onChange={handleChange}
                                                 name="invoice_date"
                                             />
+
+
                                         </td>
                                     </tr>
                                     <tr>
@@ -593,13 +633,14 @@ const EditInvoice = () => {
                                         <td>Delivery Note Date</td>
                                         <td>
                                             <input
-                                                type="text"
+                                                type="date"
                                                 name="delivery_note_date"
                                                 className="deliveryNote"
-                                                value={formData.delivery_note_date}
+                                                value={formData.delivery_note_date || ''}
                                                 onChange={handleChange}
                                             />
                                         </td>
+
                                     </tr>
                                     <tr>
                                         <td>Destination</td>
@@ -1260,7 +1301,6 @@ const EditInvoice = () => {
                 <p className="text-center" style={{ marginBottom: "0px" }}>This is a Computer Generated Invoice</p>
             </div>
         </div>
-
 
     );
 };

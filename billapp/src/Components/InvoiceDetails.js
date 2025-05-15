@@ -107,15 +107,15 @@ const InvoiceDetails = () => {
               <td>{invoice.invoice_date}</td>
               <td>-</td>
               <td>-</td>
-              <td>{invoice.currency}{invoice.total_with_gst}</td>
+              <td>{invoice.currency} {invoice.total_with_gst}</td>
               <td>-</td>
             </tr>
 
             {buyerDeposits.map((entry, index) => (
               <tr key={index}>
                 <td>-</td>
-                <td>{entry.selected_date}</td>
-                <td>{invoice.currency}{entry.deposit_amount}</td>
+                <td>{entry.transaction_date}</td>
+                <td>{invoice.currency}  {entry.deposit_amount}</td>
                 <td>-</td>
                 <td>-</td>
               </tr>
@@ -123,7 +123,7 @@ const InvoiceDetails = () => {
 
             <tr className="bg-yellow-100 font-bold">
               <td colSpan={4} className="text-right">Remaining Balance</td>
-              <td>{invoice.currency}{remainingBalance.toFixed(2)}</td>
+              <td>{invoice.currency} {remainingBalance.toFixed(2)}</td>
             </tr>
           </tbody>
         </table>
@@ -148,7 +148,7 @@ const InvoiceDetails = () => {
         <div className="mb-4">
           <p><strong>Buyer Name:</strong> {invoice.buyer_name}</p>
           <p><strong>Invoice Date:</strong> {invoice.invoice_date}</p>
-          <p><strong>Total Invoice Amount (Debit):</strong> {invoice.currency}{invoice.total_with_gst}</p>
+          <p><strong>Total Invoice Amount (Debit):</strong> {invoice.currency} {invoice.total_with_gst}</p>
         </div>
 
         <h4 className="w-100 text-center" style={{ backgroundColor: "#51add9" }}>Account Activity</h4>
@@ -156,6 +156,7 @@ const InvoiceDetails = () => {
           <thead>
             <tr>
               <th className="text-left">Date</th>
+              <th>Deposit Date</th>
               <th className="text-left">Description</th>
               <th className="text-right">Credit (Deposit)</th>
               <th className="text-right">Debit (Invoice)</th>
@@ -165,10 +166,11 @@ const InvoiceDetails = () => {
           <tbody>
             <tr className="bg-red-50 font-semibold">
               <td>{invoice.invoice_date}</td>
+              <td>-</td>
               <td>{invoice.buyer_name}</td>
               <td className="text-right">-</td>
               <td className="text-right">{invoice.currency}{invoice.total_with_gst}</td>
-              <td className="text-right">{invoice.currency}{invoice.total_with_gst}</td>
+              <td className="text-right">{invoice.currency} {invoice.total_with_gst}</td>
             </tr>
 
             {(() => {
@@ -178,7 +180,8 @@ const InvoiceDetails = () => {
                 runningBalance -= depositAmt;
                 return (
                   <tr key={`deposit-${index}`} className="bg-green-50">
-                    <td>{entry.selected_date}</td>
+                    <td>--</td>
+                    <td>{entry.transaction_date}</td>
                     <td>{entry.notice || "Deposit"}</td>
                     <td className="text-right">{invoice.currency}{depositAmt}</td>
                     <td className="text-right">-</td>
@@ -188,8 +191,9 @@ const InvoiceDetails = () => {
               });
             })()}
 
-            <tr className="bg-gray-100 font-bold">
+            <tr className="bg-gray-100 font-bold" style={{height:"100px"}}>
               <td colSpan="2">Final Totals</td>
+              <td></td>
               <td className="text-right">{invoice.currency}{totalDeposited.toFixed(2)}</td>
               <td className="text-right">{invoice.currency}{invoice.total_with_gst.toFixed(2)}</td>
               <td className="text-right">{invoice.currency}{remainingBalance.toFixed(2)}</td>

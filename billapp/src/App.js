@@ -27,6 +27,7 @@ import Buyer from "./Components/Buyer.js";
 import EditInvoice from "./Components/EditInvoice.js";
 import Employee from "./Components/Employee.js";
 import EmployeeDetails from "./Components/EmployeeDetails.js";
+import IncomeExpenditure from "./Components/IncomeExpenditure .js";
 
 
 
@@ -72,7 +73,7 @@ const AppContent = () => {
           <Route path="/edit-invoice/:invoiceId" element={<EditInvoice />} />
           <Route path="/employee" element={<Employee />} />
           <Route path="/employee-details/:id" element={<EmployeeDetails />} />
-
+<Route path="/incomeExpenditure" element={<IncomeExpenditure />} />
         </Routes>
       </div>
     </div>

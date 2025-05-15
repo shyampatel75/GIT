@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-
 const SalaryManager = () => {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
@@ -14,10 +13,10 @@ const SalaryManager = () => {
   const [salaryList, setSalaryList] = useState([]);
   const [selectedPerson, setSelectedPerson] = useState(null);
   const [error, setError] = useState(null);
-
+  const [isEditing, setIsEditing] = useState(false);
+  const [editId, setEditId] = useState(null);
 
   const navigate = useNavigate();
-
 
   useEffect(() => {
     const fetchSalaries = async () => {
@@ -37,7 +36,15 @@ const SalaryManager = () => {
 
   const toggleForm = () => {
     setShowForm(!showForm);
-    setSelectedPerson(null);
+    setFormData({
+      salary_name: "",
+      salary_amount: "",
+      salary_date: "",
+      salary_email: "",
+      salary_number: "",
+    });
+    setIsEditing(false);
+    setEditId(null);
   };
 
   const handleChange = (e) => {
@@ -59,22 +66,31 @@ const SalaryManager = () => {
     };
 
     try {
-      const response = await fetch("http://localhost:8000/api/banking/employee/", {
-        method: "POST",
+      const url = isEditing
+        ? `http://localhost:8000/api/employees/${editId}/`
+        : "http://localhost:8000/api/banking/employee/";
+
+      const method = isEditing ? "PUT" : "POST";
+
+      const response = await fetch(url, {
+        method: method,
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Backend validation error:", errorData);
-        throw new Error("Submission failed. Check all fields.");
-      }
+      if (!response.ok) throw new Error("Submission failed");
 
       const data = await response.json();
-      setSalaryList([...salaryList, data]);
+
+      if (isEditing) {
+        setSalaryList((prevList) =>
+          prevList.map((item) => (item.id === editId ? data : item))
+        );
+      } else {
+        setSalaryList([...salaryList, data]);
+      }
 
       setFormData({
         salary_name: "",
@@ -83,6 +99,8 @@ const SalaryManager = () => {
         salary_email: "",
         salary_number: "",
       });
+      setIsEditing(false);
+      setEditId(null);
       setShowForm(false);
       setError(null);
     } catch (err) {
@@ -91,10 +109,22 @@ const SalaryManager = () => {
     }
   };
 
+  const handleEditClick = (person) => {
+    setFormData({
+      salary_name: person.name,
+      salary_amount: person.salary,
+      salary_date: person.joining_date,
+      salary_email: person.email,
+      salary_number: person.number,
+    });
+    setIsEditing(true);
+    setEditId(person.id);
+    setShowForm(true);
+  };
+
   const handleNameClick = (person) => {
     navigate(`/employee-details/${person.id}`);
   };
-
 
   const handleCloseDetails = () => {
     setSelectedPerson(null);
@@ -235,6 +265,12 @@ const SalaryManager = () => {
                     <td className="p-2 border">{salary.email}</td>
                     <td className="p-2 border">{salary.number}</td>
                     <td className="p-2 border">
+                      <button
+                        onClick={() => handleEditClick(salary)}
+                        className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600 mr-2"
+                      >
+                        Edit
+                      </button>
                       <button
                         onClick={() => handleDelete(salary.id)}
                         className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"

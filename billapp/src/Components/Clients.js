@@ -103,11 +103,11 @@ const Clients = () => {
   };
 
   const handleEdit = (invoice) => {
-    navigate('/tax-invoice', {
+    navigate(`/edit-invoice/${invoice.id}`, {
       state: {
         isEdit: true,
-        fullInvoiceData: invoice
-      }
+        fullInvoiceData: invoice,
+      },
     });
   };
 

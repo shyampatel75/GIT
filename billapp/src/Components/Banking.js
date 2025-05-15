@@ -26,6 +26,7 @@ const Banking = () => {
   const [otherDate, setOtherDate] = useState("");
   const [otherNotice, setOtherNotice] = useState("");
   const [otherAmount, setOtherAmount] = useState("");
+   const [otherSelector, setOtherSelector] = useState(''); 
 
   const [allInvoices, setAllInvoices] = useState([]);
 
@@ -147,6 +148,7 @@ const Banking = () => {
     }
 
     const data = {
+      salary_newname: salarynewname,
       salary_name: salaryName,
       salary_amount: parseFloat(salary),
       salary_date: salaryDate,
@@ -160,12 +162,11 @@ const Banking = () => {
         body: JSON.stringify(data),
       });
 
-      const result = await response.json();
-
       if (response.ok) {
         alert("✅ Salary data submitted successfully!");
       } else {
-        alert("❌ Submission failed: " + (result.detail || JSON.stringify(result)));
+        const result = await response.json();
+        alert("❌ Submission failed: " + result.detail);
       }
     } catch (error) {
       console.error("Error:", error);
@@ -173,37 +174,43 @@ const Banking = () => {
     }
   };
 
+ const handleOtherSubmit = async () => {
+  if (!otherDate || !otherNotice || !otherAmount || !otherSelector) {
+    alert("Please fill all required fields.");
+    return;
+  }
 
-  const handleOtherSubmit = async () => {
-    if (!otherDate || !otherNotice || !otherAmount) {
-      alert("Please fill all 'other' fields.");
-      return;
-    }
 
-    const data = {
-      other_date: otherDate,
-      other_notice: otherNotice,
-      other_amount: parseFloat(otherAmount),
-    };
-
-    try {
-      const response = await fetch("http://localhost:8000/api/banking/other/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (response.ok) {
-        alert("✅ Other data submitted successfully!");
-      } else {
-        const result = await response.json();
-        alert("❌ Submission failed: " + result.detail);
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      alert("❌ Error submitting other data.");
-    }
+  const data = {
+    other_type: otherSelector,
+    other_date: otherDate,
+    other_notice: otherNotice,
+    other_amount: parseFloat(otherAmount),
   };
+
+  try {
+    const response = await fetch("http://localhost:8000/api/banking/other/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    if (response.ok) {
+      alert("✅ Other data submitted successfully!");
+      // Reset form fields
+      setOtherSelector('');
+      setOtherDate('');
+      setOtherNotice('');
+      setOtherAmount('');
+    } else {
+      const result = await response.json();
+      alert("❌ Submission failed: " + (result.detail || JSON.stringify(result)));
+    }
+  } catch (error) {
+    console.error("Error:", error);
+    alert("❌ Error submitting other data.");
+  }
+};
 
   const handleDepositSubmit = async () => {
     try {
@@ -248,8 +255,8 @@ const Banking = () => {
       </div>
 
       <div className="d-flex justify-content-around gap-2 mb-4 my-4">
-        <button className="bg-blue-500 text-white px-4 py-2 rounded" onClick={() => setVisibleButton(1)}>Buyer</button>
-        <button className="bg-green-500 text-white px-4 py-2 rounded" onClick={() => setVisibleButton(2)}>company bill</button>
+        <button className="bg-blue-500 text-white px-4 py-2 rounded" onClick={() => setVisibleButton(1)}>Company Bill</button>
+        <button className="bg-green-500 text-white px-4 py-2 rounded" onClick={() => setVisibleButton(2)}>Buyer</button>
         <button className="bg-yellow-500 text-white px-4 py-2 rounded" onClick={() => setVisibleButton(3)}>Salary</button>
         <button className="bg-red-500 text-white px-4 py-2 rounded" onClick={() => setVisibleButton(4)}>Other</button>
       </div>
@@ -257,9 +264,9 @@ const Banking = () => {
       <div className="mt-4">
         {visibleButton === 1 && (
           <>
-            <h3 className="mb-2 font-semibold">Buyer Bill</h3>
+            <h3 className="mb-2 font-semibold">Company Bill</h3>
             <select className="border px-4 py-2 rounded w-full mb-3" value={selectedBuyer} onChange={(e) => setSelectedBuyer(e.target.value)} required>
-              <option value="">-- Select Buyer Bill --</option>
+              <option value="">-- Select Company Bill --</option>
               {buyerNames.map((name, index) => (
                 <option key={index} value={name}>{name}</option>
               ))}
@@ -279,71 +286,52 @@ const Banking = () => {
 
         {visibleButton === 2 && (
           <>
-            <h3 className="mb-2 font-semibold">company Bill</h3>
+            <h3 className="mb-2 font-semibold">Buyer Bill</h3>
             <input type="text" placeholder="Buyer Name*" className="border px-4 py-2 rounded w-full mb-3" value={companyName} onChange={(e) => setCompanyName(e.target.value)} required />
             <input type="date" className="border px-4 py-2 rounded w-full mb-3" value={companyDate} onChange={(e) => setCompanyDate(e.target.value)} required />
             <input type="number" placeholder="Amount*" className="border px-4 py-2 rounded w-full mb-3" value={companyAmount} onChange={(e) => setCompanyAmount(e.target.value)} required />
             <input type="text" placeholder="Notice (Optional)" className="border px-4 py-2 rounded w-full mb-3" value={companyNotice} onChange={(e) => setCompanyNotice(e.target.value)} />
-            <button className="bg-green-600 text-white px-4 py-2 rounded" onClick={handleCompanySubmit}>Submit company Bill</button>
+            <button className="bg-green-600 text-white px-4 py-2 rounded" onClick={handleCompanySubmit}>Submit Buyer Bill</button>
           </>
         )}
+
         {visibleButton === 3 && (
           <>
             <h3 className="mb-2 font-semibold">Salary</h3>
-            <select
-              className="border px-4 py-2 rounded w-full mb-3"
-              value={salaryName}
-              onChange={(e) => {
-                const selected = e.target.value;
-                setSalaryName(selected);
-                const emp = employees.find(emp => emp.name === selected);
-                if (emp) {
-                  setSalaryAmount(emp.salary || "");
-                  setSalaryNewName(emp.id); // Save the employee ID
-                }
-              }}
-            >
+            <select className="border px-4 py-2 rounded w-full mb-3" value={salaryName} onChange={(e) => {
+              const selected = e.target.value;
+              setSalaryName(selected);
+              const emp = employees.find(emp => emp.name === selected);
+              if (emp) {
+                setSalaryAmount(emp.salary || "");
+              }
+            }}>
               <option value="">-- Select Employee --</option>
               {employees.map((emp, index) => (
                 <option key={index} value={emp.name}>{emp.name}</option>
               ))}
             </select>
-
-            {/* Display or store the employee ID */}
-            <input
-              type="text" // You can change this to "hidden" if you don't want to show it
-              className="border px-4 py-2 rounded w-full mb-3"
-              placeholder="Employee ID"
-              value={salarynewname}
-              onChange={(e) => setSalaryNewName(e.target.value)}
-            />
-
-            <input
-              type="number"
-              placeholder="Enter amount"
-              className="border px-4 py-2 rounded w-full mb-3"
-              value={salary}
-              onChange={(e) => setSalaryAmount(e.target.value)}
-            />
-            <input
-              type="date"
-              className="border px-4 py-2 rounded w-full mb-3"
-              value={salaryDate}
-              onChange={(e) => setSalaryDate(e.target.value)}
-            />
-            <button
-              className="bg-yellow-600 text-white px-4 py-2 rounded"
-              onClick={handleSalarySubmit}
-            >
-              Submit
-            </button>
+            <input type="number" placeholder="Enter amount" className="border px-4 py-2 rounded w-full mb-3" value={salary} onChange={(e) => setSalaryAmount(e.target.value)} />
+            <input type="date" className="border px-4 py-2 rounded w-full mb-3" value={salaryDate} onChange={(e) => setSalaryDate(e.target.value)} />
+            <button className="bg-yellow-600 text-white px-4 py-2 rounded" onClick={handleSalarySubmit}>Submit</button>
           </>
         )}
-
 
         {visibleButton === 4 && (
           <>
             <h3 className="mb-2 font-semibold">Other</h3>
+                <select
+      className="border px-4 py-2 rounded w-full mb-3"
+      value={otherSelector}
+      onChange={(e) => setOtherSelector(e.target.value)}
+      required
+    >
+      <option value="">Select Type*</option>
+      <option value="Fast Expand">Fast Expand</option>
+      <option value="Profit">Profit</option>
+      <option value="Other">Other</option>
+    </select>
+
             <input type="date" className="border px-4 py-2 rounded w-full mb-3" value={otherDate} onChange={(e) => setOtherDate(e.target.value)} />
             <input type="text" placeholder="Enter notice" className="border px-4 py-2 rounded w-full mb-3" value={otherNotice} onChange={(e) => setOtherNotice(e.target.value)} />
             <input type="number" placeholder="Enter amount" className="border px-4 py-2 rounded w-full mb-3" value={otherAmount} onChange={(e) => setOtherAmount(e.target.value)} />

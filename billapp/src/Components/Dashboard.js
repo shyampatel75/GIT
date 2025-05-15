@@ -17,8 +17,9 @@ const Dashboard = () => {
     { label: "Settings", icon: "bi-gear-fill", path: "/setting" },
     { label: "Profile", icon: "bi-person-circle", path: "/profile" },
     { label: "Employee", icon: "bi-person-badge-fill", path: "/employee" }, // 👈 New button
-
+    { label: "Income Expenditure", icon: "bi-person-badge-fill", path: "/incomeExpenditure" },
   ];
+
 
   const handleButtonClick = (path) => {
     navigate(path);

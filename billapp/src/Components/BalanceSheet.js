@@ -4,29 +4,38 @@ const BalanceSheet = () => {
   const [invoices, setInvoices] = useState([]);
   const [deposits, setDeposits] = useState([]);
   const [buyerTransactions, setBuyerTransactions] = useState([]);
+  const [otherTransactions, setOtherTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [invoicesRes, depositsRes, buyersRes] = await Promise.all([
+        const [invoicesRes, depositsRes, buyersRes, othersRes] = await Promise.all([
           fetch("http://localhost:8000/api/invoices/"),
           fetch("http://localhost:8000/api/add-deposit/"),
           fetch("http://localhost:8000/api/banking/buyer/"),
+          fetch("http://localhost:8000/api/banking/other/"),
         ]);
 
-        if (!invoicesRes.ok || !depositsRes.ok || !buyersRes.ok) {
+        if (
+          !invoicesRes.ok ||
+          !depositsRes.ok ||
+          !buyersRes.ok ||
+          !othersRes.ok
+        ) {
           throw new Error("Failed to fetch data");
         }
 
         const invoicesData = await invoicesRes.json();
         const depositsData = await depositsRes.json();
         const buyersData = await buyersRes.json();
+        const othersData = await othersRes.json();
 
         setInvoices(invoicesData);
         setDeposits(depositsData);
         setBuyerTransactions(buyersData);
+        setOtherTransactions(othersData);
       } catch (err) {
         console.error(err);
         setError(err.message);
@@ -48,6 +57,9 @@ const BalanceSheet = () => {
     0
   );
 
+  const profitTransactions = otherTransactions.filter((tx) => tx.other_type === "Profit");
+  const fastExpandTransactions = otherTransactions.filter((tx) => tx.other_type === "Fast Expand");
+
   if (loading) {
     return <div className="p-6">Loading...</div>;
   }
@@ -66,50 +78,60 @@ const BalanceSheet = () => {
         <p className="text-xl font-mono">₹ {totalDepositAmount.toFixed(2)}</p>
       </div>
 
-      {/* Flex Layout for Buyers and Invoices */}
+      {/* Flex Layout */}
       <div className="d-flex flex-row mb-6">
-        {/* Buyer Transactions (Left) */}
+        {/* LEFT SIDE: Buyer Deposits + Profit */}
         <div className="w-50 pr-4">
-          {buyerTransactions.length > 0 ? (
-            <div>
+          {buyerTransactions.length > 0 && (
+            <div className="mb-6">
               <h2 className="text-lg font-semibold mb-2">Buyer Deposits</h2>
               <table className="w-100 bg-white border border-gray-200">
                 <thead className="bg-gray-100">
                   <tr>
-                    <th className="py-3 px-4 border-b text-left">Buyer Name</th>
                     <th className="py-3 px-4 border-b text-left">Transaction Date</th>
+                    <th className="py-3 px-4 border-b text-left">Buyer Name</th>
                     <th className="py-3 px-4 border-b text-right">Deposit Amount</th>
                   </tr>
                 </thead>
                 <tbody>
                   {buyerTransactions.map((buyer) => (
                     <tr key={buyer.id} className="hover:bg-gray-50">
-                      <td className="py-3 px-4 border-b">{buyer.buyer_name}</td>
                       <td className="py-3 px-4 border-b">
                         {buyer.transaction_date
                           ? new Date(buyer.transaction_date).toLocaleDateString()
                           : "N/A"}
                       </td>
+                      <td className="py-3 px-4 border-b">{buyer.buyer_name}</td>
                       <td className="py-3 px-4 border-b text-right font-mono">
                         ₹ {Number(buyer.deposit_amount || 0).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                  {profitTransactions.map((tx) => (
+                    <tr key={tx.id} className="hover:bg-gray-50">
+                      <td className="py-3 px-4 border-b">
+                        {tx.other_date
+                          ? new Date(tx.other_date).toLocaleDateString()
+                          : "N/A"}
+                      </td>
+                      <td className="py-3 px-4 border-b">{tx.other_notice || "N/A"}</td>
+                      <td className="py-3 px-4 border-b text-right font-mono text-green-700">
+                        ₹ {Number(tx.other_amount || 0).toFixed(2)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          ) : (
-            <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">
-              No buyer transactions available.
-            </div>
           )}
+
+
         </div>
 
-        {/* Invoices (Right) */}
-        {/* Invoices (Right) */}
+        {/* RIGHT SIDE: Buyer Invoices + Fast Expand */}
         <div className="w-50 pl-4">
-          {invoices.length > 0 ? (
-            <div>
+          {invoices.length > 0 && (
+            <div className="mb-6">
               <h2 className="text-lg font-semibold mb-2">Buyer Invoices</h2>
               <table className="w-100 bg-white border border-gray-200">
                 <thead>
@@ -127,8 +149,7 @@ const BalanceSheet = () => {
                         .filter((t) => t.buyer_name === invoice.buyer_name)
                         .reduce((sum, t) => sum + Number(t.deposit_amount || 0), 0);
                       const remaining = invoiceAmount - buyerDepositTotal;
-
-                      return remaining > 0; // Only include if remaining is positive
+                      return remaining > 0;
                     })
                     .map((invoice) => {
                       const invoiceAmount = Number(invoice.total_with_gst || 0);
@@ -151,17 +172,26 @@ const BalanceSheet = () => {
                         </tr>
                       );
                     })}
+                  {fastExpandTransactions.map((tx) => (
+                    <tr key={tx.id} className="hover:bg-gray-50">
+                      <td className="py-3 px-4 border-b">
+                        {tx.other_date
+                          ? new Date(tx.other_date).toLocaleDateString()
+                          : "N/A"}
+                      </td>
+                      <td className="py-3 px-4 border-b">{tx.other_notice || "N/A"}</td>
+                      <td className="py-3 px-4 border-b text-right font-mono text-red-700">
+                        ₹ {Number(tx.other_amount || 0).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
-
               </table>
             </div>
-          ) : (
-            <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">
-              No invoices found.
-            </div>
           )}
-        </div>
 
+
+        </div>
       </div>
     </div>
   );

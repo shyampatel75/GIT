@@ -70,4 +70,9 @@
     border-left: 4px solid #fff;
     border-radius: 10px;
   }
-  
+  .sidebar-fixed {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}

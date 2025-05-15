@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from "react";
-import "./profile.css";
+import React, { useState, useEffect, useCallback } from "react";
+
 const Profile = () => {
     const [showFileUpload, setShowFileUpload] = useState(false);
     const [profileData, setProfileData] = useState({
         first_name: "",
         email: "",
-        // password: "",
         mobile: ""
     });
     const [images, setImages] = useState({
@@ -16,56 +15,57 @@ const Profile = () => {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [success, setSuccess] = useState(false);
 
-    // Fetch existing profile data on component mount
-    useEffect(() => {
-        const fetchProfile = async () => {
-            try {
-                const userResponse = await fetch("http://localhost:8000/api/auth/me/", {
+    const fetchProfile = useCallback(async () => {
+        try {
+            setLoading(true);
+            const token = localStorage.getItem("access_token");
+            
+            const [userResponse, profileResponse] = await Promise.all([
+                fetch("http://localhost:8000/api/auth/me/", {
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem("access_token")}`,
+                        'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     }
-                });
-                
-                if (!userResponse.ok) {
-                    throw new Error('Failed to fetch profile');
-                }
-                
-                const userData  = await userResponse.json();
-
-                   const profileResponse = await fetch("http://localhost:8000/api/profile/", {
+                }),
+                fetch("http://localhost:8000/api/profile/", {
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem("access_token")}`,
+                        'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     }
-                });
-                
-                const profileData = profileResponse.ok ? await profileResponse.json() : null;
+                })
+            ]);
 
-                // const { user, profile } = data;
-                
-                setProfileData({
-                    first_name: userData.first_name || "",
-                    email: userData.email || "",
-                    mobile: userData.mobile || "",
-                    // password: "" // Never pre-fill password for security
-                });
-                
-                if (profileData) {
-                    setImages(prev => ({
-                        ...prev,
-                        image1Preview: profileData.image1_url || null,
-                        image2Preview: profileData.image2_url || null
-                    }));
-                }
-            } catch (err) {
-                console.error("Error fetching profile:", err);
-                setError("Failed to load profile data");
+            if (!userResponse.ok) {
+                throw new Error('Failed to fetch user data');
             }
-        };
-        fetchProfile();
+
+            const userData = await userResponse.json();
+            const profileData = profileResponse.ok ? await profileResponse.json() : {};
+
+            setProfileData({
+                first_name: userData.first_name || "",
+                email: userData.email || "",
+                mobile: userData.mobile || ""
+            });
+
+            setImages(prev => ({
+                ...prev,
+                image1Preview: profileData.image1_url || null,
+                image2Preview: profileData.image2_url || null
+            }));
+        } catch (err) {
+            console.error("Error fetching profile:", err);
+            setError(err.message || "Failed to load profile data");
+        } finally {
+            setLoading(false);
+        }
     }, []);
+
+    useEffect(() => {
+        fetchProfile();
+    }, [fetchProfile]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -75,30 +75,14 @@ const Profile = () => {
         }));
     };
 
-    const handleButtonClick = () => {
-        setShowFileUpload(true);
-    };
-
-    const handleImage1Change = (e) => {
+    const handleImageChange = (imageKey) => (e) => {
         const file = e.target.files[0];
         if (file) {
             const previewUrl = URL.createObjectURL(file);
             setImages(prev => ({
                 ...prev,
-                image1: file,
-                image1Preview: previewUrl
-            }));
-        }
-    };
-
-    const handleImage2Change = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const previewUrl = URL.createObjectURL(file);
-            setImages(prev => ({
-                ...prev,
-                image2: file,
-                image2Preview: previewUrl
+                [imageKey]: file,
+                [`${imageKey}Preview`]: previewUrl
             }));
         }
     };
@@ -107,51 +91,38 @@ const Profile = () => {
         e.preventDefault();
         setLoading(true);
         setError("");
+        setSuccess(false);
 
-      try {
-            // Update user data (first_name and mobile)
-            const userResponse = await fetch("http://localhost:8000/api/profile/", {
-                method: 'PUT',
+        try {
+            const token = localStorage.getItem("access_token");
+            let formData = new FormData();
+            
+            // Add basic profile data
+            formData.append("first_name", profileData.first_name);
+            formData.append("mobile", profileData.mobile);
+            
+            // Add images if they exist
+            if (images.image1) formData.append("image1", images.image1);
+            if (images.image2) formData.append("image2", images.image2);
+
+            // Use POST instead of PATCH if your backend doesn't support PATCH
+            const response = await fetch("http://localhost:8000/api/profile/", {
+                method: 'POST', // Changed from PATCH to POST
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem("access_token")}`,
-                    'Content-Type': 'application/json'
+                    'Authorization': `Bearer ${token}`
+                    // Don't set Content-Type when using FormData - browser will set it automatically
                 },
-                body: JSON.stringify({
-                    first_name: profileData.first_name,
-                    email:profileData.email,
-                    mobile: profileData.mobile
-                })
+                body: formData
             });
 
-            if (!userResponse.ok) {
-                const errorData = await userResponse.json();
-                throw new Error(errorData.message || 'Failed to update user info');
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to update profile');
             }
 
-            // Handle image uploads to profile endpoint if needed
-            
-
-            if (images.image1 || images.image2) {
-                const formData = new FormData();
-                if (images.image1) formData.append("image1", images.image1);
-                if (images.image2) formData.append("image2", images.image2);
-
-                const profileResponse = await fetch("http://localhost:8000/api/profile/", {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem("access_token")}`
-                    },
-                    body: formData
-                });
-
-                if (!profileResponse.ok) {
-                    const errorData = await profileResponse.json();
-                    throw new Error('Failed to update profile images');
-                }
-            }
-
-            alert("Profile updated successfully!");
+            setSuccess(true);
             setShowFileUpload(false);
+            fetchProfile(); // Refresh data
         } catch (err) {
             console.error("Error updating profile:", err);
             setError(err.message || "Failed to update profile");
@@ -162,15 +133,30 @@ const Profile = () => {
 
     return (
         <div className="container mt-5">
+            {error && (
+                <div className="alert alert-danger">
+                    {error}
+                </div>
+            )}
+            {success && (
+                <div className="alert alert-success">
+                    Profile updated successfully!
+                </div>
+            )}
+
             {!showFileUpload ? (
                 <div className="card p-4">
                     <div className="text-center mb-3">
                         <img
-                            src={images.image1Preview || "https://via.placeholder.com/100"}
+                            src={images.image1Preview || "/images/default-profile.png"}
                             alt="Profile"
                             className="rounded-circle"
                             width="100"
                             height="100"
+                            onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = "/images/default-profile.png";
+                            }}
                         />
                     </div>
                     <div className="mb-3">
@@ -182,6 +168,7 @@ const Profile = () => {
                             placeholder="Enter Name"
                             value={profileData.first_name}
                             onChange={handleInputChange}
+                            disabled={loading}
                         />
                     </div>
                     <div className="mb-3">
@@ -190,23 +177,10 @@ const Profile = () => {
                             type="email"
                             name="email"
                             className="form-control"
-                            placeholder="Enter Email"
                             value={profileData.email}
-                            
-                            // readOnly  // Changed from disabled to readOnly for better styling
+                            readOnly
                         />
                     </div>
-                    {/* <div className="mb-3">
-                        <label>Password</label>
-                        <input
-                            type="password"
-                            name="password"
-                            className="form-control"
-                            placeholder="Enter new password (leave blank to keep current)"
-                            value={profileData.password}
-                            onChange={handleInputChange}
-                        />
-                    </div> */}
                     <div className="mb-3">
                         <label>Mobile Number</label>
                         <input
@@ -216,10 +190,15 @@ const Profile = () => {
                             placeholder="Enter Mobile Number"
                             value={profileData.mobile}
                             onChange={handleInputChange}
+                            disabled={loading}
                         />
                     </div>
-                    <button onClick={handleButtonClick} className="btn btn-primary w-100">
-                        Next
+                    <button 
+                        onClick={() => setShowFileUpload(true)} 
+                        className="btn btn-primary w-100"
+                        disabled={loading}
+                    >
+                        {loading ? "Loading..." : "Next"}
                     </button>
                 </div>
             ) : (
@@ -229,8 +208,9 @@ const Profile = () => {
                         <input
                             type="file"
                             accept="image/*"
-                            onChange={handleImage1Change}
+                            onChange={handleImageChange("image1")}
                             className="form-control mb-3"
+                            disabled={loading}
                         />
                         {images.image1Preview && (
                             <div className="text-center mt-3">
@@ -248,8 +228,9 @@ const Profile = () => {
                         <input
                             type="file"
                             accept="image/*"
-                            onChange={handleImage2Change}
+                            onChange={handleImageChange("image2")}
                             className="form-control mb-3"
+                            disabled={loading}
                         />
                         {images.image2Preview && (
                             <div className="text-center mt-3">
@@ -263,22 +244,12 @@ const Profile = () => {
                             </div>
                         )}
 
-                        <div className="mt-4">
-                            <h5>Other Details Section</h5>
-                            <p>You can add more fields here if needed...</p>
-                        </div>
-
-                        {error && (
-                            <div className="alert alert-danger mt-3">
-                                {error}
-                            </div>
-                        )}
-
                         <div className="mt-4 d-flex justify-content-between">
                             <button
                                 type="button"
                                 className="btn btn-secondary"
                                 onClick={() => setShowFileUpload(false)}
+                                disabled={loading}
                             >
                                 Back
                             </button>

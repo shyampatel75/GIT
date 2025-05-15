@@ -12,11 +12,11 @@ const Address = () => {
   const printRef = useRef();
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/invoices/") 
+    fetch("http://localhost:8000/api/invoices/")
       .then((res) => res.json())
       .then((data) => setInvoices(data))
       .catch((err) => console.error("Error fetching invoices:", err));
-  }, []); 
+  }, []);
 
   const handleDownload = async (invoiceId) => {
     try {
@@ -173,37 +173,37 @@ const Address = () => {
                     {invoice.currency} {parseFloat(invoice.total_with_gst).toFixed(2)}
                   </td>
                   <td>
-  <button
-    className="action-button view-button"
-    onClick={() => navigate(`/invoice-detail/${invoice.id}`)}
-  >
-    View
-  </button>
-</td>
-<td>
-  <button
-    className="action-button download-button"
-    onClick={() => handleDownload(invoice.id)}
-  >
-    Download
-  </button>
-</td>
-<td>
-  <button
-    className="action-button edit-button"
-    onClick={() => handleEdit(invoice.id)}
-  >
-    Edit
-  </button>
-</td>
-<td>
-  <button
-    className="action-button delete-button"
-    onClick={() => handleDelete(invoice.id)}
-  >
-    Delete
-  </button>
-</td>
+                    <button
+                      className="action-button view-button"
+                      onClick={() => navigate(`/invoice-detail/${invoice.id}`)}
+                    >
+                      View
+                    </button>
+                  </td>
+                  <td>
+                    <button
+                      className="action-button download-button"
+                      onClick={() => handleDownload(invoice.id)}
+                    >
+                      Download
+                    </button>
+                  </td>
+                  <td>
+                    <button
+                      className="action-button edit-button"
+                      onClick={() => handleEdit(invoice.id)}
+                    >
+                      Edit
+                    </button>
+                  </td>
+                  <td>
+                    <button
+                      className="action-button delete-button"
+                      onClick={() => handleDelete(invoice.id)}
+                    >
+                      Delete
+                    </button>
+                  </td>
 
                 </tr>
               ))}

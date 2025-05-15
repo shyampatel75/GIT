@@ -36,7 +36,11 @@ const BillManager = () => {
                                 >
                                     <td>{index + 1}</td>
                                     <td>{invoice.buyer_name}</td>
-                                    <td>{invoice.invoice_date}</td>
+                                    <td>
+                                        {invoice.invoice_date
+                                            ? new Date(invoice.invoice_date).toLocaleDateString("en-GB")
+                                            : "N/A"}
+                                    </td>
                                     <td>{invoice.buyer_gst}</td>
                                 </tr>
                             ))}
