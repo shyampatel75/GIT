@@ -299,72 +299,62 @@ const Taxinvoice = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
   // Update the handleSubmit function
- // Update the handleSubmit function
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // Update the handleSubmit function
+ const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    // Format dates
-    const formattedInvoiceDate = formatToISO(formData.invoice_date);
-    const formattedDeliveryDate = formatToISO(formData.delivery_note_date);
+  // Format invoice date and delivery note date
+  const formattedInvoiceDate = formatToISO(formData.invoice_date);
+  const formattedDeliveryDate = formatToISO(formData.delivery_note_date);
 
-    if (!formattedInvoiceDate || !formattedDeliveryDate) {
-      alert("Please enter valid dates in DD-MM-YYYY or YYYY-MM-DD format.");
-      return;
+  if (!formattedInvoiceDate) {
+    alert("Please enter a valid invoice date in DD-MM-YYYY or YYYY-MM-DD format.");
+    return;
+  }
+
+  try {
+    const fullInvoiceNumber = `${String(invoice_Number).padStart(2, "0")}-${invoiceYear}`;
+
+    const payload = {
+      ...formData,
+      invoice_number: fullInvoiceNumber,
+      invoice_date: formattedInvoiceDate,
+      delivery_note_date: formattedDeliveryDate,
+      country: selectedCountry.name,
+      currency: selectedCountry.currency,
+    };
+
+    const saveResponse = await fetch("http://localhost:8000/api/create/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const responseData = await saveResponse.json();
+
+    if (!saveResponse.ok) {
+      const errorMessages = Object.values(responseData.errors || {}).flat().join(", ");
+      throw new Error(errorMessages || "Failed to save invoice");
     }
 
-    try {
-      // Use the current invoice_Number state to construct the full invoice number
-      const fullInvoiceNumber = `${String(invoice_Number).padStart(2, "0")}-${invoiceYear}`;
+    await generatePDF(fullInvoiceNumber);
 
-      // Prepare payload with the constructed invoice number
-      const payload = {
-        ...formData,
-        invoice_number: fullInvoiceNumber,
-        invoice_date: formattedInvoiceDate,
-        delivery_note_date: formattedDeliveryDate,
-        country: selectedCountry.name,
-        currency: selectedCountry.currency,
-      };
+    setinvoice_Number(prev => {
+      const nextNum = prev + 1;
+      localStorage.setItem('lastInvoiceNumber', nextNum.toString());
+      return nextNum;
+    });
 
-      console.log("Payload being sent:", payload);
+    alert("Invoice created and PDF downloaded successfully!");
+  } catch (error) {
+    console.error("Invoice processing error:", error);
+    alert(`Error: ${error.message}`);
+  }
+};
 
-      // Save invoice
-      const saveResponse = await fetch("http://localhost:8000/api/create/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
 
-      const responseData = await saveResponse.json();
-
-      if (!saveResponse.ok) {
-        console.error("Server validation errors:", responseData);
-        const errorMessages = Object.values(responseData.errors || {}).flat().join(", ");
-        throw new Error(errorMessages || "Failed to save invoice");
-      }
-
-      console.log("Invoice saved successfully:", responseData);
-
-      // Generate PDF with the current invoice number
-      await generatePDF(fullInvoiceNumber);
-
-      // Increment the invoice number for next use
-      setinvoice_Number(prev => {
-        const nextNum = prev + 1;
-        // Store in localStorage to persist across reloads
-        localStorage.setItem('lastInvoiceNumber', nextNum.toString());
-        return nextNum;
-      });
-
-      alert("Invoice created and PDF downloaded successfully!");
-
-    } catch (error) {
-      console.error("Invoice processing error:", error);
-      alert(`Error: ${error.message}`);
-    }
-  };
 
 
 
@@ -555,7 +545,7 @@ const Taxinvoice = () => {
                         value={formData.buyer_name}
                         onChange={handleChange}
                         required
-                        style={{ border: !formData.buyer_name ? '1px solid red' : '' }}
+                      // style={{ border: !formData.buyer_name ? '1px solid red' : '' }}
                       />
                       <br />
                       Address:
@@ -1175,7 +1165,11 @@ const Taxinvoice = () => {
                     </tr>
                     <tr>
                       <td>Date</td>
-                      <td>{formData.invoice_date}</td>
+                      <td>
+                        {formData.invoice_date
+                          ? new Date(formData.invoice_date).toLocaleDateString("en-GB")
+                          : ""}
+                      </td>
                     </tr>
                     <tr>
                       <td>Delivery Note</td>
@@ -1187,7 +1181,9 @@ const Taxinvoice = () => {
                     </tr>
                     <tr>
                       <td>Delivery Note Date</td>
-                      <td>{formData.delivery_note_date}</td>
+                      <td>{formData.delivery_note_date
+                      ? new Date(formData.delivery_note_date).toLocaleDateString("en-GB")
+                          : ""}</td>
                     </tr>
                     <tr>
                       <td>Destination</td>

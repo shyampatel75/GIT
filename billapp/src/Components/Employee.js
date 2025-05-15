@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+
 
 const SalaryManager = () => {
   const [showForm, setShowForm] = useState(false);
@@ -12,6 +14,10 @@ const SalaryManager = () => {
   const [salaryList, setSalaryList] = useState([]);
   const [selectedPerson, setSelectedPerson] = useState(null);
   const [error, setError] = useState(null);
+
+
+  const navigate = useNavigate();
+
 
   useEffect(() => {
     const fetchSalaries = async () => {
@@ -86,8 +92,9 @@ const SalaryManager = () => {
   };
 
   const handleNameClick = (person) => {
-    setSelectedPerson(person);
+    navigate(`/employee-details/${person.id}`);
   };
+
 
   const handleCloseDetails = () => {
     setSelectedPerson(null);
@@ -96,7 +103,7 @@ const SalaryManager = () => {
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this entry?")) {
       try {
-        const response = await fetch(`http://localhost:8000/api/banking/employee/${id}/`, {
+        const response = await fetch(`http://localhost:8000/api/employees/${id}/`, {
           method: "DELETE",
         });
 

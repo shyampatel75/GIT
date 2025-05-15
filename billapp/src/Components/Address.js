@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import './InvoicesTable.css';
 
 const Address = () => {
   const navigate = useNavigate();
@@ -172,37 +173,38 @@ const Address = () => {
                     {invoice.currency} {parseFloat(invoice.total_with_gst).toFixed(2)}
                   </td>
                   <td>
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => navigate(`/invoice-detail/${invoice.id}`)}
-                    >
-                      View
-                    </button>
-                  </td>
-                  <td>
-                    <button
-                      className="downloadbutton"
-                      onClick={() => handleDownload(invoice.id)}
-                    >
-                      Download
-                    </button>
-                  </td>
-                  <td>
-                    <button
-                      className="editbutton"
-                      onClick={() => handleEdit(invoice.id)}
-                    >
-                      Edit
-                    </button>
-                  </td>
-                  <td>
-                    <button
-                      className="deletebutton"
-                      onClick={() => handleDelete(invoice.id)}
-                    >
-                      Delete
-                    </button>
-                  </td>
+  <button
+    className="action-button view-button"
+    onClick={() => navigate(`/invoice-detail/${invoice.id}`)}
+  >
+    View
+  </button>
+</td>
+<td>
+  <button
+    className="action-button download-button"
+    onClick={() => handleDownload(invoice.id)}
+  >
+    Download
+  </button>
+</td>
+<td>
+  <button
+    className="action-button edit-button"
+    onClick={() => handleEdit(invoice.id)}
+  >
+    Edit
+  </button>
+</td>
+<td>
+  <button
+    className="action-button delete-button"
+    onClick={() => handleDelete(invoice.id)}
+  >
+    Delete
+  </button>
+</td>
+
                 </tr>
               ))}
             </tbody>

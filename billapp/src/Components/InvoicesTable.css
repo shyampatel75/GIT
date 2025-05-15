@@ -1,0 +1,36 @@
+/* Base button style */
+.action-button {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  color: white;
+  margin: 0 4px;
+}
+
+/* Specific action colors */
+.view-button {
+  background-color: #007bff; /* blue */
+}
+
+.download-button {
+  background-color: #17a2b8; /* teal */
+}
+
+.edit-button {
+  background-color: #ffc107; /* yellow */
+  color: #212529;
+}
+
+.delete-button {
+  background-color: #dc3545; /* red */
+}
+
+/* Hover effect */
+.action-button:hover {
+  opacity: 0.9;
+  transform: scale(1.02);
+}

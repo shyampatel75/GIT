@@ -120,29 +120,39 @@ const BalanceSheet = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {invoices.map((invoice) => {
-                    const invoiceAmount = Number(invoice.total_with_gst || 0);
-                    const buyerDepositTotal = buyerTransactions
-                      .filter((t) => t.buyer_name === invoice.buyer_name)
-                      .reduce((sum, t) => sum + Number(t.deposit_amount || 0), 0);
-                    const remaining = invoiceAmount - buyerDepositTotal;
+                  {invoices
+                    .filter((invoice) => {
+                      const invoiceAmount = Number(invoice.total_with_gst || 0);
+                      const buyerDepositTotal = buyerTransactions
+                        .filter((t) => t.buyer_name === invoice.buyer_name)
+                        .reduce((sum, t) => sum + Number(t.deposit_amount || 0), 0);
+                      const remaining = invoiceAmount - buyerDepositTotal;
 
-                    return (
-                      <tr key={invoice.id} className="hover:bg-gray-50">
-                        <td className="py-3 px-4 border-b">
-                          {invoice.invoice_date
-                            ? new Date(invoice.invoice_date).toLocaleDateString()
-                            : "N/A"}
-                        </td>
-                        <td className="py-3 px-4 border-b">{invoice.buyer_name || "N/A"}</td>
+                      return remaining > 0; // Only include if remaining is positive
+                    })
+                    .map((invoice) => {
+                      const invoiceAmount = Number(invoice.total_with_gst || 0);
+                      const buyerDepositTotal = buyerTransactions
+                        .filter((t) => t.buyer_name === invoice.buyer_name)
+                        .reduce((sum, t) => sum + Number(t.deposit_amount || 0), 0);
+                      const remaining = invoiceAmount - buyerDepositTotal;
 
-                        <td className="py-3 px-4 border-b text-right font-mono text-red-600 font-semibold">
-                          ₹ {remaining.toFixed(2)}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                      return (
+                        <tr key={invoice.id} className="hover:bg-gray-50">
+                          <td className="py-3 px-4 border-b">
+                            {invoice.invoice_date
+                              ? new Date(invoice.invoice_date).toLocaleDateString()
+                              : "N/A"}
+                          </td>
+                          <td className="py-3 px-4 border-b">{invoice.buyer_name || "N/A"}</td>
+                          <td className="py-3 px-4 border-b text-right font-mono text-red-600 font-semibold">
+                            ₹ {remaining.toFixed(2)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
+
               </table>
             </div>
           ) : (

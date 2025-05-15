@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-
+import "./profile.css";
 const Profile = () => {
     const [showFileUpload, setShowFileUpload] = useState(false);
     const [profileData, setProfileData] = useState({
