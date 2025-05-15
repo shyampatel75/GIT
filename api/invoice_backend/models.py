@@ -6,7 +6,8 @@ from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.contrib.auth import get_user_model
-# models.py
+
+
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, first_name, mobile, password=None, **extra_fields):
         if not email:
@@ -212,6 +213,17 @@ class Salary(models.Model):
 
 
 class Other(models.Model):
+    TYPE_CHOICES = [
+        ('Fast Expand', 'Fast Expand'),
+        ('Profit', 'Profit'),
+        ('Other', 'Other'),
+    ]
+    
+    other_type = models.CharField(
+        max_length=20,
+        choices=TYPE_CHOICES,
+        default='Other'
+    )
     other_date = models.DateField()
     other_notice = models.TextField()
     other_amount = models.DecimalField(max_digits=10, decimal_places=2)
