@@ -119,7 +119,7 @@ class Invoice(models.Model):
 
 class Setting(models.Model):
     # Seller Info
-    seller_name = models.CharField(max_length=255, default='Unknown')
+    company_name = models.CharField(max_length=255, default='Unknown')
     seller_address = models.TextField(default='Not Provided')
     seller_email = models.EmailField(default='noemail@example.com')
     seller_pan = models.CharField(max_length=20, default='UNKNOWN')
