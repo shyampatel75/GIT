@@ -60,4 +60,5 @@ urlpatterns = [
     path('auth/me/', views.get_current_user, name='current-user'),
     path('auth/login/', MyTokenObtainPairView.as_view(), name='login'),
 
+    path('remaining-amount/', views.remaining_amount_view, name='remaining-amount'),
 ]

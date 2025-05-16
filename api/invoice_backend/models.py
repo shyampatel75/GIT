@@ -148,10 +148,8 @@ class Setting(models.Model):
     )
 
     def __str__(self):
-        return f"{self.seller_name} - Settings"
+        return f"{self.company_name} - Settings"
 
-    def __str__(self):
-        return f"{self.seller_name} - Settings"
 
 
 class Statement(models.Model):
@@ -264,3 +262,10 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"Profile for {self.user.email}"
+    
+class RemainingAmount(models.Model):
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    last_updated = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Remaining Amount: {self.amount}"

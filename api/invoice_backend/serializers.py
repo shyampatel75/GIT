@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth.models import User
 from .models import UserProfile
+from .models import UserProfile, RemainingAmount
 
 User = get_user_model()
 
@@ -157,3 +158,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
         if obj.image2:
             return self.context['request'].build_absolute_uri(obj.image2.url)
         return None
+    
+
+class RemainingAmountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RemainingAmount
+        fields = ['id', 'amount', 'last_updated']

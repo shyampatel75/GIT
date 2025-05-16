@@ -2,7 +2,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status, generics, permissions
 from .models import Invoice, Setting,Statement, Deposit,CompanyBill, Buyer, Salary, Other,BankingDeposit,Employee
-from .serializers import InvoiceSerializer, SettingSerializer, StatementSerializer, DepositSerializer,CompanyBillSerializer, BuyerSerializer, SalarySerializer, OtherSerializer,BankingDepositSerializer,EmployeeSerializer
+from .serializers import InvoiceSerializer, SettingSerializer, StatementSerializer, DepositSerializer,CompanyBillSerializer, BuyerSerializer, SalarySerializer, OtherSerializer,BankingDepositSerializer,EmployeeSerializer,RemainingAmountSerializer
 from django.contrib.auth.models import User
 from datetime import datetime
 from django.http import JsonResponse,FileResponse,Http404,HttpResponseBadRequest
@@ -20,7 +20,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import UserProfile
 from .serializers import UserProfileSerializer
-
+from .models import UserProfile,RemainingAmount
 
 class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
@@ -609,3 +609,39 @@ def user_profile_view(request):
             {'error': str(e)}, 
             status=status.HTTP_400_BAD_REQUEST
         )
+
+@api_view(['GET', 'POST', 'PATCH', 'PUT'])  # Support both for flexibility
+def remaining_amount_view(request):
+    # Get or create remaining amount record
+    remaining_amount = RemainingAmount.objects.last()
+    if not remaining_amount:
+        remaining_amount = RemainingAmount.objects.create(amount=0.00)
+
+    if request.method == 'POST':
+        serializer = RemainingAmountSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method in ['PATCH', 'PUT']:
+        # For PUT, we'll merge existing data with request data
+        if request.method == 'PUT':
+            data = {**RemainingAmountSerializer(remaining_amount).data, **request.data}
+        else:
+            data = request.data
+            
+        serializer = RemainingAmountSerializer(
+            remaining_amount, 
+            data=data, 
+            partial=(request.method == 'PATCH')
+        )
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'GET':
+        serializer = RemainingAmountSerializer(remaining_amount)
+        return Response(serializer.data)

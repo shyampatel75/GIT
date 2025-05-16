@@ -1,5 +1,7 @@
 from django.contrib import admin
 from .models import Invoice,Setting,Statement, Deposit,Buyer, CompanyBill, Salary, Other,BankingDeposit
+from django.contrib import admin
+from .models import RemainingAmount
 
 
 # Register your models here.
@@ -13,3 +15,4 @@ admin.site.register(CompanyBill)
 admin.site.register(Salary)
 admin.site.register(Other)
 admin.site.register(BankingDeposit)
+admin.site.register(RemainingAmount)
