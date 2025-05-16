@@ -6,7 +6,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   const menuItems = [
-    { label: "Dashboard", icon: "bi-speedometer2", path: "/dashboard" },
+    // { label: "Dashboard", icon: "bi-speedometer2", path: "/dashboard" },
     { label: "Bills", icon: "bi-receipt-cutoff", path: "/year-table" },
     { label: "Address", icon: "bi-house-add-fill", path: "/address" },
     { label: "Clients", icon: "bi-person-lines-fill", path: "/clients" },
@@ -14,8 +14,8 @@ const Dashboard = () => {
     { label: "Balance Sheet", icon: "bi-layout-text-sidebar-reverse", path: "/balancesheet" },
     { label: "Banking", icon: "bi-bank2", path: "/banking" },
     { label: "Buyer", icon: "bi-cart-fill", path: "/buyer" }, // Added Buyer button
-    { label: "Settings", icon: "bi-gear-fill", path: "/setting" },
-    { label: "Profile", icon: "bi-person-circle", path: "/profile" },
+    // { label: "Settings", icon: "bi-gear-fill", path: "/setting" },
+    // { label: "Profile", icon: "bi-person-circle", path: "/profile" },
     { label: "Employee", icon: "bi-person-badge-fill", path: "/employee" }, // 👈 New button
     { label: "Income Expenditure", icon: "bi-person-badge-fill", path: "/incomeExpenditure" },
   ];

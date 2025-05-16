@@ -28,7 +28,9 @@ const BillManager = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {invoices.slice(0, 30).map((invoice, index) => (
+                            {[...new Map(invoices.map((item) =>
+  [`${item.buyer_name}-${item.buyer_gst}`, item])
+).values()].slice(0, 30).map((invoice, index) => (
                                 <tr
                                     key={invoice.id}
                                     onClick={() => navigate(`/invoice-details/${invoice.id}`)}
@@ -44,7 +46,7 @@ const BillManager = () => {
                                     <td>{invoice.buyer_gst}</td>
                                 </tr>
                             ))}
-                        </tbody>
+                        </tbody>    
                     </table>
                 </div>
             </div>

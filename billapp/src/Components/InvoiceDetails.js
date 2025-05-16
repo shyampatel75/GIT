@@ -7,49 +7,35 @@ const InvoiceDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [invoice, setInvoice] = useState(null);
-  const [buyerDeposits, setBuyerDeposits] = useState([]);
+  const [sameBuyerInvoices, setSameBuyerInvoices] = useState([]);
   const tableRef = useRef();
 
+  // Fetch all invoices, find current one, and filter by same name and GST
   useEffect(() => {
-    fetch(`http://localhost:8000/api/invoices/${id}/`)
+    fetch("http://localhost:8000/api/invoices/")
       .then((res) => {
         if (!res.ok) throw new Error("Invoice not found");
         return res.json();
       })
-      .then((invoiceData) => {
-        setInvoice(invoiceData);
+      .then((invoices) => {
+        const current = invoices.find((inv) => String(inv.id) === String(id));
+        if (!current) throw new Error("Invoice not found");
+
+        const filtered = invoices.filter(
+          (inv) =>
+            inv.buyer_name === current.buyer_name &&
+            inv.buyer_gst === current.buyer_gst &&
+            inv.buyer_country === "India"
+        );
+
+        setInvoice(current);
+        setSameBuyerInvoices(filtered);
       })
       .catch((err) => {
         console.error(err);
         setInvoice(null);
       });
   }, [id]);
-
-  useEffect(() => {
-    if (!invoice) return;
-
-    fetch(`http://localhost:8000/api/banking/buyer/`)
-      .then((res) => res.json())
-      .then((allDeposits) => {
-        const filtered = allDeposits.filter(
-          (entry) => entry.invoice_id === invoice.invoice_number
-        );
-        setBuyerDeposits(filtered);
-      })
-      .catch((err) => {
-        console.error("Error fetching deposits", err);
-        setBuyerDeposits([]);
-      });
-  }, [invoice]);
-
-  const totalDeposited = Number(
-    buyerDeposits.reduce((sum, d) => sum + Number(d.deposit_amount || 0), 0)
-  );
-  
-
-  const remainingBalance = invoice
-    ? invoice.total_with_gst - totalDeposited
-    : 0;
 
   const handleGeneratePDF = async () => {
     const element = tableRef.current;
@@ -85,49 +71,43 @@ const InvoiceDetails = () => {
   }
 
   return (
-    <div className="mx-auto bg-white rounded shadow-md mt-6 p-6 border" style={{ paddingLeft: "100px", height: "100vh" }}>
+    <div
+      className="mx-auto bg-white rounded shadow-md mt-6 p-6 border"
+      style={{ paddingLeft: "100px", height: "100vh" }}
+    >
       <h2 className="text-2xl font-bold text-center mb-4">
         Invoice - {invoice.buyer_name}
       </h2>
 
-      <div className="mb-6">
-        <h3 className="text-xl font-semibold mb-2">Invoice Summary & Transactions</h3>
-        <table className="w-100 border text-sm">
-          <thead className="bg-gray-200">
-            <tr>
-              <th>Date</th>
-              <th>Deposit Date</th>
-              <th>Deposit Amount</th>
-              <th>Amount</th>
-              <th>Remaining Balance</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="bg-green-100 font-semibold">
-              <td>{invoice.invoice_date}</td>
-              <td>-</td>
-              <td>-</td>
-              <td>{invoice.currency} {invoice.total_with_gst}</td>
-              <td>-</td>
-            </tr>
-
-            {buyerDeposits.map((entry, index) => (
-              <tr key={index}>
-                <td>-</td>
-                <td>{entry.transaction_date}</td>
-                <td>{invoice.currency}  {entry.deposit_amount}</td>
-                <td>-</td>
-                <td>-</td>
+      {sameBuyerInvoices.length > 0 && (
+        <div className="mt-10">
+          <h3 className="text-xl font-semibold mb-2">
+            All Invoices for {invoice.buyer_name} (India)
+          </h3>
+          <table className="w-full border text-sm">
+            <thead className="bg-blue-100">
+              <tr>
+                <th>Invoice #</th>
+                <th>Date</th>
+                <th>GST</th>
+                <th>Total with GST</th>
               </tr>
-            ))}
-
-            <tr className="bg-yellow-100 font-bold">
-              <td colSpan={4} className="text-right">Remaining Balance</td>
-              <td>{invoice.currency} {remainingBalance.toFixed(2)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {sameBuyerInvoices.map((inv) => (
+                <tr key={inv.id}>
+                  <td>{inv.invoice_number}</td>
+                  <td>{inv.invoice_date}</td>
+                  <td>{inv.buyer_gst}</td>
+                  <td>
+                    {inv.currency} {inv.total_with_gst}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Printable hidden area */}
       <div
@@ -143,63 +123,24 @@ const InvoiceDetails = () => {
           padding: "30px",
         }}
       >
-        <h2 className="text-2xl font-bold text-center mb-6">Statement of Account</h2>
+        <h2 className="text-2xl font-bold text-center mb-6">
+          Statement of Account
+        </h2>
 
         <div className="mb-4">
-          <p><strong>Buyer Name:</strong> {invoice.buyer_name}</p>
-          <p><strong>Invoice Date:</strong> {invoice.invoice_date}</p>
-          <p><strong>Total Invoice Amount (Debit):</strong> {invoice.currency} {invoice.total_with_gst}</p>
+          <p>
+            <strong>Buyer Name:</strong> {invoice.buyer_name}
+          </p>
+          <p>
+            <strong>Invoice Date:</strong> {invoice.invoice_date}
+          </p>
+          <p>
+            <strong>Total Invoice Amount (Debit):</strong> {invoice.currency}{" "}
+            {invoice.total_with_gst}
+          </p>
         </div>
 
-        <h4 className="w-100 text-center" style={{ backgroundColor: "#51add9" }}>Account Activity</h4>
-        <table className="w-100 text-sm">
-          <thead>
-            <tr>
-              <th className="text-left">Date</th>
-              <th>Deposit Date</th>
-              <th className="text-left">Description</th>
-              <th className="text-right">Credit (Deposit)</th>
-              <th className="text-right">Debit (Invoice)</th>
-              <th className="text-right">Balance</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="bg-red-50 font-semibold">
-              <td>{invoice.invoice_date}</td>
-              <td>-</td>
-              <td>{invoice.buyer_name}</td>
-              <td className="text-right">-</td>
-              <td className="text-right">{invoice.currency}{invoice.total_with_gst}</td>
-              <td className="text-right">{invoice.currency} {invoice.total_with_gst}</td>
-            </tr>
-
-            {(() => {
-              let runningBalance = invoice.total_with_gst;
-              return buyerDeposits.map((entry, index) => {
-                const depositAmt = entry.deposit_amount;
-                runningBalance -= depositAmt;
-                return (
-                  <tr key={`deposit-${index}`} className="bg-green-50">
-                    <td>--</td>
-                    <td>{entry.transaction_date}</td>
-                    <td>{entry.notice || "Deposit"}</td>
-                    <td className="text-right">{invoice.currency}{depositAmt}</td>
-                    <td className="text-right">-</td>
-                    <td className="text-right">{invoice.currency}{runningBalance.toFixed(2)}</td>
-                  </tr>
-                );
-              });
-            })()}
-
-            <tr className="bg-gray-100 font-bold" style={{height:"100px"}}>
-              <td colSpan="2">Final Totals</td>
-              <td></td>
-              <td className="text-right">{invoice.currency}{totalDeposited.toFixed(2)}</td>
-              <td className="text-right">{invoice.currency}{invoice.total_with_gst.toFixed(2)}</td>
-              <td className="text-right">{invoice.currency}{remainingBalance.toFixed(2)}</td>
-            </tr>
-          </tbody>
-        </table>
+        {/* Account Activity section removed */}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-2 mt-4">

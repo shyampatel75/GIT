@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import "./Taxinvoice.css";
 
 const getCurrentInvoiceYear = () => {
@@ -11,65 +11,10 @@ const getCurrentInvoiceYear = () => {
 
 const Taxinvoice = () => {
   const location = useLocation();
-
-  const [billTo, setBillTo] = useState({ title: "", address: "", gst: "" });
-  const [shipTo, setShipTo] = useState({ title: "", address: "", gst: "" });
-  const [rate, setRate] = useState(0);
-  const [baseAmount, setBaseAmount] = useState(0);
-  const [cgst, setCgst] = useState(0);
-  const [sgst, setSgst] = useState(0);
-  const [totalWithGst, setTotalWithGst] = useState(0);
-  const [selectedHsn, setSelectedHsn] = useState("9983");
-  const [countries, setCountries] = useState([]);
-  const [search, setSearch] = useState("");
-  const [selectedCountry, setSelectedCountry] = useState({
-    name: "India",
-    currency: "₹",
-  });
-  const [isOpen, setIsOpen] = useState(false);
-  const [invoiceYear, setInvoiceYear] = useState(getCurrentInvoiceYear());
-  const [invoiceNumber, setInvoiceNumber] = useState(1);
-  const [showPdfContent, setShowPdfContent] = useState(false);
+  const navigate = useNavigate();
   const pdfRef = useRef(null);
-  const [date, setDate] = useState("");
-  const [deliveryNote, setDeliveryNote] = useState("");
-  const [modeOfPayment, setModeOfPayment] = useState("");
-  const [deliveryNoteDate, setDeliveryNoteDate] = useState("");
-  const [destination, setDestination] = useState("");
-  const [billToAddress, setBillToAddress] = useState("");
-  const [gstConsultancy, setGstConsultancy] = useState("");
 
-  const [invoice_Number, setinvoice_Number] = useState(() => {
-
-    const savedNumber = localStorage.getItem('lastInvoiceNumber');
-    return savedNumber ? parseInt(savedNumber) : 1;
-  });
-
-  const copyBillToShip = () => {
-    setFormData((prev) => ({
-      ...prev,
-      consignee_name: prev.buyer_name,
-      consignee_address: prev.buyer_address,
-      consignee_gst: prev.buyer_gst,
-    }));
-  };
-
-  const formatToISO = (dateStr) => {
-    if (!dateStr) return null;
-
-    // If it's already in YYYY-MM-DD
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-
-    const parts = dateStr.split(/[-/]/);
-    if (parts.length !== 3) return null; // Invalid date format
-
-    // If format is DD-MM-YYYY or DD/MM/YYYY
-    const [day, month, year] = parts;
-    if (!day || !month || !year) return null;
-
-    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
-  };
-
+  // State management
   const [formData, setFormData] = useState({
     buyer_name: location.state?.buyerData?.buyer_name || "",
     buyer_address: location.state?.buyerData?.buyer_address || "",
@@ -100,108 +45,199 @@ const Taxinvoice = () => {
     financial_year: getCurrentInvoiceYear(),
   });
 
+  const [selectedHsn, setSelectedHsn] = useState("9983");
+  const [countries, setCountries] = useState([]);
+  const [search, setSearch] = useState("");
+  const [selectedCountry, setSelectedCountry] = useState({
+    name: "India",
+    currency: "₹",
+    currencyCode: "INR"
+  });
+  const [isOpen, setIsOpen] = useState(false);
+  const [invoiceYear, setInvoiceYear] = useState(getCurrentInvoiceYear());
+  const [invoice_Number, setinvoice_Number] = useState(() => {
+    const savedNumber = localStorage.getItem('lastInvoiceNumber');
+    return savedNumber ? parseInt(savedNumber) : 1;
+  });
+  const [settingsData, setSettingsData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
-  const [data, setData] = useState(null);
+  // Helper functions
+  const formatToISO = (dateStr) => {
+    if (!dateStr) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+    const parts = dateStr.split(/[-/]/);
+    if (parts.length !== 3) return null;
+    const [day, month, year] = parts;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  };
 
-  useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/settings/")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.length > 0) {
-          setData(data[data.length - 1]);
+  const copyBillToShip = () => {
+    setFormData(prev => ({
+      ...prev,
+      consignee_name: prev.buyer_name,
+      consignee_address: prev.buyer_address,
+      consignee_gst: prev.buyer_gst,
+    }));
+  };
+
+  // Fetch data functions with authentication
+  const fetchSettings = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      const response = await fetch("http://127.0.0.1:8000/api/settings/", {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
-      })
-      .catch((err) => console.error("Error fetching settings", err));
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch settings');
+      }
+
+      const data = await response.json();
+      if (data.length > 0) {
+        setSettingsData(data[data.length - 1]);
+      }
+    } catch (err) {
+      console.error("Error fetching settings:", err);
+      setError(err.message || "Failed to load company settings");
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate]);
+
+  const fetchCountries = useCallback(async () => {
+    try {
+      const response = await fetch("https://restcountries.com/v3.1/all");
+      if (!response.ok) throw new Error("Network response was not ok");
+      const data = await response.json();
+      const countryList = data.map((country) => {
+        const currencyCode = country.currencies ? Object.keys(country.currencies)[0] : "";
+        const currencySymbol = country.currencies?.[currencyCode]?.symbol || "";
+        return {
+          name: country.name.common,
+          currency: currencySymbol,
+          currencyCode: currencyCode,
+          flag: country.flags?.svg
+        };
+      }).filter(country => country.currencyCode);
+
+      countryList.sort((a, b) => a.name.localeCompare(b.name));
+      setCountries(countryList);
+    } catch (error) {
+      console.error("Error fetching countries:", error);
+      const fallbackCountries = [
+        { name: "India", currency: "₹", currencyCode: "INR" },
+        { name: "United States", currency: "$", currencyCode: "USD" },
+        { name: "United Kingdom", currency: "£", currencyCode: "GBP" },
+        { name: "European Union", currency: "€", currencyCode: "EUR" },
+        { name: "Japan", currency: "¥", currencyCode: "JPY" }
+      ];
+      setCountries(fallbackCountries);
+    }
   }, []);
 
+  const fetchLatestInvoiceNumber = useCallback(async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      const response = await fetch("http://localhost:8000/api/invoices/next-invoice-number/", {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const numericPart = parseInt(data.invoice_number.split('-')[0]);
+        setinvoice_Number(prev => Math.max(prev, numericPart || 1));
+      }
+    } catch (error) {
+      console.error("Error verifying invoice number:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate]);
+
+  // Effects
   useEffect(() => {
+    fetchCountries();
+    fetchSettings();
+    fetchLatestInvoiceNumber();
+
     const interval = setInterval(() => {
       const newYear = getCurrentInvoiceYear();
       setInvoiceYear(newYear);
-    }, 1000 * 60 * 60 * 24); // Check daily if the year has changed
+    }, 1000 * 60 * 60 * 24);
 
-    return () => clearInterval(interval); // Cleanup interval on component unmount
-  }, []);
+    return () => clearInterval(interval);
+  }, [fetchCountries, fetchSettings, fetchLatestInvoiceNumber]);
 
   useEffect(() => {
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
       financial_year: invoiceYear,
     }));
   }, [invoiceYear]);
 
-
-
-
-  // And add this useEffect to sync with the server's latest number on load
   useEffect(() => {
-    const fetchLatestInvoiceNumber = async () => {
-      try {
-        const response = await fetch("http://localhost:8000/api/invoices/next-invoice-number/");
-        if (response.ok) {
-          const data = await response.json();
-          const numericPart = parseInt(data.invoice_number.split('-')[0]);
-          // Only update if server has a higher number than we have locally
-          setinvoice_Number(prev => Math.max(prev, numericPart || 1));
-        }
-      } catch (error) {
-        console.error("Error verifying invoice number:", error);
-      }
-    };
+    if (selectedCountry) {
+      setFormData(prev => ({
+        ...prev,
+        country: selectedCountry.name,
+        currency: selectedCountry.currencyCode,
+      }));
+    }
+  }, [selectedCountry]);
 
-    fetchLatestInvoiceNumber();
-  }, []);
+  // Filter countries based on search
+  const filteredCountries = countries.filter(country =>
+    country.name.toLowerCase().includes(search.toLowerCase()) ||
+    country.currencyCode.toLowerCase().includes(search.toLowerCase())
+  );
 
-  const incrementInvoice = () => setInvoiceNumber((prev) => prev + 1);
-  const decrementInvoice = () => setInvoiceNumber((prev) => (prev > 1 ? prev - 1 : 1));
+  // Handlers
+  const handleSelectChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
 
-  // Use invoiceNumber in your form
-
-
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
   const numberToWords = (num) => {
-    const ones = [
-      "",
-      "One",
-      "Two",
-      "Three",
-      "Four",
-      "Five",
-      "Six",
-      "Seven",
-      "Eight",
-      "Nine",
-    ];
-    const teens = [
-      "Ten",
-      "Eleven",
-      "Twelve",
-      "Thirteen",
-      "Fourteen",
-      "Fifteen",
-      "Sixteen",
-      "Seventeen",
-      "Eighteen",
-      "Nineteen",
-    ];
-    const tens = [
-      "",
-      "",
-      "Twenty",
-      "Thirty",
-      "Forty",
-      "Fifty",
-      "Sixty",
-      "Seventy",
-      "Eighty",
-      "Ninety",
-    ];
+    const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
+    const teens = ["Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+    const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
     const thousandUnits = ["", "Thousand", "Lakh", "Crore"];
+    
     if (num === 0) return "Zero";
     let words = "";
     let unitIndex = 0;
-    // Handle the integer part of the number
     let integerPart = Math.floor(num);
+    
     while (integerPart > 0) {
       let chunk = integerPart % 1000;
       if (chunk) {
@@ -215,18 +251,14 @@ const Taxinvoice = () => {
         } else if (chunk < 20) {
           chunkWords += teens[chunk - 10];
         } else {
-          chunkWords +=
-            tens[Math.floor(chunk / 10)] +
-            (chunk % 10 !== 0 ? " " + ones[chunk % 10] : "");
+          chunkWords += tens[Math.floor(chunk / 10)] + (chunk % 10 !== 0 ? " " + ones[chunk % 10] : "");
         }
-        words =
-          chunkWords.trim() + " " + thousandUnits[unitIndex] + " " + words;
+        words = chunkWords.trim() + " " + thousandUnits[unitIndex] + " " + words;
       }
       integerPart = Math.floor(integerPart / 1000);
       unitIndex++;
     }
 
-    // Handle the fractional part (for paisa or cents)
     let decimalPart = Math.round((num - Math.floor(num)) * 100);
     if (decimalPart > 0) {
       words += " and " + numberToWords(decimalPart) + " Paisa";
@@ -235,85 +267,143 @@ const Taxinvoice = () => {
     return words.trim();
   };
 
-  useEffect(() => {
-    const fetchCountries = async () => {
-      try {
-        const response = await fetch("https://restcountries.com/v3.1/all");
-        if (!response.ok) throw new Error("Network response was not ok");
-        const data = await response.json();
-        const countryList = data.map((country) => {
-          const currencyCode = country.currencies
-            ? Object.keys(country.currencies)[0]
-            : "";
-          const currencySymbol =
-            country.currencies?.[currencyCode]?.symbol || "";
-          return {
-            name: country.name.common,
-            currency: currencySymbol,
-            flag: country.flags.svg, // Get country flag image
-          };
-        });
-        setCountries(countryList);
-      } catch (error) {
-        console.error("Error fetching countries:", error);
-      }
-    };
-    fetchCountries();
-  }, []);
+  const calculateTotal = useCallback(() => {
+  const total_hours = parseFloat(formData.total_hours) || 0;
+  const rate = parseFloat(formData.rate) || 0;
+  const base_amount = parseFloat(formData.base_amount);
 
-  const filteredCountries = countries.filter((country) =>
-    country.name.toLowerCase().includes(search.toLowerCase())
-  );
-  const handleSelectChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prevData) => ({
-      ...prevData,
-      [name]: value,
-    }));
-  };
-
-  useEffect(() => {
-    if (selectedCountry) {
-      setFormData((prev) => ({
-        ...prev,
-        country: selectedCountry.name,
-        currency: selectedCountry.currency, // ✅ update currency
-      }));
-    }
-  }, [selectedCountry]);
-
-
-  // Auto calculate values when total_hours or rate changes
-  useEffect(() => {
-    calculateTotal();
-  }, [formData.total_hours, formData.rate, formData.country]);
-
-  // Function to calculate total tax (CGST + SGST)
-  const totalTax = (cgstValue, sgstValue) => {
-    return cgstValue + sgstValue;
-  };
-
-  // Handle input changes
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-  // Update the handleSubmit function
-  // Update the handleSubmit function
- const handleSubmit = async (e) => {
-  e.preventDefault();
-
-  // Format invoice date and delivery note date
-  const formattedInvoiceDate = formatToISO(formData.invoice_date);
-  const formattedDeliveryDate = formatToISO(formData.delivery_note_date);
-
-  if (!formattedInvoiceDate) {
-    alert("Please enter a valid invoice date in DD-MM-YYYY or YYYY-MM-DD format.");
-    return;
+  let calculatedBaseAmount;
+  if (total_hours > 0 && rate > 0) {
+    // Calculate from hours and rate
+    calculatedBaseAmount = total_hours * rate;
+  } else {
+    // Use directly entered base amount
+    calculatedBaseAmount = base_amount;
   }
 
+  if (selectedCountry.name === "India" && calculatedBaseAmount > 0) {
+    const tax = (calculatedBaseAmount * 9) / 100;
+    const total_with_gst = Math.round(calculatedBaseAmount + 2 * tax);
+    const total_tax = tax * 2;
+
+    setFormData(prev => ({
+      ...prev,
+      base_amount: calculatedBaseAmount,
+      cgst: tax,
+      sgst: tax,
+      taxtotal: total_tax,
+      total_with_gst,
+    }));
+  } else {
+    setFormData(prev => ({
+      ...prev,
+      base_amount: calculatedBaseAmount,
+      cgst: 0,
+      sgst: 0,
+      taxtotal: 0,
+      total_with_gst: Math.round(calculatedBaseAmount) || 0,
+    }));
+  }
+}, [formData.total_hours, formData.rate, formData.base_amount, selectedCountry.name]);
+
+
+const handleBaseAmountChange = (e) => {
+  const { name, value } = e.target;
+  setFormData(prev => ({ 
+    ...prev, 
+    [name]: value,
+    // Reset hours and rate when manually entering base amount
+    ...(name === "base_amount" && value && {
+      total_hours: "",
+      rate: ""
+    })
+  }));
+  
+  // Only recalculate if we're changing base_amount directly
+  if (name === "base_amount") {
+    const base_amount = parseFloat(value);
+    if (selectedCountry.name === "India" && base_amount > 0) {
+      const tax = (base_amount * 9) / 100;
+      const total_with_gst = Math.round(base_amount + 2 * tax);
+      const total_tax = tax * 2;
+
+      setFormData(prev => ({
+        ...prev,
+        base_amount,
+        cgst: tax,
+        sgst: tax,
+        taxtotal: total_tax,
+        total_with_gst,
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        base_amount,
+        cgst: 0,
+        sgst: 0,
+        taxtotal: 0,
+        total_with_gst: Math.round(base_amount),
+      }));
+    }
+  }
+};
+
+  useEffect(() => {
+    calculateTotal();
+  }, [calculateTotal]);
+
+  const toBase64 = (url) =>
+    fetch(url)
+      .then((response) => response.blob())
+      .then((blob) => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      });
+
+
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  
   try {
+    setLoading(true);
+    setError("");
+    setSuccess(false);
+    
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
+    // Format dates
+    const formattedInvoiceDate = formatToISO(formData.invoice_date);
+    const formattedDeliveryDate = formatToISO(formData.delivery_note_date);
+
+    if (!formattedInvoiceDate || !formattedDeliveryDate) {
+      throw new Error("Please enter valid dates in DD-MM-YYYY or YYYY-MM-DD format.");
+    }
+
     const fullInvoiceNumber = `${String(invoice_Number).padStart(2, "0")}-${invoiceYear}`;
+
+    // Prepare numeric fields - ensure they're valid numbers or null
+    const prepareNumericField = (value) => {
+      const num = parseFloat(value);
+      return isNaN(num) ? null : num;
+    };
+
+    // Calculate base_amount based on what's provided
+    let base_amount;
+    if (formData.total_hours && formData.rate) {
+      base_amount = parseFloat(formData.total_hours) * parseFloat(formData.rate);
+    } else if (formData.base_amount) {
+      base_amount = parseFloat(formData.base_amount);
+    } else {
+      throw new Error("Please provide either (total hours + rate) OR base amount");
+    }
 
     const payload = {
       ...formData,
@@ -321,44 +411,53 @@ const Taxinvoice = () => {
       invoice_date: formattedInvoiceDate,
       delivery_note_date: formattedDeliveryDate,
       country: selectedCountry.name,
-      currency: selectedCountry.currency,
+      currency: selectedCountry.currencyCode,
+      // Ensure all numeric fields are properly formatted
+      total_hours: prepareNumericField(formData.total_hours),
+      rate: prepareNumericField(formData.rate),
+      base_amount: base_amount,
+      cgst: prepareNumericField(formData.cgst),
+      sgst: prepareNumericField(formData.sgst),
+      taxtotal: prepareNumericField(formData.taxtotal),
+      total_with_gst: prepareNumericField(formData.total_with_gst),
     };
 
-    const saveResponse = await fetch("http://localhost:8000/api/create/", {
+    const response = await fetch("http://localhost:8000/api/create/", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify(payload),
     });
 
-    const responseData = await saveResponse.json();
+    const responseData = await response.json();
 
-    if (!saveResponse.ok) {
+    if (!response.ok) {
       const errorMessages = Object.values(responseData.errors || {}).flat().join(", ");
       throw new Error(errorMessages || "Failed to save invoice");
     }
 
+    setSuccess("Invoice created and PDF downloaded successfully!");
+    
+    // Generate PDF
     await generatePDF(fullInvoiceNumber);
 
+    // Update invoice number
     setinvoice_Number(prev => {
       const nextNum = prev + 1;
       localStorage.setItem('lastInvoiceNumber', nextNum.toString());
       return nextNum;
     });
 
-    alert("Invoice created and PDF downloaded successfully!");
-  } catch (error) {
-    console.error("Invoice processing error:", error);
-    alert(`Error: ${error.message}`);
+  } catch (err) {
+    console.error("Invoice processing error:", err);
+    setError(err.message || "An error occurred while processing the invoice");
+  } finally {
+    setLoading(false);
   }
 };
 
-
-
-
-
-  // Update the generatePDF function
   const generatePDF = async (invoiceNumber) => {
     const input = pdfRef.current;
     if (!input) {
@@ -394,7 +493,7 @@ const Taxinvoice = () => {
       let contentHeight = (canvas.height * contentWidth) / canvas.width;
 
       if (contentHeight + margin > pageHeight) {
-        contentHeight = pageHeight - margin; // Set bottom padding to 0
+        contentHeight = pageHeight - margin;
       }
 
       pdf.addImage(
@@ -409,88 +508,14 @@ const Taxinvoice = () => {
       pdf.save(`Invoice_${invoiceNumber}.pdf`);
     } catch (error) {
       console.error("PDF generation error:", error);
-      alert("Failed to generate PDF");
+      setError("Failed to generate PDF");
     } finally {
       input.style.visibility = originalVisibility;
     }
   };
 
+  if (!settingsData) return <p className="text-center mt-4">Loading settings...</p>;
 
-
-
-  const getNextInvoiceNumber = async () => {
-    try {
-      const res = await fetch("http://localhost:8000/api/invoices/");
-      const data = await res.json();
-
-      // Extract and filter only valid invoice numbers like "01-2025/2026"
-      const invoiceNumbers = data
-        .map((inv) => inv.invoice_number)
-        .filter((num) => num && num.includes("-"))
-        .map((num) => {
-          const [prefix] = num.split("-");
-          return parseInt(prefix, 10);
-        });
-
-      const maxNumber = invoiceNumbers.length > 0 ? Math.max(...invoiceNumbers) : 0;
-      const nextNumber = (maxNumber + 1).toString().padStart(2, "0");
-
-      const year = new Date().getFullYear();
-      const currentFinancialYear = `${year}/${year + 1}`;
-
-      const nextInvoiceNumber = `${nextNumber}-${currentFinancialYear}`;
-
-      console.log("Next Invoice Number:", nextInvoiceNumber);
-      return nextInvoiceNumber;
-
-    } catch (error) {
-      console.error("Failed to get next invoice number:", error);
-      return null;
-    }
-  };
-
-
-  // Auto calculate total with GST and tax fields
-  const calculateTotal = () => {
-    const total_hours = parseFloat(formData.total_hours) || 0;
-    const rate = parseFloat(formData.rate) || 0;
-    const base_amount = total_hours * rate;
-
-    console.log("Base Amount:", base_amount);
-    // console.log("Total With GST:", total_with_gst);
-
-    if (formData.country === "India" && base_amount > 0) {
-      const tax = (base_amount * 9) / 100;
-      const total_with_gst = Math.round(base_amount + 2 * tax);
-      console.log("Total With GST after tax:", total_with_gst);
-
-      const total_tax = totalTax(tax, tax); // Calculate CGST + SGST
-      setFormData((prev) => ({
-        ...prev,
-        base_amount,
-        cgst: tax,
-        sgst: tax,
-        taxtotal: total_tax, // Set total tax value
-        total_with_gst,
-      }));
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        base_amount,
-        cgst: 0,
-        sgst: 0,
-        taxtotal: 0, // No tax for countries other than India
-        total_with_gst: Math.round(base_amount),
-      }));
-    }
-  };
-
-  useEffect(() => {
-    calculateTotal(); // Whenever formData.base_amount changes, recalculate
-  }, [formData.base_amount]);
-
-
-  if (!data) return <p className="text-center mt-4">Loading settings...</p>;
   return (
     <div style={{ paddingLeft: "70px", fontFamily: "Arial, sans-serif" }} onSubmit={handleSubmit}>
       <div style={{ paddingRight: "10px" }}>
@@ -505,23 +530,23 @@ const Taxinvoice = () => {
                   <tr>
                     <td className="gray-background" >
                       <strong style={{ fontSize: "15px", fontfamily: "Arial, sans-serif" }}>
-                        {data.company_name}
+                        {settingsData.company_name}
                       </strong>
                     </td>
                   </tr>
                   <tr>
                     <td style={{ padding: "10px", fontFamily: "Arial, sans-serif" }}>
-                      {data.seller_address}
+                      {settingsData.seller_address}
                       <br />
-                      Email: {data.seller_email}
+                      Email: {settingsData.seller_email}
                       <br />
-                      PAN: {data.seller_pan}
+                      PAN: {settingsData.seller_pan}
                       <br />
                     </td>
                   </tr>
                   <tr >
                     <td className="gray-background">
-                      <strong>  GSTIN/UIN:</strong>{data.seller_gstin}
+                      <strong>  GSTIN/UIN:</strong>{settingsData.seller_gstin}
                     </td>
                   </tr>
                 </tbody>
@@ -545,7 +570,7 @@ const Taxinvoice = () => {
                         value={formData.buyer_name}
                         onChange={handleChange}
                         required
-                      // style={{ border: !formData.buyer_name ? '1px solid red' : '' }}
+                        // style={{ border: !formData.buyer_name ? '1px solid red' : '' }}
                       />
                       <br />
                       Address:
@@ -572,7 +597,6 @@ const Taxinvoice = () => {
               </table>
 
               {/* Consignee Info */}
-
               <table className="table table-bordered black-bordered">
                 <tbody>
                   <tr>
@@ -680,7 +704,7 @@ const Taxinvoice = () => {
                     <td>Delivery Note Date</td>
                     <td>
                       <input
-                        type="date" // ✅ Use "date" for a date picker
+                        type="date"
                         name="delivery_note_date"
                         className="deliveryNote"
                         value={formData.delivery_note_date}
@@ -834,6 +858,10 @@ const Taxinvoice = () => {
                         value={formData.total_hours}
                         onChange={(e) => {
                           handleChange(e);
+                          setFormData(prev => ({
+        ...prev,
+        base_amount: ""
+      }));
                           calculateTotal();
                         }}
                       />
@@ -846,6 +874,10 @@ const Taxinvoice = () => {
                         value={formData.rate}
                         onChange={(e) => {
                           handleChange(e);
+                          setFormData(prev => ({
+        ...prev,
+        base_amount: ""
+      }));
                           calculateTotal();
                         }}
                       />
@@ -861,9 +893,9 @@ const Taxinvoice = () => {
                         name="base_amount"
                         type="number"
                         value={formData.base_amount}
-                        onChange={handleChange}
+                        onChange={handleBaseAmountChange}
+                        readOnly={formData.total_hours > 0 && formData.rate > 0}
                       />
-
                     </td>
                   </tr>
                   {selectedCountry.name === "India" && (
@@ -1014,22 +1046,22 @@ const Taxinvoice = () => {
               <div className="hr">
                 <strong>Company's Bank Details</strong>
                 <br />
-                A/c Holder's Name: {data.bank_account_holder}
+                A/c Holder's Name: {settingsData.bank_account_holder}
                 <br />
-                Bank Name:{data.bank_name}
+                Bank Name:{settingsData.bank_name}
                 <br />
-                A/c No.:{data.account_number}
+                A/c No.:{settingsData.account_number}
                 <br />
-                IFS Code:{data.ifsc_code}
+                IFS Code:{settingsData.ifsc_code}
                 <br />
-                Branch: {data.branch}
+                Branch: {settingsData.branch}
                 <br />
-                SWIFT Code:{data.swift_code}
+                SWIFT Code:{settingsData.swift_code}
               </div>
               <div className="text-right signatory">
-                {data.logo && (
+                {settingsData.logo && (
                   <img
-                    src={`http://127.0.0.1:8000${data.logo}`}
+                    src={`http://127.0.0.1:8000${settingsData.logo}`}
                     alt="Company Logo"
                     className="logo-image"
                   />
@@ -1048,10 +1080,6 @@ const Taxinvoice = () => {
       <div
         ref={pdfRef}
         style={{
-          // position: "absolute",
-          // // top: "-9999px",
-          // // left: "-9999px",
-          // // visibility: "hidden",
           fontFamily: "Arial, sans-serif",
           color: "#575757"
         }}
@@ -1068,23 +1096,23 @@ const Taxinvoice = () => {
                     <tr>
                       <td className="gray-background">
                         <strong style={{ fontSize: "15px" }}>
-                          Grabsolve Infotech:
+                          {settingsData.company_name}:
                         </strong>
                       </td>
                     </tr>
                     <tr>
                       <td style={{ padding: "10px", height: "150px" }}>
-                        {data.seller_address}
+                        {settingsData.seller_address}
                         <br />
-                        Email:{data.seller_email}
+                        Email:{settingsData.seller_email}
                         <br />
-                        PAN:{data.seller_pan}
+                        PAN:{settingsData.seller_pan}
                         <br />
                       </td>
                     </tr>
                     <tr>
                       <td className="gray-background">
-                        <strong>  GSTIN/UIN:</strong>{data.seller_gstin}
+                        <strong>  GSTIN/UIN:</strong>{settingsData.seller_gstin}
                       </td>
                     </tr>
                   </tbody>
@@ -1135,7 +1163,6 @@ const Taxinvoice = () => {
                           height: "150px",
                         }}
                       >
-
                         <div>
                           {formData.consignee_address}
                         </div>
@@ -1165,11 +1192,7 @@ const Taxinvoice = () => {
                     </tr>
                     <tr>
                       <td>Date</td>
-                      <td>
-                        {formData.invoice_date
-                          ? new Date(formData.invoice_date).toLocaleDateString("en-GB")
-                          : ""}
-                      </td>
+                      <td>{formData.invoice_date}</td>
                     </tr>
                     <tr>
                       <td>Delivery Note</td>
@@ -1181,9 +1204,7 @@ const Taxinvoice = () => {
                     </tr>
                     <tr>
                       <td>Delivery Note Date</td>
-                      <td>{formData.delivery_note_date
-                      ? new Date(formData.delivery_note_date).toLocaleDateString("en-GB")
-                          : ""}</td>
+                      <td>{formData.delivery_note_date}</td>
                     </tr>
                     <tr>
                       <td>Destination</td>
@@ -1453,22 +1474,22 @@ const Taxinvoice = () => {
                 <div className="hr">
                   <strong>Company's Bank Details</strong>
                   <br />
-                  A/c Holder's Name: {data.bank_account_holder}
+                  A/c Holder's Name: {settingsData.bank_account_holder}
                   <br />
-                  Bank Name:{data.bank_name}
+                  Bank Name:{settingsData.bank_name}
                   <br />
-                  A/c No.:{data.account_number}
+                  A/c No.:{settingsData.account_number}
                   <br />
-                  IFS Code:{data.ifsc_code}
+                  IFS Code:{settingsData.ifsc_code}
                   <br />
-                  Branch: {data.branch}
+                  Branch: {settingsData.branch}
                   <br />
-                  SWIFT Code:{data.swift_code}
+                  SWIFT Code:{settingsData.swift_code}
                 </div>
                 <div className="text-right signatory">
-                  {data.logo && (
+                  {settingsData.logo && (
                     <img
-                      src={`http://127.0.0.1:8000${data.logo}`}
+                      src={`http://127.0.0.1:8000${settingsData.logo}`}
                       alt="Company Logo"
                       className="logo-image"
                     />

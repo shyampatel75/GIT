@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -9,36 +9,75 @@ const Clientinvoices = () => {
   const [invoices, setInvoices] = useState([]);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [logoLoaded, setLogoLoaded] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
   const printRef = useRef();
 
   const client = state?.client;
+
+  const fetchInvoices = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      const response = await fetch("http://localhost:8000/api/invoices/", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch invoices");
+      }
+
+      const data = await response.json();
+      setInvoices(data);
+    } catch (err) {
+      console.error("Error fetching invoices:", err);
+      setError(err.message || "Failed to load invoices");
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate]);
 
   useEffect(() => {
     if (!client) {
       fetchInvoices();
     }
-  }, []);
-
-  const fetchInvoices = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch("http://localhost:8000/api/invoices/");
-      const data = await response.json();
-      setInvoices(data);
-    } catch (err) {
-      console.error("Error fetching invoices:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [client, fetchInvoices]);
 
   const handleDownload = async (invoice) => {
     try {
-      setIsLoading(true);
+      setLoading(true);
+      setError("");
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        navigate("/login");
+        return;
+      }
 
-      const resSetting = await fetch(`http://localhost:8000/api/settings/`);
-      const settingsData = await resSetting.json();
+      // Fetch settings data
+      const settingsResponse = await fetch(
+        `http://localhost:8000/api/settings/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!settingsResponse.ok) {
+        throw new Error("Failed to fetch settings");
+      }
+      const settingsData = await settingsResponse.json();
       const settings = settingsData[0];
 
       let fullInvoice;
@@ -46,8 +85,20 @@ const Clientinvoices = () => {
       if (invoice.id && invoice.invoice_number) {
         fullInvoice = { ...invoice, ...settings };
       } else {
-        const res = await fetch(`http://localhost:8000/api/invoices/${invoice}/`);
-        const pdfBasicDetail = await res.json();
+        const invoiceResponse = await fetch(
+          `http://localhost:8000/api/invoices/${invoice}/`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        if (!invoiceResponse.ok) {
+          throw new Error("Failed to fetch invoice details");
+        }
+        const pdfBasicDetail = await invoiceResponse.json();
         fullInvoice = { ...pdfBasicDetail, ...settings };
       }
 
@@ -72,7 +123,8 @@ const Clientinvoices = () => {
       }
     } catch (err) {
       console.error("Download error:", err);
-      setIsLoading(false);
+      setError(err.message || "Failed to prepare invoice for download");
+      setLoading(false);
     }
   };
 
@@ -92,12 +144,14 @@ const Clientinvoices = () => {
         const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
         pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
         pdf.save(`Invoice_${selectedInvoice.invoice_number}.pdf`);
+        setSuccess("Invoice downloaded successfully!");
       } catch (err) {
         console.error("PDF generation error:", err);
+        setError("Failed to generate PDF");
       } finally {
         setSelectedInvoice(null);
         setLogoLoaded(false);
-        setIsLoading(false);
+        setLoading(false);
       }
     }
   };
@@ -108,37 +162,53 @@ const Clientinvoices = () => {
     }
   }, [selectedInvoice, logoLoaded]);
 
- const handleDelete = async (invoiceId) => {
+  const handleDelete = async (invoiceId) => {
     if (window.confirm("Are you sure you want to delete this invoice?")) {
       try {
-        const res = await fetch(`http://localhost:8000/api/delete/${invoiceId}/`, {
-          method: "DELETE",
-        });
+        setLoading(true);
+        setError("");
+        const token = localStorage.getItem("access_token");
+        if (!token) {
+          navigate("/login");
+          return;
+        }
+
+        const res = await fetch(
+          `http://localhost:8000/api/delete/${invoiceId}/`,
+          {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
 
         if (res.ok) {
-          // Remove the deleted invoice from state
           setInvoices((prevInvoices) =>
             prevInvoices.filter((invoice) => invoice.id !== invoiceId)
           );
-          alert("Invoice deleted successfully!");
+          setSuccess("Invoice deleted successfully!");
         } else {
-          alert("Failed to delete invoice.");
+          const errorData = await res.json();
+          throw new Error(errorData.message || "Failed to delete invoice");
         }
       } catch (err) {
         console.error("Error deleting invoice:", err);
-        alert("An error occurred while deleting the invoice.");
+        setError(err.message || "An error occurred while deleting the invoice");
+      } finally {
+        setLoading(false);
       }
     }
   };
 
-  // const displayInvoices = client ? client.invoices : invoices;
-  // const displayInvoices = client?.invoices || invoices;
   const displayInvoices = client ? client.invoices : invoices;
-
-
 
   return (
     <div style={{ padding: "40px" }}>
+      {error && <div className="alert alert-danger">{error}</div>}
+      {success && <div className="alert alert-success">{success}</div>}
+
       {client ? (
         <h2>
           Invoices for {client.buyer_name} (GST: {client.buyer_gst})
@@ -161,58 +231,81 @@ const Clientinvoices = () => {
           </tr>
         </thead>
         <tbody>
-         {(displayInvoices || []).map((invoice, index) => (
-            <tr key={invoice.id}>
-              <td>{index + 1}</td>
-              <td>{invoice.buyer_name}</td>
-              <td>{invoice.invoice_number}</td>
-              <td>{invoice.invoice_date}</td>
-              <td>
-                {invoice.currency} {parseFloat(invoice.total_with_gst).toFixed(2)}
+          {loading && invoices.length === 0 ? (
+            <tr>
+              <td colSpan="8" className="text-center">
+                Loading invoices...
               </td>
-              <td>
-                <button
-                  className="btn btn-outline-primary"
-                  onClick={() =>
-                    navigate(`/invoice-detail/${invoice.id}`, {
-                      state: { invoice },
-                    })
-                  }
-                >
-                  View
-                </button>
-              </td>
-              <td>
-                <button
-                  className="btn btn-outline-success"
-                  onClick={() => handleDownload(invoice)}
-                  disabled={isLoading && selectedInvoice?.id === invoice.id}
-                >
-                  {isLoading && selectedInvoice?.id === invoice.id
-                    ? "Generating..."
-                    : "Download"}
-                </button>
-              </td>
-              <td>
-                    <button
-                      className="deletebutton"
-                      onClick={() => handleDelete(invoice.id)}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                
             </tr>
-          ))}
+          ) : (
+            (displayInvoices || []).map((invoice, index) => (
+              <tr key={invoice.id}>
+                <td>{index + 1}</td>
+                <td>{invoice.buyer_name}</td>
+                <td>{invoice.invoice_number}</td>
+                {/* <td>{invoice.invoice_date}</td> */}
+                <td>
+                  {invoice.invoice_date
+                    ? new Date(invoice.invoice_date).toLocaleDateString("en-GB")
+                    : "N/A"}
+                </td>
+
+                <td>
+                  {invoice.currency}{" "}
+                  {parseFloat(invoice.total_with_gst).toFixed(2)}
+                </td>
+                <td>
+                  <button
+                    className="btn btn-outline-primary"
+                    onClick={() =>
+                      navigate(`/invoice-detail/${invoice.id}`, {
+                        state: { invoice },
+                      })
+                    }
+                    disabled={loading}
+                  >
+                    View
+                  </button>
+                </td>
+                <td>
+                  <button
+                    className="btn btn-outline-success"
+                    onClick={() => handleDownload(invoice)}
+                    disabled={loading && selectedInvoice?.id === invoice.id}
+                  >
+                    {loading && selectedInvoice?.id === invoice.id
+                      ? "Generating..."
+                      : "Download"}
+                  </button>
+                </td>
+                <td>
+                  <button
+                    className="deletebutton"
+                    onClick={() => handleDelete(invoice.id)}
+                    disabled={loading}
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
+
       {/* Hidden Printable Section */}
       {selectedInvoice && (
-        <div ref={printRef} style={{ position: "absolute", left: "-9999px", top: 0 }}>
+        <div
+          ref={printRef}
+          style={{ position: "absolute", left: "-9999px", top: 0 }}
+        >
           <div style={{ paddingLeft: "10px" }}>
             <div style={{ paddingRight: "10px" }}>
               <h2 className="text-center">TAX INVOICE</h2>
-              <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white" }}>
+              <div
+                className="table-bordered black-bordered main-box"
+                style={{ backgroundColor: "white" }}
+              >
                 <div className="row date-tables">
                   <div className="col-6">
                     {/* Seller Info */}
@@ -237,7 +330,8 @@ const Clientinvoices = () => {
                         </tr>
                         <tr>
                           <td className="gray-background">
-                            <strong>GSTIN/UIN:</strong> {selectedInvoice.seller_gstin}
+                            <strong>GSTIN/UIN:</strong>{" "}
+                            {selectedInvoice.seller_gstin}
                           </td>
                         </tr>
                       </tbody>
@@ -248,7 +342,8 @@ const Clientinvoices = () => {
                       <tbody style={{ border: "2px solid" }}>
                         <tr>
                           <td className="gray-background">
-                            <strong>Buyer (Bill to):</strong> {selectedInvoice.buyer_name}
+                            <strong>Buyer (Bill to):</strong>{" "}
+                            {selectedInvoice.buyer_name}
                           </td>
                         </tr>
                         <tr>
@@ -264,7 +359,8 @@ const Clientinvoices = () => {
                         </tr>
                         <tr>
                           <td className="gray-background">
-                            <strong>GSTIN/UIN:</strong> {selectedInvoice.buyer_gst}
+                            <strong>GSTIN/UIN:</strong>{" "}
+                            {selectedInvoice.buyer_gst}
                           </td>
                         </tr>
                       </tbody>
@@ -275,7 +371,8 @@ const Clientinvoices = () => {
                       <tbody style={{ border: "2px solid" }}>
                         <tr>
                           <td className="gray-background">
-                            <strong>Consignee (Ship to):</strong> {selectedInvoice.consignee_name}
+                            <strong>Consignee (Ship to):</strong>{" "}
+                            {selectedInvoice.consignee_name}
                           </td>
                         </tr>
                         <tr>
@@ -291,7 +388,8 @@ const Clientinvoices = () => {
                         </tr>
                         <tr>
                           <td className="gray-background">
-                            <strong>GSTIN/UIN:</strong> {selectedInvoice.consignee_gst}
+                            <strong>GSTIN/UIN:</strong>{" "}
+                            {selectedInvoice.consignee_gst}
                           </td>
                         </tr>
                       </tbody>
@@ -303,9 +401,7 @@ const Clientinvoices = () => {
                       <tbody style={{ border: "2px solid" }}>
                         <tr>
                           <td style={{ width: "50%" }}>Invoice No.</td>
-                          <td>
-                            {selectedInvoice.invoice_number}
-                          </td>
+                          <td>{selectedInvoice.invoice_number}</td>
                         </tr>
                         <tr>
                           <td>Date</td>
@@ -338,11 +434,15 @@ const Clientinvoices = () => {
                           </td>
                         </tr>
                         <tr>
-                          <td style={{
-                            maxWidth: "250px",
-                            overflowWrap: "break-word",
-                            height: "150px",
-                          }}>{selectedInvoice.Terms_to_delivery}</td>
+                          <td
+                            style={{
+                              maxWidth: "250px",
+                              overflowWrap: "break-word",
+                              height: "150px",
+                            }}
+                          >
+                            {selectedInvoice.Terms_to_delivery}
+                          </td>
                         </tr>
                       </tbody>
                     </table>
@@ -351,8 +451,7 @@ const Clientinvoices = () => {
                       <p>
                         <strong>Country and currency:</strong>
                       </p>
-                      <div
-                        className="border border-gray-300 p-2 rounded flex items-center justify-between cursor-pointer bg-white">
+                      <div className="border border-gray-300 p-2 rounded flex items-center justify-between cursor-pointer bg-white">
                         <div
                           className="flex items-center"
                           style={{ height: "30px" }}
@@ -386,12 +485,19 @@ const Clientinvoices = () => {
                         <tr style={{ height: "111px" }}>
                           <td>1</td>
                           <td>{selectedInvoice.Particulars}</td>
-                          <td style={{ width: "130px" }}>{selectedInvoice.hsn_code}</td>
-                          <td style={{ width: "10%" }}>{selectedInvoice.total_hours}</td>
-                          <td style={{ width: "10%" }}>{selectedInvoice.rate}</td>
+                          <td style={{ width: "130px" }}>
+                            {selectedInvoice.hsn_code}
+                          </td>
+                          <td style={{ width: "10%" }}>
+                            {selectedInvoice.total_hours}
+                          </td>
+                          <td style={{ width: "10%" }}>
+                            {selectedInvoice.rate}
+                          </td>
                           <td style={{ width: "200px" }}>
                             <span className="currency-sym">
-                              {selectedInvoice.currency} {selectedInvoice.base_amount}
+                              {selectedInvoice.currency}{" "}
+                              {selectedInvoice.base_amount}
                             </span>
                           </td>
                         </tr>
@@ -400,25 +506,35 @@ const Clientinvoices = () => {
                             <tr className="inside-india">
                               <td></td>
                               <td>
-                                <span style={{ float: "right" }}>CGST @ 9%</span>
+                                <span style={{ float: "right" }}>
+                                  CGST @ 9%
+                                </span>
                               </td>
                               <td></td>
                               <td></td>
                               <td>9%</td>
                               <td id="cgst">
-                                <span className="currency-sym">{selectedInvoice.currency} {selectedInvoice.cgst}</span>
+                                <span className="currency-sym">
+                                  {selectedInvoice.currency}{" "}
+                                  {selectedInvoice.cgst}
+                                </span>
                               </td>
                             </tr>
                             <tr className="inside-india">
                               <td></td>
                               <td>
-                                <span style={{ float: "right" }}>SGST @ 9%</span>
+                                <span style={{ float: "right" }}>
+                                  SGST @ 9%
+                                </span>
                               </td>
                               <td></td>
                               <td></td>
                               <td>9%</td>
                               <td id="sgst">
-                                <span className="currency-sym">{selectedInvoice.currency} {selectedInvoice.sgst}</span>
+                                <span className="currency-sym">
+                                  {selectedInvoice.currency}{" "}
+                                  {selectedInvoice.sgst}
+                                </span>
                               </td>
                             </tr>
                           </>
@@ -429,7 +545,8 @@ const Clientinvoices = () => {
                           </td>
                           <td>
                             <strong id="total-with-gst">
-                              {selectedInvoice.currency} {selectedInvoice.total_with_gst}
+                              {selectedInvoice.currency}{" "}
+                              {selectedInvoice.total_with_gst}
                             </strong>
                           </td>
                         </tr>
@@ -480,7 +597,9 @@ const Clientinvoices = () => {
                         <tbody style={{ border: "2px solid" }}>
                           <tr>
                             <td>
-                              <span className="hns_select_text">{selectedInvoice.hsn_code}</span>
+                              <span className="hns_select_text">
+                                {selectedInvoice.hsn_code}
+                              </span>
                             </td>
                             <td className="taxable-value">
                               {selectedInvoice.base_amount}
@@ -489,7 +608,9 @@ const Clientinvoices = () => {
                             <td className="tax-cgst">{selectedInvoice.cgst}</td>
                             <td>9%</td>
                             <td className="tax-sgst">{selectedInvoice.sgst}</td>
-                            <td className="all-tax-amount">{selectedInvoice.taxtotal}</td>
+                            <td className="all-tax-amount">
+                              {selectedInvoice.taxtotal}
+                            </td>
                           </tr>
                           <tr className="total-row">
                             <td>Total</td>
@@ -497,9 +618,13 @@ const Clientinvoices = () => {
                               {selectedInvoice.base_amount}
                             </td>
                             <td></td>
-                            <td className="total-tax-cgst">{selectedInvoice.cgst}</td>
+                            <td className="total-tax-cgst">
+                              {selectedInvoice.cgst}
+                            </td>
                             <td></td>
-                            <td className="total-tax-sgst">{selectedInvoice.sgst}</td>
+                            <td className="total-tax-sgst">
+                              {selectedInvoice.sgst}
+                            </td>
                             <td className="total-tax-amount">
                               {selectedInvoice.taxtotal}
                             </td>
@@ -522,7 +647,9 @@ const Clientinvoices = () => {
                         <h4>
                           <strong>Remarks:</strong>
                         </h4>
-                        <h5 className="html-remark">{selectedInvoice.remark}</h5>
+                        <h5 className="html-remark">
+                          {selectedInvoice.remark}
+                        </h5>
                       </div>
                     </div>
                   </div>
@@ -548,7 +675,7 @@ const Clientinvoices = () => {
                     <div className="text-right signatory">
                       <img
                         className="logo-image"
-                        src='http://127.0.0.1:8000/media/favicon_cvGw7pn.png'
+                        src="http://127.0.0.1:8000/media/favicon_cvGw7pn.png"
                         alt="Logo"
                         height={100}
                         crossOrigin="anonymous" // Add this attribute
@@ -560,7 +687,9 @@ const Clientinvoices = () => {
                   </div>
                 </div>
               </div>
-              <p className="text-center">This is a Computer Generated Invoice</p>
+              <p className="text-center">
+                This is a Computer Generated Invoice
+              </p>
             </div>
           </div>
         </div>

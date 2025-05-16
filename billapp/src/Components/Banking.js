@@ -18,7 +18,7 @@ const Banking = () => {
 
   const [salarynewname, setSalaryNewName] = useState("");
   const [salaryName, setSalaryName] = useState("");
-  const [salary, setSalaryAmount] = useState(""); // Correct usage
+  const [salary, setSalaryAmount] = useState(""); 
   const [salaryDate, setSalaryDate] = useState("");
   const [salaryInvoices, setSalaryInvoices] = useState([]);
   const [selectedSalaryInvoice, setSelectedSalaryInvoice] = useState("");
@@ -26,7 +26,7 @@ const Banking = () => {
   const [otherDate, setOtherDate] = useState("");
   const [otherNotice, setOtherNotice] = useState("");
   const [otherAmount, setOtherAmount] = useState("");
-   const [otherSelector, setOtherSelector] = useState(''); 
+  const [otherSelector, setOtherSelector] = useState('');
 
   const [allInvoices, setAllInvoices] = useState([]);
 
@@ -35,6 +35,10 @@ const Banking = () => {
   const [depositFormDate, setDepositFormDate] = useState("");
 
   const [employees, setEmployees] = useState([]);
+
+  const [showAddTypeInput, setShowAddTypeInput] = useState(false);
+  const [newType, setNewType] = useState("");
+  const [typeOptions, setTypeOptions] = useState(["Fast Expand", "Profit", "Other"]);
 
   useEffect(() => {
     if ([1, 2, 3].includes(visibleButton)) {
@@ -174,43 +178,43 @@ const Banking = () => {
     }
   };
 
- const handleOtherSubmit = async () => {
-  if (!otherDate || !otherNotice || !otherAmount || !otherSelector) {
-    alert("Please fill all required fields.");
-    return;
-  }
-
-
-  const data = {
-    other_type: otherSelector,
-    other_date: otherDate,
-    other_notice: otherNotice,
-    other_amount: parseFloat(otherAmount),
-  };
-
-  try {
-    const response = await fetch("http://localhost:8000/api/banking/other/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-
-    if (response.ok) {
-      alert("✅ Other data submitted successfully!");
-      // Reset form fields
-      setOtherSelector('');
-      setOtherDate('');
-      setOtherNotice('');
-      setOtherAmount('');
-    } else {
-      const result = await response.json();
-      alert("❌ Submission failed: " + (result.detail || JSON.stringify(result)));
+  const handleOtherSubmit = async () => {
+    if (!otherDate || !otherNotice || !otherAmount || !otherSelector) {
+      alert("Please fill all required fields.");
+      return;
     }
-  } catch (error) {
-    console.error("Error:", error);
-    alert("❌ Error submitting other data.");
-  }
-};
+
+
+    const data = {
+      other_type: otherSelector,
+      other_date: otherDate,
+      other_notice: otherNotice,
+      other_amount: parseFloat(otherAmount),
+    };
+
+    try {
+      const response = await fetch("http://localhost:8000/api/banking/other/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (response.ok) {
+        alert("✅ Other data submitted successfully!");
+        // Reset form fields
+        setOtherSelector('');
+        setOtherDate('');
+        setOtherNotice('');
+        setOtherAmount('');
+      } else {
+        const result = await response.json();
+        alert("❌ Submission failed: " + (result.detail || JSON.stringify(result)));
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      alert("❌ Error submitting other data.");
+    }
+  };
 
   const handleDepositSubmit = async () => {
     try {
@@ -320,24 +324,87 @@ const Banking = () => {
         {visibleButton === 4 && (
           <>
             <h3 className="mb-2 font-semibold">Other</h3>
-                <select
-      className="border px-4 py-2 rounded w-full mb-3"
-      value={otherSelector}
-      onChange={(e) => setOtherSelector(e.target.value)}
-      required
-    >
-      <option value="">Select Type*</option>
-      <option value="Fast Expand">Fast Expand</option>
-      <option value="Profit">Profit</option>
-      <option value="Other">Other</option>
-    </select>
 
-            <input type="date" className="border px-4 py-2 rounded w-full mb-3" value={otherDate} onChange={(e) => setOtherDate(e.target.value)} />
-            <input type="text" placeholder="Enter notice" className="border px-4 py-2 rounded w-full mb-3" value={otherNotice} onChange={(e) => setOtherNotice(e.target.value)} />
-            <input type="number" placeholder="Enter amount" className="border px-4 py-2 rounded w-full mb-3" value={otherAmount} onChange={(e) => setOtherAmount(e.target.value)} />
-            <button className="bg-red-600 text-white px-4 py-2 rounded" onClick={handleOtherSubmit}>Submit</button>
+            {/* Add Type Button + Input */}
+            <div className="flex items-center gap-2 mb-3 flex-wrap">
+              <button
+                className="bg-blue-600 text-white px-3 py-1 rounded"
+                onClick={() => setShowAddTypeInput(!showAddTypeInput)}
+              >
+                {showAddTypeInput ? "Cancel" : "Add New Type"}
+              </button>
+
+              {showAddTypeInput && (
+                <>
+                  <input
+                    type="text"
+                    placeholder="New type"
+                    className="border px-3 py-1 rounded"
+                    value={newType}
+                    onChange={(e) => setNewType(e.target.value)}
+                  />
+                  <button
+                    className="bg-green-600 text-white px-3 py-1 rounded"
+                    onClick={() => {
+                      const trimmed = newType.trim();
+                      if (trimmed && !typeOptions.includes(trimmed)) {
+                        setTypeOptions([...typeOptions, trimmed]);
+                        setNewType("");
+                        setShowAddTypeInput(false);
+                      }
+                    }}
+                  >
+                    Add
+                  </button>
+                </>
+              )}
+            </div>
+
+
+            {/* Selector with dynamic options */}
+            <select
+              className="border px-4 py-2 rounded w-full mb-3"
+              value={otherSelector}
+              onChange={(e) => setOtherSelector(e.target.value)}
+              required
+            >
+              <option value="">Select Type*</option>
+              {typeOptions.map((option, i) => (
+                <option key={i} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+
+            <input
+              type="date"
+              className="border px-4 py-2 rounded w-full mb-3"
+              value={otherDate}
+              onChange={(e) => setOtherDate(e.target.value)}
+            />
+            <input
+              type="text"
+              placeholder="Enter notice"
+              className="border px-4 py-2 rounded w-full mb-3"
+              value={otherNotice}
+              onChange={(e) => setOtherNotice(e.target.value)}
+            />
+            <input
+              type="number"
+              placeholder="Enter amount"
+              className="border px-4 py-2 rounded w-full mb-3"
+              value={otherAmount}
+              onChange={(e) => setOtherAmount(e.target.value)}
+            />
+            <button
+              className="bg-red-600 text-white px-4 py-2 rounded"
+              onClick={handleOtherSubmit}
+            >
+              Submit
+            </button>
           </>
         )}
+
       </div>
     </div>
   );
