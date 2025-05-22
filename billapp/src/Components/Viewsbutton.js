@@ -1,34 +1,73 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 
 const ViewsButton = () => {
     const { id } = useParams();
+    const navigate = useNavigate();
 
     const [invoice, setInvoice] = useState(null);
     const [settings, setSettings] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
 
     useEffect(() => {
-        // Fetch invoice details
-        fetch(`http://127.0.0.1:8000/api/invoices/${id}/`)
-            .then((res) => res.json())
-            .then((data) => setInvoice(data))
-            .catch((err) => console.error("Error fetching invoice:", err));
+        const token = localStorage.getItem("access_token");
+        if (!token) {
+            // If no token, redirect to login or show error
+            navigate("/login"); // Adjust the path as needed
+            return;
+        }
 
-        // Fetch settings
-        fetch("http://127.0.0.1:8000/api/settings/")
-            .then((res) => res.json())
-            .then((data) => {
-                if (Array.isArray(data) && data.length > 0) {
-                    setSettings(data[0]); // Use first item from array
+        const headers = {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json",
+        };
+
+        Promise.all([
+            fetch(`http://127.0.0.1:8000/api/invoices/${id}/`, { headers }),
+            fetch("http://127.0.0.1:8000/api/settings/", { headers }),
+        ])
+            .then(async ([invoiceRes, settingsRes]) => {
+                if (!invoiceRes.ok) {
+                    const errText = await invoiceRes.text();
+                    throw new Error(`Invoice fetch failed: ${errText}`);
+                }
+                if (!settingsRes.ok) {
+                    const errText = await settingsRes.text();
+                    throw new Error(`Settings fetch failed: ${errText}`);
+                }
+                const invoiceData = await invoiceRes.json();
+                const settingsData = await settingsRes.json();
+
+                setInvoice(invoiceData);
+                if (Array.isArray(settingsData) && settingsData.length > 0) {
+                    setSettings(settingsData[0]);
                 } else {
-                    console.error("Settings data is empty or not an array:", data);
+                    throw new Error("Settings data empty or invalid");
+                }
+                setError("");
+            })
+            .catch((err) => {
+                console.error("Error fetching data:", err);
+                setError(err.message || "Failed to fetch data");
+                // Optionally redirect on auth failure
+                if (err.message.includes("401") || err.message.includes("403")) {
+                    navigate("/login");
                 }
             })
-            .catch((err) => console.error("Error fetching settings:", err));
-    }, [id]);
+            .finally(() => setLoading(false));
+    }, [id, navigate]);
+
+    if (loading) {
+        return <div>Loading invoice and settings...</div>;
+    }
+
+    if (error) {
+        return <div style={{ color: "red" }}>Error: {error}</div>;
+    }
 
     if (!invoice || !settings) {
-        return <div>Loading invoice and settings...</div>;
+        return <div>No data available</div>;
     }
 
     return (

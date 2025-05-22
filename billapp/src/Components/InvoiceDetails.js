@@ -1,160 +1,198 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 
 const InvoiceDetails = () => {
-  const { id } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
-  const [invoice, setInvoice] = useState(null);
-  const [sameBuyerInvoices, setSameBuyerInvoices] = useState([]);
+  const { buyer_name, buyer_gst } = location.state || {};
+  const [invoices, setInvoices] = useState([]);
+  const [buyerDeposits, setBuyerDeposits] = useState([]);
+  const [error, setError] = useState("");
   const tableRef = useRef();
+  const token = localStorage.getItem("access_token");
 
-  // Fetch all invoices, find current one, and filter by same name and GST
-  useEffect(() => {
-    fetch("http://localhost:8000/api/invoices/")
-      .then((res) => {
-        if (!res.ok) throw new Error("Invoice not found");
-        return res.json();
-      })
-      .then((invoices) => {
-        const current = invoices.find((inv) => String(inv.id) === String(id));
-        if (!current) throw new Error("Invoice not found");
-
-        const filtered = invoices.filter(
-          (inv) =>
-            inv.buyer_name === current.buyer_name &&
-            inv.buyer_gst === current.buyer_gst &&
-            inv.buyer_country === "India"
-        );
-
-        setInvoice(current);
-        setSameBuyerInvoices(filtered);
-      })
-      .catch((err) => {
-        console.error(err);
-        setInvoice(null);
-      });
-  }, [id]);
-
-  const handleGeneratePDF = async () => {
-    const element = tableRef.current;
-    element.style.backgroundColor = "#ffffff";
-
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      backgroundColor: "#ffffff",
-      useCORS: true,
-    });
-
-    const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF("p", "mm", "a4");
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-    pdf.save(`Invoice-${invoice.buyer_name}.pdf`);
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    return `${String(date.getDate()).padStart(2, "0")}-${String(
+      date.getMonth() + 1
+    ).padStart(2, "0")}-${date.getFullYear()}`;
   };
 
-  if (!invoice) {
+  useEffect(() => {
+    if (!token) {
+      setError("Unauthorized access. Please login.");
+      return;
+    }
+
+    fetch("http://localhost:8000/api/invoices/", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject("Failed to fetch invoices")))
+      .then((all) => setInvoices(all.filter((i) => i.buyer_gst === buyer_gst)))
+      .catch((err) => setError(err.toString()));
+  }, [buyer_gst, token]);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch("http://localhost:8000/api/banking/buyer/", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject("Failed to fetch deposits")))
+      .then(setBuyerDeposits)
+      .catch(() => setBuyerDeposits([]));
+  }, [token]);
+
+const handleGeneratePDF = async () => {
+  const element = tableRef.current;
+  element.style.backgroundColor = "#fff";
+
+  const canvas = await html2canvas(element, {
+    scale: 2,
+    backgroundColor: "#fff",
+    useCORS: true,
+  });
+
+  const pdf = new jsPDF("p", "mm", "a4");
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 10;
+
+  const pdfWidth = pageWidth - margin * 2;
+  const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+  pdf.addImage(
+    canvas.toDataURL("image/png"),
+    "PNG",
+    margin,
+    margin,
+    pdfWidth,
+    pdfHeight
+  );
+
+  pdf.save(`Statement-${buyer_name}.pdf`);
+};
+
+
+  const renderTableRows = () => {
+    let balance = 0;
+    const rows = [];
+
+    invoices.forEach((inv) => {
+      const total = Number(inv.total_with_gst) || 0;
+      balance += total;
+
+      rows.push(
+        <tr key={`inv-${inv.invoice_number}`} className="bg-red-50 font-semibold w-100">
+          <td>{formatDate(inv.invoice_date)}</td>
+          <td>{inv.invoice_number}</td>
+          <td className="text-right">-</td>
+          <td className="text-right">
+            {inv.currency} {total.toFixed(2)}
+          </td>
+          <td className="text-right">
+            {inv.currency}  {balance.toFixed(2)}
+          </td>
+        </tr>
+      );
+
+      buyerDeposits
+        .filter((d) => d.invoice_id === inv.invoice_number)
+        .forEach((dep, i) => {
+          const amount = Number(dep.deposit_amount) || 0;
+          balance -= amount;
+
+          rows.push(
+            <tr key={`dep-${inv.invoice_number}-${i}`} className="bg-green-50">
+              <td>{formatDate(dep.selected_date || dep.transaction_date)}</td>
+              <td>{dep.notice || "Deposit"}</td>
+              <td className="text-right">
+                {inv.currency} {amount.toFixed(2)}
+              </td>
+              <td className="text-right">-</td>
+              <td className="text-right">
+                {inv.currency} {balance.toFixed(2)}
+              </td>
+            </tr>
+          );
+        });
+    });
+
+    return { rows, balance, currency: invoices[0]?.currency || "" };
+  };
+
+  if (error) {
     return (
       <div className="p-4 text-center">
-        <h2 className="text-xl font-semibold mb-2">No invoice data found.</h2>
+        <h2 className="text-xl font-semibold mb-2 text-red-600">{error}</h2>
         <button
-          onClick={() => navigate(-1)}
-          className="px-4 py-2 bg-red-500 text-white rounded"
+          onClick={() => navigate("/login")}
+          className="px-4 py-2 bg-blue-500 text-white rounded"
         >
-          Go Back
+          Go to Login
         </button>
       </div>
     );
   }
 
+  if (!invoices.length) {
+    return <div className="text-center p-6 text-lg">Loading invoices...</div>;
+  }
+
+  const { rows, balance, currency } = renderTableRows();
+
   return (
-    <div
-      className="mx-auto bg-white rounded shadow-md mt-6 p-6 border"
-      style={{ paddingLeft: "100px", height: "100vh" }}
-    >
-      <h2 className="text-2xl font-bold text-center mb-4">
-        Invoice - {invoice.buyer_name}
-      </h2>
-
-      {sameBuyerInvoices.length > 0 && (
-        <div className="mt-10">
-          <h3 className="text-xl font-semibold mb-2">
-            All Invoices for {invoice.buyer_name} (India)
-          </h3>
-          <table className="w-full border text-sm">
-            <thead className="bg-blue-100">
-              <tr>
-                <th>Invoice #</th>
-                <th>Date</th>
-                <th>GST</th>
-                <th>Total with GST</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sameBuyerInvoices.map((inv) => (
-                <tr key={inv.id}>
-                  <td>{inv.invoice_number}</td>
-                  <td>{inv.invoice_date}</td>
-                  <td>{inv.buyer_gst}</td>
-                  <td>
-                    {inv.currency} {inv.total_with_gst}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Printable hidden area */}
-      <div
-        ref={tableRef}
-        className="printable-area"
-        style={{
-          display: "block",
-          position: "absolute",
-          top: "-9999px",
-          left: "-9999px",
-          backgroundColor: "white",
-          width: "800px",
-          padding: "30px",
-        }}
-      >
-        <h2 className="text-2xl font-bold text-center mb-6">
-          Statement of Account
-        </h2>
-
-        <div className="mb-4">
-          <p>
-            <strong>Buyer Name:</strong> {invoice.buyer_name}
-          </p>
-          <p>
-            <strong>Invoice Date:</strong> {invoice.invoice_date}
-          </p>
-          <p>
-            <strong>Total Invoice Amount (Debit):</strong> {invoice.currency}{" "}
-            {invoice.total_with_gst}
-          </p>
-        </div>
-
-        {/* Account Activity section removed */}
+    <div className="mx-auto bg-white p-6 rounded shadow-md" style={{ paddingLeft: "100px", minHeight: "100vh" }}>
+      <div ref={tableRef}>
+      <h2 className="text-2xl font-bold text-center mb-6">Statement of Account</h2>
+      <div className="mb-4">
+        <p><strong>Buyer Name:</strong> {buyer_name}</p>
+        <p><strong>GST Number:</strong> {buyer_gst}</p>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-2 mt-4">
-        <button
-          onClick={handleGeneratePDF}
-          className="m-4 text-white px-6 py-2 rounded btn btn-success"
-        >
-          📄 Generate PDF
-        </button>
+        <h4 className="w-full text-center py-2" style={{ backgroundColor: "#51add9" }}>Account Activity</h4>
+        <table className="w-100 text-sm border mt-2">
+          <thead>
+            <tr>
+              <th className="text-left p-2 border">Date</th>
+              <th className="text-left p-2 border">Description</th>
+              <th className="text-right p-2 border">Credit (Deposit)</th>
+              <th className="text-right p-2 border">Debit (Invoice)</th>
+              <th className="text-right p-2 border">Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows}
+            <tr className="bg-gray-200 font-bold">
+              <td colSpan={4} className="text-right p-2 border">Remaining Balance:</td>
+              <td className="text-right p-2 border">
+                {currency} {balance.toFixed(2)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div className="pt-4 d-flex justify-content-around">
         <button
           onClick={() => navigate(-1)}
-          className="text-white px-6 py-2 rounded btn-primary"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
         >
           ← Go Back
+        </button>
+        <button
+          onClick={handleGeneratePDF}
+          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+        >
+          📄 Generate PDF
         </button>
       </div>
     </div>

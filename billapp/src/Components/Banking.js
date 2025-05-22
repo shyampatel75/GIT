@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 
 const Banking = () => {
+  // State variables
   const [visibleButton, setVisibleButton] = useState(null);
-
   const [buyerNames, setBuyerNames] = useState([]);
   const [selectedBuyer, setSelectedBuyer] = useState("");
   const [buyerInvoices, setBuyerInvoices] = useState([]);
@@ -10,47 +10,125 @@ const Banking = () => {
   const [buyerNotice, setBuyerNotice] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
-
   const [companyName, setCompanyName] = useState("");
   const [companyDate, setCompanyDate] = useState("");
   const [companyAmount, setCompanyAmount] = useState("");
   const [companyNotice, setCompanyNotice] = useState("");
-
-  const [salarynewname, setSalaryNewName] = useState("");
   const [salaryName, setSalaryName] = useState("");
-  const [salary, setSalaryAmount] = useState(""); 
+  const [salary, setSalaryAmount] = useState("");
   const [salaryDate, setSalaryDate] = useState("");
   const [salaryInvoices, setSalaryInvoices] = useState([]);
   const [selectedSalaryInvoice, setSelectedSalaryInvoice] = useState("");
-
   const [otherDate, setOtherDate] = useState("");
   const [otherNotice, setOtherNotice] = useState("");
   const [otherAmount, setOtherAmount] = useState("");
   const [otherSelector, setOtherSelector] = useState('');
-
+  const [transactionType, setTransactionType] = useState('debit'); // Add credit/debit selector state
   const [allInvoices, setAllInvoices] = useState([]);
-
   const [showDepositForm, setShowDepositForm] = useState(false);
   const [depositFormAmount, setDepositFormAmount] = useState("");
   const [depositFormDate, setDepositFormDate] = useState("");
-
   const [employees, setEmployees] = useState([]);
-
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
   const [showAddTypeInput, setShowAddTypeInput] = useState(false);
   const [newType, setNewType] = useState("");
   const [typeOptions, setTypeOptions] = useState(["Fast Expand", "Profit", "Other"]);
+  const [isLoadingTypes, setIsLoadingTypes] = useState(false);
 
+  // Helper functions
+  const handleResponse = (response) => {
+    if (!response.ok) throw new Error('Network response was not ok');
+    return response.json();
+  };
+
+  const handleError = (error) => {
+    console.error("API Error:", error);
+    alert("An error occurred. Please try again.");
+  };
+
+  const validateRequiredFields = (fields) => {
+    if (fields.some(field => !field)) {
+      alert("Please fill all required fields.");
+      return false;
+    }
+    return true;
+  };
+
+  const getAuthHeaders = () => ({
+    "Content-Type": "application/json",
+    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+  });
+
+  const handleApiResponse = async (response, entity) => {
+    if (!response.ok) {
+      const error = await response.json();
+      alert(`Error: ${JSON.stringify(error)}`);
+      return false;
+    }
+    alert(`${entity} saved successfully!`);
+    return true;
+  };
+
+  const resetBuyerForm = () => {
+    setSelectedBuyer("");
+    setSelectedInvoice("");
+    setSelectedDate("");
+    setBuyerNotice("");
+    setDepositAmount("");
+  };
+
+  const handleSubmissionError = (error, entity) => {
+    console.error(`${entity} submission error:`, error);
+    alert(`Failed to save ${entity}. Please try again.`);
+  };
+
+  // Load existing transaction types
+  const loadTransactionTypes = () => {
+    setIsLoadingTypes(true);
+    fetch("http://localhost:8000/api/banking/other/", {
+      headers: getAuthHeaders()
+    })
+      .then(handleResponse)
+      .then((data) => {
+        // Extract unique types from the response
+        const existingTypes = data.map(item => item.other_type);
+        const uniqueTypes = [...new Set(existingTypes)];
+
+        // Merge with default types while avoiding duplicates
+        const defaultTypes = ["Fast Expand", "Profit", "Other"];
+        const allTypes = [...defaultTypes];
+
+        uniqueTypes.forEach(type => {
+          if (!allTypes.includes(type)) {
+            allTypes.push(type);
+          }
+        });
+
+        setTypeOptions(allTypes);
+      })
+      .catch(handleError)
+      .finally(() => setIsLoadingTypes(false));
+  };
+
+  // useEffect hooks
   useEffect(() => {
     if ([1, 2, 3].includes(visibleButton)) {
-      fetch("http://localhost:8000/api/invoices/")
-        .then((res) => res.json())
+      fetch("http://localhost:8000/api/invoices/", {
+        headers: getAuthHeaders()
+      })
+        .then(handleResponse)
         .then((data) => {
           const names = data.map(item => item.buyer_name);
           const uniqueNames = [...new Set(names)];
           setBuyerNames(uniqueNames);
           setAllInvoices(data);
         })
-        .catch((error) => console.error("Error fetching invoices:", error));
+        .catch(handleError);
+    }
+
+    // Load transaction types when "Other" button is clicked
+    if (visibleButton === 4) {
+      loadTransactionTypes();
     }
   }, [visibleButton]);
 
@@ -68,23 +146,25 @@ const Banking = () => {
 
   useEffect(() => {
     if (visibleButton === 3) {
-      fetch("http://localhost:8000/api/banking/employee/")
-        .then((res) => res.json())
+      setIsLoadingEmployees(true);
+      fetch("http://localhost:8000/api/banking/employee/", {
+        headers: getAuthHeaders()
+      })
+        .then(handleResponse)
         .then((data) => setEmployees(data))
-        .catch((error) => console.error("Failed to fetch employees:", error));
+        .catch(handleError)
+        .finally(() => setIsLoadingEmployees(false));
     }
   }, [visibleButton]);
 
+  // Handler functions
   const handleBuyerSubmit = async () => {
-    if (!selectedBuyer || !selectedDate || !depositAmount) {
-      alert("Please fill all required fields.");
-      return;
-    }
+    if (!validateRequiredFields([selectedBuyer, selectedDate, depositAmount])) return;
 
     try {
       const response = await fetch("http://localhost:8000/api/banking/buyer/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           buyer_name: selectedBuyer,
           invoice_id: selectedInvoice,
@@ -94,33 +174,39 @@ const Banking = () => {
         }),
       });
 
-      if (response.ok) {
-        alert("Transaction saved successfully!");
-        setSelectedBuyer("");
-        setSelectedInvoice("");
-        setSelectedDate("");
-        setBuyerNotice("");
-        setDepositAmount("");
-      } else {
-        const error = await response.json();
-        alert(`Error: ${JSON.stringify(error)}`);
-      }
+      await handleApiResponse(response, "Transaction");
+      resetBuyerForm();
     } catch (error) {
-      console.error("Submission error:", error);
-      alert("Failed to save transaction. Please try again.");
+      handleSubmissionError(error, "transaction");
     }
   };
 
-  const handleCompanySubmit = async () => {
-    if (!companyName || !companyDate || !companyAmount) {
-      alert("Please fill all required fields.");
+  const handleAddType = async () => {
+    const trimmed = newType.trim();
+    if (!trimmed) return;
+
+    // If the type already exists, just update the UI state
+    if (typeOptions.includes(trimmed)) {
+      setOtherSelector(trimmed);
+      setNewType("");
+      setShowAddTypeInput(false);
       return;
     }
+
+    // Update the UI immediately for a more responsive feel
+    setTypeOptions(prev => [...prev, trimmed]);
+    setOtherSelector(trimmed);
+    setNewType("");
+    setShowAddTypeInput(false);
+  };
+
+  const handleCompanySubmit = async () => {
+    if (!validateRequiredFields([companyName, companyDate, companyAmount])) return;
 
     try {
       const response = await fetch("http://localhost:8000/api/banking/company/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           company_name: companyName,
           transaction_date: companyDate,
@@ -129,90 +215,76 @@ const Banking = () => {
         }),
       });
 
-      if (response.ok) {
-        alert("Company bill saved successfully!");
+      if (await handleApiResponse(response, "Company bill")) {
         setCompanyName("");
         setCompanyDate("");
         setCompanyAmount("");
         setCompanyNotice("");
-      } else {
-        const error = await response.json();
-        alert(`Error: ${JSON.stringify(error)}`);
       }
     } catch (error) {
-      console.error("Submission error:", error);
-      alert("Failed to save company bill. Please try again.");
+      handleSubmissionError(error, "company bill");
     }
   };
 
   const handleSalarySubmit = async () => {
-    if (!salaryName || !salary || !salaryDate) {
-      alert("Please fill all salary fields.");
-      return;
-    }
-
-    const data = {
-      salary_newname: salarynewname,
-      salary_name: salaryName,
-      salary_amount: parseFloat(salary),
-      salary_date: salaryDate,
-      salary_invoice: selectedSalaryInvoice || null,
-    };
+    if (!validateRequiredFields([salaryName, salary, salaryDate])) return;
 
     try {
       const response = await fetch("http://localhost:8000/api/banking/salary/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          salary_name: salaryName,
+          salary_amount: parseFloat(salary),
+          salary_date: salaryDate,
+          salary_invoice: selectedSalaryInvoice || null,
+        }),
       });
 
-      if (response.ok) {
-        alert("✅ Salary data submitted successfully!");
-      } else {
-        const result = await response.json();
-        alert("❌ Submission failed: " + result.detail);
+      if (await handleApiResponse(response, "Salary data")) {
+        setSalaryName("");
+        setSalaryAmount("");
+        setSalaryDate("");
+        setSelectedSalaryInvoice("");
       }
     } catch (error) {
-      console.error("Error:", error);
-      alert("❌ Error submitting salary data.");
+      handleSubmissionError(error, "salary data");
     }
   };
 
   const handleOtherSubmit = async () => {
-    if (!otherDate || !otherNotice || !otherAmount || !otherSelector) {
-      alert("Please fill all required fields.");
-      return;
-    }
+    if (!validateRequiredFields([otherDate, otherNotice, otherAmount, otherSelector, transactionType])) return;
 
-
-    const data = {
-      other_type: otherSelector,
-      other_date: otherDate,
-      other_notice: otherNotice,
-      other_amount: parseFloat(otherAmount),
-    };
+    // Adjust amount based on transaction type
+    const finalAmount = transactionType === 'debit'
+      ? -Math.abs(parseFloat(otherAmount))
+      : Math.abs(parseFloat(otherAmount));
 
     try {
       const response = await fetch("http://localhost:8000/api/banking/other/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          other_type: otherSelector,
+          other_date: otherDate,
+          other_notice: otherNotice,
+          other_amount: finalAmount,
+          transaction_type: transactionType, // Add transaction type to payload
+        }),
       });
 
-      if (response.ok) {
-        alert("✅ Other data submitted successfully!");
-        // Reset form fields
+      if (await handleApiResponse(response, "Other data")) {
         setOtherSelector('');
         setOtherDate('');
         setOtherNotice('');
         setOtherAmount('');
-      } else {
-        const result = await response.json();
-        alert("❌ Submission failed: " + (result.detail || JSON.stringify(result)));
+        setTransactionType('debit'); // Reset to default
+
+        // Refresh the types list to include the newly added type
+        loadTransactionTypes();
       }
     } catch (error) {
-      console.error("Error:", error);
-      alert("❌ Error submitting other data.");
+      handleSubmissionError(error, "other data");
     }
   };
 
@@ -220,25 +292,51 @@ const Banking = () => {
     try {
       const response = await fetch('http://localhost:8000/api/add-deposit/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           amount: depositFormAmount,
           date: depositFormDate,
         }),
       });
 
-      if (response.ok) {
-        alert('Deposit saved successfully!');
+      if (await handleApiResponse(response, "Deposit")) {
         setShowDepositForm(false);
         setDepositFormAmount('');
         setDepositFormDate('');
-      } else {
-        console.error('Failed to save deposit');
       }
     } catch (error) {
-      console.error('Error:', error);
+      handleSubmissionError(error, "deposit");
     }
   };
+
+  const [companies, setCompanies] = useState([]);
+// const [companyName, setCompanyName] = useState("");  
+const [manualEntry, setManualEntry] = useState(false); // NEW
+
+useEffect(() => {
+  const fetchCompanies = async () => {
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
+
+    try {
+      const res = await fetch("http://localhost:8000/api/banking/company/", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) throw new Error("Failed to fetch companies");
+
+      const data = await res.json();
+      setCompanies(data);
+    } catch (error) {
+      console.error("Error fetching companies:", error);
+    }
+  };
+
+  fetchCompanies();
+}, []);
+
 
   return (
     <div className="p-6 max-w-md mx-auto" style={{ paddingLeft: "100px" }}>
@@ -246,15 +344,19 @@ const Banking = () => {
         <div className="p-2 bd-highlight position-relative">
           {showDepositForm && (
             <div className="card p-3 position-absolute bg-white shadow" style={{ zIndex: 999, left: "7px", top: "50px" }}>
-              <input type="number" placeholder="Amount" className="form-control mb-2" value={depositFormAmount} onChange={(e) => setDepositFormAmount(e.target.value)} />
-              <input type="date" className="form-control mb-2" value={depositFormDate} onChange={(e) => setDepositFormDate(e.target.value)} />
+              <input type="number" placeholder="Amount" className="form-control mb-2"
+                value={depositFormAmount} onChange={(e) => setDepositFormAmount(e.target.value)} />
+              <input type="date" className="form-control mb-2"
+                value={depositFormDate} onChange={(e) => setDepositFormDate(e.target.value)} />
               <div className="d-flex justify-content-between">
                 <button className="btn btn-success me-2" onClick={handleDepositSubmit}>Submit</button>
                 <button className="btn btn-secondary" onClick={() => setShowDepositForm(false)}>Cancel</button>
               </div>
             </div>
           )}
-          <button className="btn btn-secondary" onClick={() => setShowDepositForm(!showDepositForm)}>Add Deposit</button>
+          <button className="btn btn-secondary" onClick={() => setShowDepositForm(!showDepositForm)}>
+            Add Deposit
+          </button>
         </div>
       </div>
 
@@ -269,63 +371,141 @@ const Banking = () => {
         {visibleButton === 1 && (
           <>
             <h3 className="mb-2 font-semibold">Company Bill</h3>
-            <select className="border px-4 py-2 rounded w-full mb-3" value={selectedBuyer} onChange={(e) => setSelectedBuyer(e.target.value)} required>
+            <select className="border px-4 py-2 rounded w-full mb-3"
+              value={selectedBuyer} onChange={(e) => setSelectedBuyer(e.target.value)} required>
               <option value="">-- Select Company Bill --</option>
               {buyerNames.map((name, index) => (
                 <option key={index} value={name}>{name}</option>
               ))}
             </select>
-            <select className="border px-4 py-2 rounded w-full mb-3" value={selectedInvoice} onChange={(e) => setSelectedInvoice(e.target.value)}>
+            <select className="border px-4 py-2 rounded w-full mb-3"
+              value={selectedInvoice} onChange={(e) => setSelectedInvoice(e.target.value)}>
               <option value="">-- Select Invoice (Optional) --</option>
               {buyerInvoices.map(inv => (
                 <option key={inv.id} value={inv.invoice_number}>{inv.invoice_number}</option>
               ))}
             </select>
-            <input type="date" className="border px-4 py-2 rounded w-full mb-3" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} required />
-            <input type="text" placeholder="Notice (Optional)" className="border px-4 py-2 rounded w-full mb-3" value={buyerNotice} onChange={(e) => setBuyerNotice(e.target.value)} />
-            <input type="number" placeholder="Deposit Amount*" className="border px-4 py-2 rounded w-full mb-3" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} required />
-            <button className="bg-blue-600 text-white px-4 py-2 rounded" onClick={handleBuyerSubmit}>Submit Buyer Transaction</button>
+            <input type="date" className="border px-4 py-2 rounded w-full mb-3"
+              value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} required />
+            <input type="text" placeholder="Notice (Optional)" className="border px-4 py-2 rounded w-full mb-3"
+              value={buyerNotice} onChange={(e) => setBuyerNotice(e.target.value)} />
+            <input type="number" placeholder="Deposit Amount*" className="border px-4 py-2 rounded w-full mb-3"
+              value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} required />
+            <button className="bg-blue-600 text-white px-4 py-2 rounded" onClick={handleBuyerSubmit}>
+              Submit Buyer Transaction
+            </button>
           </>
         )}
 
-        {visibleButton === 2 && (
-          <>
-            <h3 className="mb-2 font-semibold">Buyer Bill</h3>
-            <input type="text" placeholder="Buyer Name*" className="border px-4 py-2 rounded w-full mb-3" value={companyName} onChange={(e) => setCompanyName(e.target.value)} required />
-            <input type="date" className="border px-4 py-2 rounded w-full mb-3" value={companyDate} onChange={(e) => setCompanyDate(e.target.value)} required />
-            <input type="number" placeholder="Amount*" className="border px-4 py-2 rounded w-full mb-3" value={companyAmount} onChange={(e) => setCompanyAmount(e.target.value)} required />
-            <input type="text" placeholder="Notice (Optional)" className="border px-4 py-2 rounded w-full mb-3" value={companyNotice} onChange={(e) => setCompanyNotice(e.target.value)} />
-            <button className="bg-green-600 text-white px-4 py-2 rounded" onClick={handleCompanySubmit}>Submit Buyer Bill</button>
-          </>
-        )}
+       {visibleButton === 2 && (
+  <>
+    <h3 className="mb-2 font-semibold">Buyer Bill</h3>
+
+    <label className="mb-1 font-medium flex items-center gap-2">
+      <input
+        type="checkbox"
+        checked={manualEntry}
+        onChange={() => {
+          setManualEntry(!manualEntry);
+          setCompanyName(""); // reset on toggle
+        }}
+      />
+      Enter Buyer Name Manually
+    </label>
+
+    {manualEntry ? (
+      <input
+        type="text"
+        placeholder="Buyer Name*"
+        className="border px-4 py-2 rounded w-full mb-3"
+        value={companyName}
+        onChange={(e) => setCompanyName(e.target.value)}
+        required
+      />
+    ) : (
+      <select
+        className="border px-4 py-2 rounded w-full mb-3"
+        value={companyName}
+        onChange={(e) => setCompanyName(e.target.value)}
+        required
+      >
+        <option value="">-- Select Buyer --</option>
+        {companies.map((comp) => (
+          <option key={comp.id} value={comp.company_name}>
+            {comp.company_name}
+          </option>
+        ))}
+      </select>
+    )}
+
+    <input
+      type="date"
+      className="border px-4 py-2 rounded w-full mb-3"
+      value={companyDate}
+      onChange={(e) => setCompanyDate(e.target.value)}
+      required
+    />
+    <input
+      type="number"
+      placeholder="Amount*"
+      className="border px-4 py-2 rounded w-full mb-3"
+      value={companyAmount}
+      onChange={(e) => setCompanyAmount(e.target.value)}
+      required
+    />
+    <input
+      type="text"
+      placeholder="Notice (Optional)"
+      className="border px-4 py-2 rounded w-full mb-3"
+      value={companyNotice}
+      onChange={(e) => setCompanyNotice(e.target.value)}
+    />
+    <button
+      className="bg-green-600 text-white px-4 py-2 rounded"
+      onClick={handleCompanySubmit}
+    >
+      Submit Buyer Bill
+    </button>
+  </>
+)}
+
 
         {visibleButton === 3 && (
           <>
             <h3 className="mb-2 font-semibold">Salary</h3>
-            <select className="border px-4 py-2 rounded w-full mb-3" value={salaryName} onChange={(e) => {
-              const selected = e.target.value;
-              setSalaryName(selected);
-              const emp = employees.find(emp => emp.name === selected);
-              if (emp) {
-                setSalaryAmount(emp.salary || "");
-              }
-            }}>
-              <option value="">-- Select Employee --</option>
-              {employees.map((emp, index) => (
-                <option key={index} value={emp.name}>{emp.name}</option>
-              ))}
-            </select>
-            <input type="number" placeholder="Enter amount" className="border px-4 py-2 rounded w-full mb-3" value={salary} onChange={(e) => setSalaryAmount(e.target.value)} />
-            <input type="date" className="border px-4 py-2 rounded w-full mb-3" value={salaryDate} onChange={(e) => setSalaryDate(e.target.value)} />
-            <button className="bg-yellow-600 text-white px-4 py-2 rounded" onClick={handleSalarySubmit}>Submit</button>
+            {isLoadingEmployees ? (
+              <p>Loading employees...</p>
+            ) : employees.length === 0 ? (
+              <p>No employees found</p>
+            ) : (
+              <>
+                <select className="border px-4 py-2 rounded w-full mb-3"
+                  value={salaryName} onChange={(e) => {
+                    const selected = e.target.value;
+                    setSalaryName(selected);
+                    const emp = employees.find(emp => emp.name === selected);
+                    if (emp) setSalaryAmount(emp.salary || "");
+                  }}>
+                  <option value="">-- Select Employee --</option>
+                  {employees.map((emp, index) => (
+                    <option key={index} value={emp.name}>{emp.name}</option>
+                  ))}
+                </select>
+                <input type="number" placeholder="Enter amount" className="border px-4 py-2 rounded w-full mb-3"
+                  value={salary} onChange={(e) => setSalaryAmount(e.target.value)} />
+                <input type="date" className="border px-4 py-2 rounded w-full mb-3"
+                  value={salaryDate} onChange={(e) => setSalaryDate(e.target.value)} />
+                <button className="bg-yellow-600 text-white px-4 py-2 rounded" onClick={handleSalarySubmit}>
+                  Submit
+                </button>
+              </>
+            )}
           </>
         )}
 
         {visibleButton === 4 && (
           <>
             <h3 className="mb-2 font-semibold">Other</h3>
-
-            {/* Add Type Button + Input */}
             <div className="flex items-center gap-2 mb-3 flex-wrap">
               <button
                 className="bg-blue-600 text-white px-3 py-1 rounded"
@@ -345,14 +525,7 @@ const Banking = () => {
                   />
                   <button
                     className="bg-green-600 text-white px-3 py-1 rounded"
-                    onClick={() => {
-                      const trimmed = newType.trim();
-                      if (trimmed && !typeOptions.includes(trimmed)) {
-                        setTypeOptions([...typeOptions, trimmed]);
-                        setNewType("");
-                        setShowAddTypeInput(false);
-                      }
-                    }}
+                    onClick={handleAddType}
                   >
                     Add
                   </button>
@@ -360,51 +533,62 @@ const Banking = () => {
               )}
             </div>
 
+            {/* Credit/Debit Selector */}
+            <div className="mb-3">
+              <label className="block mb-2 font-medium">Transaction Type*</label>
+              <div className="flex gap-4">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="transactionType"
+                    value="credit"
+                    checked={transactionType === 'credit'}
+                    onChange={() => setTransactionType('credit')}
+                    className="mr-2"
+                  />
+                  Credit (Money In)
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="transactionType"
+                    value="debit"
+                    checked={transactionType === 'debit'}
+                    onChange={() => setTransactionType('debit')}
+                    className="mr-2"
+                  />
+                  Debit (Money Out)
+                </label>
+              </div>
+            </div>
 
-            {/* Selector with dynamic options */}
-            <select
-              className="border px-4 py-2 rounded w-full mb-3"
-              value={otherSelector}
-              onChange={(e) => setOtherSelector(e.target.value)}
-              required
-            >
-              <option value="">Select Type*</option>
-              {typeOptions.map((option, i) => (
-                <option key={i} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
+            {isLoadingTypes ? (
+              <p>Loading transaction types...</p>
+            ) : (
+              <select
+                className="border px-4 py-2 rounded w-full mb-3"
+                value={otherSelector}
+                onChange={(e) => setOtherSelector(e.target.value)}
+                required
+              >
+                <option value="">Select Type*</option>
+                {typeOptions.map((option, i) => (
+                  <option key={i} value={option}>{option}</option>
+                ))}
+              </select>
+            )}
 
-            <input
-              type="date"
-              className="border px-4 py-2 rounded w-full mb-3"
-              value={otherDate}
-              onChange={(e) => setOtherDate(e.target.value)}
-            />
-            <input
-              type="text"
-              placeholder="Enter notice"
-              className="border px-4 py-2 rounded w-full mb-3"
-              value={otherNotice}
-              onChange={(e) => setOtherNotice(e.target.value)}
-            />
-            <input
-              type="number"
-              placeholder="Enter amount"
-              className="border px-4 py-2 rounded w-full mb-3"
-              value={otherAmount}
-              onChange={(e) => setOtherAmount(e.target.value)}
-            />
-            <button
-              className="bg-red-600 text-white px-4 py-2 rounded"
-              onClick={handleOtherSubmit}
-            >
+            <input type="date" className="border px-4 py-2 rounded w-full mb-3"
+              value={otherDate} onChange={(e) => setOtherDate(e.target.value)} />
+            <input type="text" placeholder="Enter notice" className="border px-4 py-2 rounded w-full mb-3"
+              value={otherNotice} onChange={(e) => setOtherNotice(e.target.value)} />
+            <input type="number" placeholder="Enter amount" className="border px-4 py-2 rounded w-full mb-3"
+              value={otherAmount} onChange={(e) => setOtherAmount(e.target.value)} />
+            <button className="bg-red-600 text-white px-4 py-2 rounded" onClick={handleOtherSubmit}>
               Submit
             </button>
           </>
         )}
-
       </div>
     </div>
   );

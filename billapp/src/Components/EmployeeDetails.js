@@ -9,10 +9,17 @@ const EmployeeDetails = () => {
     const [salaryHistory, setSalaryHistory] = useState([]);
     const [bankingEmployee, setBankingEmployee] = useState(null);
 
+    const token = localStorage.getItem("access_token");
+
     useEffect(() => {
         const fetchEmployee = async () => {
             try {
-                const response = await fetch(`http://localhost:8000/api/employees/${id}/`);
+                const response = await fetch(`http://localhost:8000/api/employees/${id}/`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
                 if (!response.ok) throw new Error("Failed to fetch employee");
                 const data = await response.json();
                 setEmployee(data);
@@ -23,23 +30,34 @@ const EmployeeDetails = () => {
         };
 
         fetchEmployee();
-    }, [id]);
+    }, [id, token]);
 
     useEffect(() => {
         const fetchAdditionalData = async () => {
             if (!employee) return;
 
             try {
-                // Fetch salary history
-                const salaryRes = await fetch("http://localhost:8000/api/banking/salary/");
+                const [salaryRes, empRes] = await Promise.all([
+                    fetch("http://localhost:8000/api/banking/salary/", {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                        },
+                    }),
+                    fetch("http://localhost:8000/api/banking/employee/", {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                        },
+                    }),
+                ]);
+
                 const salaryData = await salaryRes.json();
                 const filteredSalaries = salaryData.filter(
                     (entry) => entry.salary_name === employee.name
                 );
                 setSalaryHistory(filteredSalaries);
 
-                // Fetch banking employee info
-                const empRes = await fetch("http://localhost:8000/api/banking/employee/");
                 const empData = await empRes.json();
                 const matchedBankingEmployee = empData.find(
                     (entry) => entry.name === employee.name
@@ -51,7 +69,7 @@ const EmployeeDetails = () => {
         };
 
         fetchAdditionalData();
-    }, [employee]);
+    }, [employee, token]);
 
     if (error) return <p className="text-red-600">{error}</p>;
     if (!employee) return <p>Loading...</p>;
@@ -67,8 +85,6 @@ const EmployeeDetails = () => {
                 <p><strong>Email:</strong> {employee.email}</p>
                 <p><strong>Phone:</strong> {employee.number}</p>
             </div>
-
-
 
             <h2 className="text-xl font-semibold mb-3">Salary History</h2>
             {salaryHistory.length > 0 ? (
@@ -93,7 +109,6 @@ const EmployeeDetails = () => {
             ) : (
                 <p className="text-gray-500">No salary history available for this employee.</p>
             )}
-
 
             <button
                 onClick={() => navigate(-1)}

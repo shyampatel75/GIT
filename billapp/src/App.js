@@ -16,27 +16,27 @@ import InvoiceDetails from "./Components/InvoiceDetails";
 import BillManager from "./Components/BillManager";
 import ViewsDetailsInfo from "./Components/ViewsDetailsInfo";
 import Billsyears from "./Components/YearTable";
-// import Viewsbutton from "./Components/Viewsbutton";
 import ViewsButton from "./Components/Viewsbutton";
 import Banking from "./Components/Banking.js";
 import BalanceSheet from "./Components/BalanceSheet.js";
 import Profile from "./Components/Profile.js";
-// import NewBillPage from "./Components/NewBillPage.js";
 import ClientInvoices from "./Components/ClientInvoices.js";
 import Buyer from "./Components/Buyer.js";
 import EditInvoice from "./Components/EditInvoice.js";
 import Employee from "./Components/Employee.js";
 import EmployeeDetails from "./Components/EmployeeDetails.js";
 import IncomeExpenditure from "./Components/IncomeExpenditure .js";
+// import OtherTransactionDetails from "./Components/OtherTransactionDetails.js";
+import OtherTypeTransactions from "./Components/OtherTransactionDetails.js";
+import CompanyTransactions from "./Components/CompanyTransactions.js";
+// import IncomeExpenditure from "./Components/CorrectFileName.js"; // use correct file name
+// import IncomeExpenditure from "./Components/IncomeExpenditure.js";
 
 
-
-// Wrapper to show/hide sidebar based on path
 const AppContent = () => {
   const location = useLocation();
   const isAuthenticated = localStorage.getItem("isAuthenticated") === "true";
 
-  // hide sidebar on login and signup
   const hideSidebar = location.pathname === "/" || location.pathname === "/si";
 
   return (
@@ -48,8 +48,7 @@ const AppContent = () => {
           <Route path="/" element={<Login />} />
           <Route path="/si" element={<Signup />} />
 
-          {/* Protected Routes (optional: add guards later) */}
-
+          {/* Protected Routes */}
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/year-table" element={<Billsyears />} />
           <Route path="/:yearRange" element={<YearDetails />} />
@@ -64,16 +63,19 @@ const AppContent = () => {
           <Route path="/billmanager" element={<BillManager />} />
           <Route path="/bills/:buyer_name" element={<ViewsDetailsInfo />} />
           <Route path="/invoice-detail/:id" element={<ViewsButton />} />
-          <Route path="/banking" element={<Banking/>} />
-          <Route path="/balancesheet" element={<BalanceSheet/>} />
-          <Route path="/profile" element={<Profile />} /> {/* Add this */}
-          {/* <Route path="/tax-invoice/new" element={<NewBillPage />} /> */}
+          <Route path="/banking" element={<Banking />} />
+          <Route path="/balancesheet" element={<BalanceSheet />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="/client-invoices" element={<ClientInvoices />} />
           <Route path="/buyer" element={<Buyer />} />
           <Route path="/edit-invoice/:invoiceId" element={<EditInvoice />} />
           <Route path="/employee" element={<Employee />} />
           <Route path="/employee-details/:id" element={<EmployeeDetails />} />
-<Route path="/incomeExpenditure" element={<IncomeExpenditure />} />
+          <Route path="/incomeExpenditure" element={<IncomeExpenditure />} />
+          {/* <Route path="/banking/other/:id" element={<OtherTransactionDetails />} /> */}
+          <Route path="/banking/other-type/:type" element={<OtherTypeTransactions />} />
+          <Route path="/banking/company/:companyName" element={<CompanyTransactions />} />
+
         </Routes>
       </div>
     </div>

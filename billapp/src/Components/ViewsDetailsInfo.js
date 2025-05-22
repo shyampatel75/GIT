@@ -6,13 +6,43 @@ const ViewsDetailsInfo = () => {
   const { buyer_name } = useParams();
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchInvoices = async () => {
       try {
-        const response = await fetch(`http://localhost:8000/api/invoices/`);
-        if (!response.ok) throw new Error("Failed to fetch invoices");
+        setLoading(true);
+        setError("");
+
+        const token = localStorage.getItem("access_token");
+        if (!token) {
+          setError("User is not authenticated");
+          setInvoices([]);
+          setLoading(false);
+          return;
+        }
+
+        const response = await fetch(`http://localhost:8000/api/invoices/`, {
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            setError("Unauthorized access. Please login again.");
+            // Optionally redirect to login page here
+            // navigate("/login");
+          } else {
+            throw new Error("Failed to fetch invoices");
+          }
+          setInvoices([]);
+          setLoading(false);
+          return;
+        }
+
         const data = await response.json();
         const filtered = data.filter(
           (invoice) => invoice.buyer_name === buyer_name
@@ -20,6 +50,7 @@ const ViewsDetailsInfo = () => {
         setInvoices(filtered);
       } catch (error) {
         console.error(error);
+        setError(error.message || "Something went wrong");
         setInvoices([]);
       } finally {
         setLoading(false);
@@ -27,22 +58,19 @@ const ViewsDetailsInfo = () => {
     };
 
     fetchInvoices();
-  }, [buyer_name]);
+  }, [buyer_name, navigate]);
 
   return (
-
-    
     <div className="p-6">
       <h2 className="text-2xl font-bold mb-4">Invoice Details for {buyer_name}</h2>
 
       {loading ? (
         <p>Loading...</p>
+      ) : error ? (
+        <p className="text-red-600">{error}</p>
       ) : invoices.length === 0 ? (
         <p>No invoices found for this buyer.</p>
       ) : (
-
-
-
         <table className="w-full table-auto border border-gray-300 text-sm">
           <thead className="bg-gray-100">
             <tr>

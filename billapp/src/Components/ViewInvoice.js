@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
 const invoices = [
@@ -13,6 +13,15 @@ const ViewInvoice = () => {
   const { name } = useParams();
   const navigate = useNavigate();
   const decodedName = decodeURIComponent(name);
+
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      // No token, redirect to login page
+      navigate("/login");
+    }
+    // Optional: You can also call your backend API here to verify token validity
+  }, [navigate]);
 
   const matchedInvoices = invoices.filter(
     (invoice) => invoice.name.toLowerCase() === decodedName.toLowerCase()
@@ -50,13 +59,22 @@ const ViewInvoice = () => {
               <td>{invoice.date}</td>
               <td>${invoice.amount.toFixed(2)}</td>
               <td>
-                <button className="btn btn-info btn-sm me-2" onClick={() => alert(`Viewing invoice #${invoice.billNumber}`)}>
+                <button
+                  className="btn btn-info btn-sm me-2"
+                  onClick={() => alert(`Viewing invoice #${invoice.billNumber}`)}
+                >
                   View
                 </button>
-                <button className="btn btn-success btn-sm me-2" onClick={() => alert(`Downloading invoice #${invoice.billNumber}`)}>
+                <button
+                  className="btn btn-success btn-sm me-2"
+                  onClick={() => alert(`Downloading invoice #${invoice.billNumber}`)}
+                >
                   Download
                 </button>
-                <button className="btn btn-warning btn-sm" onClick={() => navigate("/new-bill")}>
+                <button
+                  className="btn btn-warning btn-sm"
+                  onClick={() => navigate("/new-bill")}
+                >
                   New Bill
                 </button>
               </td>

@@ -146,7 +146,7 @@ const Profile = () => {
 
             {!showFileUpload ? (
                 <div className="card p-4">
-                    <div className="text-center mb-3">
+                    {/* <div className="text-center mb-3">
                         <img
                             src={images.image1Preview || "/images/default-profile.png"}
                             alt="Profile"
@@ -158,7 +158,7 @@ const Profile = () => {
                                 e.target.src = "/images/default-profile.png";
                             }}
                         />
-                    </div>
+                    </div> */}
                     <div className="mb-3">
                         <label>Name</label>
                         <input

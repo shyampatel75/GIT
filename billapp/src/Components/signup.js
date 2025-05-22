@@ -2,10 +2,10 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeSlash } from "react-bootstrap-icons";
 import { Link } from "react-router-dom";
-import "./Signup.css"; // ⬅️ add this CSS file
 
 const Signup = () => {
   const navigate = useNavigate();
+
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -14,7 +14,7 @@ const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSignup = async (e) => {
+  const handleSignup = async(e) => {
     e.preventDefault();
 
     if (password !== confirmPassword) {
@@ -22,7 +22,7 @@ const Signup = () => {
       return;
     }
 
-    try {
+  try {
       const response = await fetch("http://localhost:8000/api/auth/register/", {
         method: "POST",
         headers: {
@@ -40,107 +40,149 @@ const Signup = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        const errorMsg = Object.entries(data)
-          .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(" ") : value}`)
-          .join("\n") || "Registration failed";
-        setError(errorMsg);
-        return;
-      }
-
-      alert("Account created successfully! Please log in.");
-      navigate("/");
-    } catch (err) {
-      setError("Network error. Please try again.");
-      console.error("Registration error:", err);
+      // Handle validation errors
+      const errorMsg = Object.entries(data)
+        .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(' ') : value}`)
+        .join('\n') || "Registration failed";
+      setError(errorMsg);
+      return;
     }
-  };
+ alert("Account created successfully! Please log in.");
+    navigate("/dashboard"); // 👈 Redirect to login page
+
+  } catch (err) {
+    setError("Network error. Please try again.");
+    console.error("Registration error:", err);
+  }
+};
+    
+
+  
 
   return (
-    <section className="signup-container">
-      <div className="signup-box">
-        <div className="signup-image">
-          <img
-            src="https://mdbcdn.b-cdn.net/img/Photos/new-templates/bootstrap-login-form/draw2.webp"
-            alt="illustration"
-          />
-        </div>
-        <div className="signup-form-box">
-          <form onSubmit={handleSignup} className="signup-form">
-            <h2>Create an Account</h2>
-            {error && <div className="error-message">{error}</div>}
-
-            <label>First Name</label>
-            <input
-              type="text"
-              placeholder="Enter your first name"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              required
+    <section className="vh-100" style={{ backgroundColor: "#eee" }}>
+      <div className="container-fluid h-custom">
+        <div className="row d-flex justify-content-center align-items-center h-100">
+          <div className="col-md-9 col-lg-6 col-xl-5">
+            <img
+              src="https://mdbcdn.b-cdn.net/img/Photos/new-templates/bootstrap-login-form/draw2.webp"
+              className="img-fluid"
+              alt="Sample"
             />
+          </div>
+          <div className="col-md-8 col-lg-6 col-xl-4 offset-xl-1">
+            <form onSubmit={handleSignup}>
+              <div className="text-center mb-3">
+                <h4 className="fw-bold">Create an Account</h4>
+              </div>
 
-            <label>Email address</label>
-            <input
-              type="email"
-              placeholder="Enter a valid email address"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+              <div className="form-outline mb-2">
+                <label className="form-label">First Name</label>
+                <input
+                  type="text"
+                  className="form-control form-control-lg"
+                  placeholder="Enter your first name"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                />
+              </div>
 
-            <label>Mobile Number</label>
-            <input
-              type="tel"
-              placeholder="Enter your mobile number"
-              value={mobile}
-              onChange={(e) => setMobile(e.target.value)}
-              pattern="[0-9]{10}"
-              title="Please enter a 10-digit mobile number"
-              required
-            />
+              <div className="form-outline mb-2">
+                <label className="form-label">Email address</label>
+                <input
+                  type="email"
+                  className="form-control form-control-lg"
+                  placeholder="Enter a valid email address"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
 
-            <label>Password</label>
-            <div className="password-wrapper">
-              <input
-                type={showPassword ? "text" : "password"}
-                placeholder="Enter password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-              <span onClick={() => setShowPassword(!showPassword)} className="toggle-password">
-                {showPassword ? <EyeSlash /> : <Eye />}
-              </span>
-            </div>
+              <div className="form-outline mb-2">
+                <label className="form-label">Mobile Number</label>
+                <input
+                  type="tel"
+                  className="form-control form-control-lg"
+                  placeholder="Enter your mobile number"
+                  value={mobile}
+                  onChange={(e) => setMobile(e.target.value)}
+                  required
+                  pattern="[0-9]{10}"
+                  title="Please enter a 10-digit mobile number"
+                />
+              </div>
 
-            <label>Confirm Password</label>
-            <div className="password-wrapper">
-              <input
-                type={showPassword ? "text" : "password"}
-                placeholder="Confirm password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-              />
-            </div>
+              <div className="form-outline mb-2 position-relative">
+                <label className="form-label">Password</label>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  className="form-control form-control-lg"
+                  placeholder="Enter password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <span
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: "absolute",
+                    top: "70%",
+                    right: "15px",
+                    transform: "translateY(-50%)",
+                    cursor: "pointer",
+                  }}
+                >
+                  {showPassword ? <EyeSlash /> : <Eye />}
+                </span>
+              </div>
 
-            <button type="submit">Signup</button>
+              <div className="form-outline mb-3 position-relative">
+                <label className="form-label">Confirm Password</label>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  className="form-control form-control-lg"
+                  placeholder="Confirm password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+              </div>
 
-            <p className="redirect">
-              Already have an account? <Link to="/">Login</Link>
-            </p>
-          </form>
+              <div className="text-center text-lg-start mt-4 pt-2">
+                <button type="submit" className="btn btn-primary btn-lg w-100">
+                  Signup
+                </button>
+                <p className="small fw-bold mt-2 pt-1 mb-0">
+                  Already have an account?{" "}
+                  <Link to="/" className="link-primary">
+                    Login
+                  </Link>
+                </p>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
 
-      <footer className="signup-footer">
-        <div>&copy; 2025 Your Company</div>
-        <div className="footer-links">
-          <a href="#!">Facebook</a>
-          <a href="#!">Twitter</a>
-          <a href="#!">Google</a>
-          <a href="#!">LinkedIn</a>
+      <div className="d-flex flex-column flex-md-row text-center text-md-start justify-content-between py-4 px-4 px-xl-5 bg-primary">
+        <div className="text-white mb-3 mb-md-0">Copyright © 2025</div>
+        <div>
+          <a href="#!" className="text-white me-4">
+            <i className="fab fa-facebook-f"></i>
+          </a>
+          <a href="#!" className="text-white me-4">
+            <i className="fab fa-twitter"></i>
+          </a>
+          <a href="#!" className="text-white me-4">
+            <i className="fab fa-google"></i>
+          </a>
+          <a href="#!" className="text-white">
+            <i className="fab fa-linkedin-in"></i>
+          </a>
         </div>
-      </footer>
+      </div>
     </section>
   );
 };

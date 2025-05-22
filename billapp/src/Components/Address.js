@@ -1,32 +1,88 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import './InvoicesTable.css';
+import './Address.css';
 
 const Address = () => {
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState([]);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
-  const [logoLoaded, setLogoLoaded] = useState(false); // Add logo loaded state
+  const [logoLoaded, setLogoLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
   const printRef = useRef();
 
+  const fetchInvoices = useCallback(async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      const response = await fetch("http://localhost:8000/api/invoices/", {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch invoices');
+      }
+
+      const data = await response.json();
+      setInvoices(data);
+    } catch (err) {
+      console.error("Error fetching invoices:", err);
+      setError(err.message || "Failed to load invoices");
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate]);
+
   useEffect(() => {
-    fetch("http://localhost:8000/api/invoices/")
-      .then((res) => res.json())
-      .then((data) => setInvoices(data))
-      .catch((err) => console.error("Error fetching invoices:", err));
-  }, []);
+    fetchInvoices();
+  }, [fetchInvoices]);
 
   const handleDownload = async (invoiceId) => {
     try {
+      setLoading(true);
+      setError("");
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
       // Fetch invoice data
-      const res = await fetch(`http://localhost:8000/api/invoices/${invoiceId}/`);
-      const pdfBasicDetail = await res.json();
+      const invoiceResponse = await fetch(`http://localhost:8000/api/invoices/${invoiceId}/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!invoiceResponse.ok) {
+        throw new Error('Failed to fetch invoice details');
+      }
+      const pdfBasicDetail = await invoiceResponse.json();
 
       // Fetch settings data
-      const resSetting = await fetch(`http://localhost:8000/api/settings/`);
-      const pdfMainDetails = await resSetting.json();
+      const settingsResponse = await fetch(`http://localhost:8000/api/settings/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!settingsResponse.ok) {
+        throw new Error('Failed to fetch settings');
+      }
+      const pdfMainDetails = await settingsResponse.json();
 
       // Set the combined data into state
       setSelectedInvoice({
@@ -36,17 +92,60 @@ const Address = () => {
 
       // Preload the logo image
       const logoImg = new Image();
-      logoImg.crossOrigin = "Anonymous"; // Important for CORS
+      logoImg.crossOrigin = "Anonymous";
       logoImg.src = 'http://127.0.0.1:8000/media/favicon_cvGw7pn.png';
       logoImg.onload = () => setLogoLoaded(true);
 
     } catch (err) {
       console.error("Download error:", err);
+      setError(err.message || "Failed to prepare invoice for download");
+    } finally {
+      setLoading(false);
     }
   };
 
+  const numberToWords = (num) => {
+    const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
+    const teens = ["Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+    const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+    const thousandUnits = ["", "Thousand", "Lakh", "Crore"];
+
+    if (num === 0) return "Zero";
+    let words = "";
+    let unitIndex = 0;
+    let integerPart = Math.floor(num);
+
+    while (integerPart > 0) {
+      let chunk = integerPart % 1000;
+      if (chunk) {
+        let chunkWords = "";
+        if (chunk >= 100) {
+          chunkWords += ones[Math.floor(chunk / 100)] + " Hundred ";
+          chunk %= 100;
+        }
+        if (chunk < 10) {
+          chunkWords += ones[chunk];
+        } else if (chunk < 20) {
+          chunkWords += teens[chunk - 10];
+        } else {
+          chunkWords += tens[Math.floor(chunk / 10)] + (chunk % 10 !== 0 ? " " + ones[chunk % 10] : "");
+        }
+        words = chunkWords.trim() + " " + thousandUnits[unitIndex] + " " + words;
+      }
+      integerPart = Math.floor(integerPart / 1000);
+      unitIndex++;
+    }
+
+    let decimalPart = Math.round((num - Math.floor(num)) * 100);
+    if (decimalPart > 0) {
+      words += " and " + numberToWords(decimalPart) + " Paisa";
+    }
+
+    return words.trim();
+  };
+
   useEffect(() => {
-    if (selectedInvoice && logoLoaded) { // Wait for logo to load
+    if (selectedInvoice && logoLoaded) {
       const timer = setTimeout(() => {
         generatePDF();
       }, 300);
@@ -58,22 +157,32 @@ const Address = () => {
     const input = printRef.current;
     if (input) {
       try {
-        // Additional options for html2canvas
         const canvas = await html2canvas(input, {
-          useCORS: true, // Enable CORS
-          allowTaint: true, // Allow tainted canvas
-          scale: 2, // Higher quality
-          logging: true, // Helpful for debugging
+          useCORS: true,
+          allowTaint: true,
+          scale: 2,
+          logging: true,
         });
-        alert("generatePDF")
+
         const imgData = canvas.toDataURL("image/png");
         const pdf = new jsPDF("p", "mm", "a4");
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+
+        const margin = 10; // 10mm margin
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+
+        // Calculate width and height with margin
+        const availableWidth = pageWidth - 2 * margin;
+        const imgHeight = (canvas.height * availableWidth) / canvas.width;
+        const imgX = margin;
+        const imgY = (pageHeight - imgHeight) / 2; // Vertically center
+
+        pdf.addImage(imgData, "PNG", imgX, imgY, availableWidth, imgHeight);
         pdf.save(`Invoice_${selectedInvoice.invoice_number}.pdf`);
+        setSuccess("Invoice downloaded successfully!");
       } catch (err) {
         console.error("PDF generation error:", err);
+        setError("Failed to generate PDF");
       } finally {
         setSelectedInvoice(null);
         setLogoLoaded(false);
@@ -101,22 +210,36 @@ const Address = () => {
   const handleDelete = async (invoiceId) => {
     if (window.confirm("Are you sure you want to delete this invoice?")) {
       try {
+        setLoading(true);
+        setError("");
+        const token = localStorage.getItem("access_token");
+        if (!token) {
+          navigate("/login");
+          return;
+        }
+
         const res = await fetch(`http://localhost:8000/api/delete/${invoiceId}/`, {
           method: "DELETE",
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         });
 
         if (res.ok) {
-          // Remove the deleted invoice from state
           setInvoices((prevInvoices) =>
             prevInvoices.filter((invoice) => invoice.id !== invoiceId)
           );
-          alert("Invoice deleted successfully!");
+          setSuccess("Invoice deleted successfully!");
         } else {
-          alert("Failed to delete invoice.");
+          const errorData = await res.json();
+          throw new Error(errorData.message || 'Failed to delete invoice');
         }
       } catch (err) {
         console.error("Error deleting invoice:", err);
-        alert("An error occurred while deleting the invoice.");
+        setError(err.message || "An error occurred while deleting the invoice");
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -127,90 +250,135 @@ const Address = () => {
 
   return (
     <div className="containers" style={{ height: "100vh" }}>
+      {/* Alert Messages */}
+      {error && (
+        <div className="alert alert-danger" role="alert">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="alert alert-success" role="alert">
+          {success}
+        </div>
+      )}
+
+      {/* New Bill Button */}
       <div className="d-grid gap-2 d-md-flex justify-content-md-end pt-2 pb-2 px-4">
         <button
           type="button"
-          className="naw-biladd"
+          className="naw-biladd btn btn-success"
           onClick={() => navigate("/tax-invoice")}
+          disabled={loading}
         >
-          <i className="bi bi-plus-lg"></i> New Bills
+          <i className="bi bi-plus-lg"></i> {loading ? "Loading..." : "New Bills"}
         </button>
       </div>
 
+      {/* Table Container */}
       <div style={{ padding: "10px 21px 10px 82px" }}>
-        <div style={{ borderRadius: "32px", overflow: "hidden", border: "15px solid" }}>
-          <table className="table table-striped table-hover text-center">
+        <div
+          style={{
+            borderRadius: "16px",
+            overflow: "hidden",
+            border: "2px solid #dee2e6",
+            boxShadow: "0 0 15px rgba(0,0,0,0.1)",
+            background: "#fff",
+          }}
+        >
+          <table className="table table-striped table-hover text-center mb-0">
             <thead className="table-dark">
               <tr>
                 <th>No.</th>
-                <th>Buyer Name</th>
-                <th>Buyer Address</th>
-                <th>Total Amount</th>
-                <th>View</th>
-                <th>Download</th>
-                <th>Edit</th>
-                <th>Delete</th>
+                <th>Buyer</th>
+                <th>Address</th>
+                <th>Total</th>
+                <th>items</th>
+
               </tr>
             </thead>
             <tbody>
-              {invoices.map((invoice, index) => (
+              {loading && invoices.length === 0 ? (
+                <tr>
+                  <td colSpan="8" className="text-center">Loading invoices...</td>
+                </tr>
+              ) : invoices.map((invoice, index) => (
                 <tr key={invoice.id}>
                   <td>{index + 1}</td>
-                  <td>{invoice.buyer_name}</td>
+
+                  {/* Buyer Name with Avatar */}
+                  <td>
+                    {invoice.buyer_name}
+                  </td>
+
+                  {/* Click-to-copy Address */}
                   <td
                     className="truncate address-hover"
                     title={invoice.buyer_address}
                     onClick={() => {
                       navigator.clipboard.writeText(invoice.buyer_address);
-                      alert("Address copied to clipboard!");
+                      setSuccess("Address copied to clipboard!");
                     }}
                   >
                     {invoice.buyer_address.length > 20
                       ? invoice.buyer_address.slice(0, 20) + "..."
                       : invoice.buyer_address}
                   </td>
+
                   <td>
                     {invoice.currency} {parseFloat(invoice.total_with_gst).toFixed(2)}
                   </td>
-                  <td>
-                    <button
-                      className="action-button view-button"
-                      onClick={() => navigate(`/invoice-detail/${invoice.id}`)}
-                    >
-                      View
-                    </button>
-                  </td>
-                  <td>
-                    <button
-                      className="action-button download-button"
-                      onClick={() => handleDownload(invoice.id)}
-                    >
-                      Download
-                    </button>
-                  </td>
-                  <td>
-                    <button
-                      className="action-button edit-button"
-                      onClick={() => handleEdit(invoice.id)}
-                    >
-                      Edit
-                    </button>
-                  </td>
-                  <td>
-                    <button
-                      className="action-button delete-button"
-                      onClick={() => handleDelete(invoice.id)}
-                    >
-                      Delete
-                    </button>
-                  </td>
 
+                  {/* View Button */}
+                  <td className="d-flex justify-content-evenly">
+                    <button
+                      className="btn btn-outline-primary action-btn"
+                      onClick={() => navigate(`/invoice-detail/${invoice.id}`)}
+                      disabled={loading}
+                    >
+                      <i className="bi bi-eye"></i>
+                    </button>
+
+
+                    {/* Download Button */}
+
+                    <button
+                      className="btn btn-outline-success action-btn"
+                      onClick={() => handleDownload(invoice.id)}
+                      disabled={loading}
+                    >
+                      <i className="bi bi-download"></i>
+                    </button>
+
+
+                    {/* Edit Button */}
+
+                    <button
+                      className="btn btn-outline-warning action-btn"
+                      onClick={() => handleEdit(invoice.id)}
+                      disabled={loading}
+                    >
+                      <i className="bi bi-pencil-square"></i>
+                    </button>
+
+
+                    {/* Delete Button */}
+
+                    <button
+                      className="btn btn-outline-danger action-btn"
+                      onClick={() => handleDelete(invoice.id)}
+                      disabled={loading}
+                    >
+                      <i className="bi bi-trash3"></i>
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+
+
 
       {/* Hidden printable invoice for PDF */}
       {selectedInvoice && (
@@ -315,7 +483,7 @@ const Address = () => {
                         </tr>
                         <tr>
                           <td>Date</td>
-                          <td>{selectedInvoice.invoice_date}</td>
+                          <td>{new Date(selectedInvoice.invoice_date).toLocaleDateString("en-GB")}</td>
                         </tr>
                         <tr>
                           <td>Delivery Note</td>
@@ -327,7 +495,8 @@ const Address = () => {
                         </tr>
                         <tr>
                           <td>Delivery Note Date</td>
-                          <td>{selectedInvoice.delivery_note_date}</td>
+
+                          <td>{new Date(selectedInvoice.delivery_note_date).toLocaleDateString("en-GB")}</td>
                         </tr>
                         <tr>
                           <td>Destination</td>
@@ -379,13 +548,13 @@ const Address = () => {
                   <div className="col-xs-12">
                     <table className="table table-bordered black-bordered">
                       <thead>
-                        <tr className="trbody" style={{ border: "2px solid" }}>
-                          <th>SI No.</th>
-                          <th>Particulars</th>
-                          <th>HSN/SAC</th>
-                          <th>Hours</th>
-                          <th>Rate</th>
-                          <th>Amount</th>
+                        <tr className="trbody" >
+                          <th style={{ backgroundColor: "#f1f3f4" }}>SI No.</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>Particulars</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>HSN/SAC</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>Hours</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
                         </tr>
                       </thead>
                       <tbody style={{ border: "2px solid" }}>
@@ -452,7 +621,8 @@ const Address = () => {
                           <strong>Amount Chargeable (in words):</strong>
                         </p>
                         <h4 className="total-in-words">
-                          <span className="currency-text">INR</span>
+                          <span className="currency-text">INR </span>
+                          {numberToWords(Math.floor(selectedInvoice.total_with_gst))}
                         </h4>
                         <div className="top-right-corner">
                           <span>E. & O.E</span>
@@ -466,21 +636,21 @@ const Address = () => {
                   {selectedInvoice.country === "India" && (
                     <div className="col-xs-12 inside-india">
                       <table className="table table-bordered invoice-table">
-                        <thead style={{ border: "2px solid" }}>
+                        <thead>
                           <tr>
-                            <th rowSpan="2">HSN/SAC</th>
-                            <th rowSpan="2">Taxable Value</th>
-                            <th colSpan="2">Central Tax</th>
-                            <th colSpan="2">State Tax</th>
-                            <th colSpan="2" rowSpan="2">
+                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Central Tax</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">State Tax</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2" rowSpan="2">
                               Total Tax Amount
                             </th>
                           </tr>
                           <tr>
-                            <th>Rate</th>
-                            <th>Amount</th>
-                            <th>Rate</th>
-                            <th>Amount</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
                           </tr>
                         </thead>
                         <tbody style={{ border: "2px solid" }}>
@@ -519,7 +689,8 @@ const Address = () => {
                       <div>
                         <strong>Tax Amount (in words):</strong>
                         <span className="total-tax-in-words">
-                          <span className="currency-text">INR</span>
+                          <span className="currency-text">INR </span>
+                          {numberToWords(Math.floor(selectedInvoice.total_with_gst))}
                         </span>
                       </div>
                     </div>
@@ -552,14 +723,14 @@ const Address = () => {
                       SWIFT Code: {selectedInvoice.swift_code}
                     </div>
                     <div className="text-right signatory">
-                      <img
-                        className="logo-image"
-                        src='http://127.0.0.1:8000/media/favicon_cvGw7pn.png'
-                        alt="Logo"
-                        height={100}
-                        crossOrigin="anonymous" // Add this attribute
-                        onLoad={() => setLogoLoaded(true)} // Track loading
-                      />
+                      {selectedInvoice.logo && (
+                        <img
+                          src={`http://127.0.0.1:8000${selectedInvoice.logo}`}
+                          alt="Company Logo"
+                          className="logo-image"
+                        />
+                      )}
+
                       <p>for Grabsolve Infotech</p>
                       <p>Authorized Signatory</p>
                     </div>
@@ -576,41 +747,3 @@ const Address = () => {
 };
 
 export default Address;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// const handleNewBill = (invoice) => {
-//   navigate('/tax-invoice', {
-//     state: {
-//       buyerData: {
-//         buyer_name: invoice?.buyer_name || '',
-//         buyer_address: invoice?.buyer_address || '',
-//         buyer_gst: invoice?.buyer_gst || '',
-//       },
-//       consigneeData: {
-//         consignee_name: invoice?.consignee_name || '',
-//         consignee_address: invoice?.consignee_address || '',
-//         consignee_gst: invoice?.consignee_gst || '',
-//       }
-//     }
-//   });
-// };
-
-
-// <button
-// className="newaddbillbutton"
-// onClick={() => handleNewBill(invoice)}
-// >
-// Newbill
-// </button>

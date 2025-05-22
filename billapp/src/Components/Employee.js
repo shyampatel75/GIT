@@ -15,24 +15,40 @@ const SalaryManager = () => {
   const [error, setError] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
-
   const navigate = useNavigate();
+  const token = localStorage.getItem("access_token");
+
+  // Helper functions
+  const handleResponse = async (response) => {
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || "Request failed");
+    }
+    return response.json();
+  };
+
+  const handleError = (error) => {
+    console.error("Error:", error);
+    setError(error.message || "An error occurred");
+  };
 
   useEffect(() => {
     const fetchSalaries = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/banking/employee/");
-        if (!response.ok) throw new Error("Failed to fetch data");
-        const data = await response.json();
+        const response = await fetch("http://localhost:8000/api/banking/employee/", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const data = await handleResponse(response);
         setSalaryList(data);
       } catch (err) {
-        console.error(err);
-        setError("Could not load salary data");
+        handleError(err);
       }
     };
 
     fetchSalaries();
-  }, []);
+  }, [token]);
 
   const toggleForm = () => {
     setShowForm(!showForm);
@@ -45,6 +61,7 @@ const SalaryManager = () => {
     });
     setIsEditing(false);
     setEditId(null);
+    setSelectedPerson(null);
   };
 
   const handleChange = (e) => {
@@ -76,13 +93,12 @@ const SalaryManager = () => {
         method: method,
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error("Submission failed");
-
-      const data = await response.json();
+      const data = await handleResponse(response);
 
       if (isEditing) {
         setSalaryList((prevList) =>
@@ -92,20 +108,10 @@ const SalaryManager = () => {
         setSalaryList([...salaryList, data]);
       }
 
-      setFormData({
-        salary_name: "",
-        salary_amount: "",
-        salary_date: "",
-        salary_email: "",
-        salary_number: "",
-      });
-      setIsEditing(false);
-      setEditId(null);
-      setShowForm(false);
+      toggleForm();
       setError(null);
     } catch (err) {
-      console.error(err);
-      setError(err.message);
+      handleError(err);
     }
   };
 
@@ -135,17 +141,19 @@ const SalaryManager = () => {
       try {
         const response = await fetch(`http://localhost:8000/api/employees/${id}/`, {
           method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         });
 
         if (response.ok) {
           setSalaryList((prev) => prev.filter((item) => item.id !== id));
           alert("Entry deleted successfully.");
         } else {
-          alert("Failed to delete entry.");
+          throw new Error("Failed to delete entry");
         }
       } catch (error) {
-        console.error("Delete error:", error);
-        alert("Error deleting entry.");
+        handleError(error);
       }
     }
   };
@@ -161,7 +169,7 @@ const SalaryManager = () => {
         {showForm ? "Cancel" : "Add Salary"}
       </button>
 
-      {showForm ? (
+        {showForm ? (
         <form
           onSubmit={handleSubmit}
           className="p-4 border rounded bg-gray-50 space-y-4"
@@ -250,8 +258,8 @@ const SalaryManager = () => {
                 </tr>
               </thead>
               <tbody>
-                {salaryList.map((salary, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
+                {salaryList.map((salary) => (
+                  <tr key={salary.id} className="hover:bg-gray-50">
                     <td
                       className="p-2 border text-blue-600 cursor-pointer underline"
                       onClick={() => handleNameClick(salary)}
@@ -264,10 +272,10 @@ const SalaryManager = () => {
                     </td>
                     <td className="p-2 border">{salary.email}</td>
                     <td className="p-2 border">{salary.number}</td>
-                    <td className="p-2 border">
+                    <td className="p-2 border space-x-2">
                       <button
                         onClick={() => handleEditClick(salary)}
-                        className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600 mr-2"
+                        className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600"
                       >
                         Edit
                       </button>
@@ -292,7 +300,6 @@ const SalaryManager = () => {
               <p><strong>Date:</strong> {new Date(selectedPerson.joining_date).toLocaleDateString()}</p>
               <p><strong>Email:</strong> {selectedPerson.email}</p>
               <p><strong>Phone:</strong> {selectedPerson.number}</p>
-
               <button
                 onClick={handleCloseDetails}
                 className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
@@ -303,6 +310,7 @@ const SalaryManager = () => {
           )}
         </>
       )}
+      {error && <p className="text-red-500 mt-4">Error: {error}</p>}
     </div>
   );
 };

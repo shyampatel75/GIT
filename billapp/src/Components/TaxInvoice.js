@@ -148,39 +148,39 @@ const Taxinvoice = () => {
     }
   }, []);
 
-  const fetchLatestInvoiceNumber = useCallback(async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem("access_token");
-      if (!token) {
-        navigate("/login");
-        return;
-      }
+  // const fetchLatestInvoiceNumber = useCallback(async () => {
+  //   try {
+  //     setLoading(true);
+  //     const token = localStorage.getItem("access_token");
+  //     if (!token) {
+  //       navigate("/login");
+  //       return;
+  //     }
 
-      const response = await fetch("http://localhost:8000/api/invoices/next-invoice-number/", {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+  //     const response = await fetch("http://localhost:8000/api/invoices/next-invoice-number/", {
+  //       headers: {
+  //         'Authorization': `Bearer ${token}`,
+  //         'Content-Type': 'application/json'
+  //       }
+  //     });
 
-      if (response.ok) {
-        const data = await response.json();
-        const numericPart = parseInt(data.invoice_number.split('-')[0]);
-        setinvoice_Number(prev => Math.max(prev, numericPart || 1));
-      }
-    } catch (error) {
-      console.error("Error verifying invoice number:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [navigate]);
+  //     if (response.ok) {
+  //       const data = await response.json();
+  //       const numericPart = parseInt(data.invoice_number.split('-')[0]);
+  //       setinvoice_Number(prev => Math.max(prev, numericPart || 1));
+  //     }
+  //   } catch (error) {
+  //     console.error("Error verifying invoice number:", error);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // }, [navigate]);
 
   // Effects
   useEffect(() => {
     fetchCountries();
     fetchSettings();
-    fetchLatestInvoiceNumber();
+    // fetchLatestInvoiceNumber();
 
     const interval = setInterval(() => {
       const newYear = getCurrentInvoiceYear();
@@ -188,7 +188,7 @@ const Taxinvoice = () => {
     }, 1000 * 60 * 60 * 24);
 
     return () => clearInterval(interval);
-  }, [fetchCountries, fetchSettings, fetchLatestInvoiceNumber]);
+  }, [fetchCountries, fetchSettings]);
 
   useEffect(() => {
     setFormData(prev => ({
@@ -570,7 +570,7 @@ const handleSubmit = async (e) => {
                         value={formData.buyer_name}
                         onChange={handleChange}
                         required
-                        // style={{ border: !formData.buyer_name ? '1px solid red' : '' }}
+                        style={{ border: !formData.buyer_name ? '1px solid red' : '' }}
                       />
                       <br />
                       Address:

@@ -14,8 +14,33 @@ const YearDetails = () => {
       setLoading(true);
       setError("");
       try {
-        const res = await fetch("http://localhost:8000/api/invoices");
+        const token = localStorage.getItem("access_token");
+        if (!token) {
+          // If no token, redirect to login or show error
+          setError("You must be logged in to view this page.");
+          setLoading(false);
+          navigate("/login");
+          return;
+        }
+
+        const res = await fetch("http://localhost:8000/api/invoices", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (res.status === 401) {
+          // Unauthorized, token may be expired or invalid
+          setError("Unauthorized. Please log in again.");
+          setLoading(false);
+          localStorage.removeItem("access_token");
+          navigate("/login");
+          return;
+        }
+
         if (!res.ok) throw new Error("Error fetching invoices");
+
         const data = await res.json();
 
         const [startYear, endYear] = yearRange.split("-").map(Number);
@@ -58,7 +83,7 @@ const YearDetails = () => {
       setError("Invalid year format.");
       setLoading(false);
     }
-  }, [yearRange]);
+  }, [yearRange, navigate]);
 
   return (
     <div style={{ padding: "20px 80px" }}>

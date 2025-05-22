@@ -7,25 +7,118 @@ const Clients = () => {
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState([]);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
-  const [logoLoaded, setLogoLoaded] = useState(false); // Add logo loaded state
+  const [logoLoaded, setLogoLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const printRef = useRef();
 
+  const fetchWithAuth = async (url, options = {}) => {
+    const token = localStorage.getItem("access_token");
+    const headers = {
+      ...options.headers,
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+
+    try {
+      const response = await fetch(url, { ...options, headers });
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Token might be expired, redirect to login
+          navigate('/login');
+          return null;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Fetch error:', error);
+      setError(error.message || "Failed to fetch data");
+      return null;
+    }
+  };
+
   useEffect(() => {
-    fetch("http://localhost:8000/api/invoices/")
-      .then((res) => res.json())
-      .then((data) => setInvoices(data))
-      .catch((err) => console.error("Error fetching invoices:", err));
-  }, []);
+    const fetchInvoices = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const data = await fetchWithAuth("http://localhost:8000/api/invoices/");
+        if (data) {
+          setInvoices(data);
+        }
+      } catch (err) {
+        console.error("Error fetching invoices:", err);
+        setError(err.message || "Error fetching invoices");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInvoices();
+  }, [navigate]);
+
+
+   const numberToWords = (num) => {
+    const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
+    const teens = ["Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+    const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+    const thousandUnits = ["", "Thousand", "Lakh", "Crore"];
+
+    if (num === 0) return "Zero";
+    let words = "";
+    let unitIndex = 0;
+    let integerPart = Math.floor(num);
+
+    while (integerPart > 0) {
+      let chunk = integerPart % 1000;
+      if (chunk) {
+        let chunkWords = "";
+        if (chunk >= 100) {
+          chunkWords += ones[Math.floor(chunk / 100)] + " Hundred ";
+          chunk %= 100;
+        }
+        if (chunk < 10) {
+          chunkWords += ones[chunk];
+        } else if (chunk < 20) {
+          chunkWords += teens[chunk - 10];
+        } else {
+          chunkWords += tens[Math.floor(chunk / 10)] + (chunk % 10 !== 0 ? " " + ones[chunk % 10] : "");
+        }
+        words = chunkWords.trim() + " " + thousandUnits[unitIndex] + " " + words;
+      }
+      integerPart = Math.floor(integerPart / 1000);
+      unitIndex++;
+    }
+
+    let decimalPart = Math.round((num - Math.floor(num)) * 100);
+    if (decimalPart > 0) {
+      words += " and " + numberToWords(decimalPart) + " Paisa";
+    }
+
+    return words.trim();
+  };
+
+
 
   const handleDownload = async (invoiceId) => {
     try {
-      // Fetch invoice data
-      const res = await fetch(`http://localhost:8000/api/invoices/${invoiceId}/`);
-      const pdfBasicDetail = await res.json();
+      setLoading(true);
+      setError("");
 
-      // Fetch settings data
-      const resSetting = await fetch(`http://localhost:8000/api/settings/`);
-      const pdfMainDetails = await resSetting.json();
+      // Fetch invoice data with auth
+      const pdfBasicDetail = await fetchWithAuth(
+        ` http://localhost:8000/api/invoices/${invoiceId}/`
+      );
+
+      if (!pdfBasicDetail) return;
+
+      // Fetch settings data with auth
+      const pdfMainDetails = await fetchWithAuth(
+        ` http://localhost:8000/api/settings/`
+      );
+
+      if (!pdfMainDetails) return;
 
       // Set the combined data into state
       setSelectedInvoice({
@@ -35,17 +128,20 @@ const Clients = () => {
 
       // Preload the logo image
       const logoImg = new Image();
-      logoImg.crossOrigin = "Anonymous"; // Important for CORS
+      logoImg.crossOrigin = "Anonymous";
       logoImg.src = 'http://127.0.0.1:8000/media/favicon_cvGw7pn.png';
       logoImg.onload = () => setLogoLoaded(true);
 
     } catch (err) {
       console.error("Download error:", err);
+      setError(err.message || "Download error");
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (selectedInvoice && logoLoaded) { // Wait for logo to load
+    if (selectedInvoice && logoLoaded) {
       const timer = setTimeout(() => {
         generatePDF();
       }, 300);
@@ -64,12 +160,10 @@ const Clients = () => {
           logging: true,
         });
 
-        alert("generatePDF");
-
         const imgData = canvas.toDataURL("image/png");
         const pdf = new jsPDF("p", "mm", "A4");
 
-        const margin = 10; // 20mm margin
+        const margin = 10;
         const pdfWidth = pdf.internal.pageSize.getWidth() - margin * 2;
         const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
@@ -77,13 +171,13 @@ const Clients = () => {
         pdf.save(`Invoice_${selectedInvoice.invoice_number}.pdf`);
       } catch (err) {
         console.error("PDF generation error:", err);
+        setError(err.message || "PDF generation error");
       } finally {
         setSelectedInvoice(null);
         setLogoLoaded(false);
       }
     }
   };
-
 
   const handleNewBill = (invoice) => {
     navigate('/tax-invoice', {
@@ -114,33 +208,72 @@ const Clients = () => {
   const handleDelete = async (invoiceId) => {
     if (window.confirm("Are you sure you want to delete this invoice?")) {
       try {
-        const res = await fetch(`http://localhost:8000/api/delete/${invoiceId}/`, {
-          method: "DELETE",
-        });
+        setLoading(true);
+        setError("");
 
-        if (res.ok) {
-          // Remove the deleted invoice from state
-          setInvoices((prevInvoices) =>
-            prevInvoices.filter((invoice) => invoice.id !== invoiceId)
+        const token = localStorage.getItem("access_token");
+        const response = await fetch(
+          `http://localhost:8000/api/delete/${invoiceId}/`,
+          {
+            method: "DELETE",
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (response.ok) {
+          setInvoices(prevInvoices =>
+            prevInvoices.filter(invoice => invoice.id !== invoiceId)
           );
           alert("Invoice deleted successfully!");
         } else {
-          alert("Failed to delete invoice.");
+          if (response.status === 401) {
+            navigate('/login');
+            return;
+          }
+          throw new Error("Failed to delete invoice");
         }
       } catch (err) {
         console.error("Error deleting invoice:", err);
+        setError(err.message || "Error deleting invoice");
         alert("An error occurred while deleting the invoice.");
+      } finally {
+        setLoading(false);
       }
     }
   };
 
+  // Check if user is authenticated on component mount
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      navigate('/login');
+    }
+  }, [navigate]);
+
   return (
     <div className="containers" style={{ height: "100vh" }}>
+      {error && (
+        <div className="alert alert-danger">
+          {error}
+        </div>
+      )}
+      {loading && (
+        <div className="text-center mt-3">
+          <div className="spinner-border" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      )}
+
       <div className="d-grid gap-2 d-md-flex justify-content-md-end pt-2 pb-2 px-4">
         <button
           type="button"
           className="naw-biladd"
           onClick={() => navigate("/tax-invoice")}
+          disabled={loading}
         >
           <i className="bi bi-plus-lg"></i> New Bills
         </button>
@@ -163,20 +296,47 @@ const Clients = () => {
                 <tr key={invoice.id}>
                   <td>{index + 1}</td>
                   <td>{invoice.buyer_name}</td>
-                  <td>
-                    {invoice.invoice_number}
-                  </td>
+                  <td>{invoice.invoice_number}</td>
                   <td>
                     {invoice.currency} {parseFloat(invoice.total_with_gst).toFixed(2)}
                   </td>
                   <td className="d-flex flex-wrap gap-2 justify-content-center">
-                    <button className="btn btn-primary" onClick={() => navigate(`/invoice-detail/${invoice.id}`)}>View</button>
-                    <button className="btn btn-success" onClick={() => handleDownload(invoice.id)}>Download</button>
-                    <button className="btn btn-secondary" onClick={() => handleNewBill(invoice)}>Newbill</button>
-                    <button className="btn btn-warning" onClick={() => handleEdit(invoice)}>Edit</button>
-                    <button className="btn btn-danger" onClick={() => handleDelete(invoice.id)}>Delete</button>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => navigate(`/invoice-detail/${invoice.id}`)}
+                      disabled={loading}
+                    >
+                      View
+                    </button>
+                    <button
+                      className="btn btn-success"
+                      onClick={() => handleDownload(invoice.id)}
+                      disabled={loading}
+                    >
+                      Download
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => handleNewBill(invoice)}
+                      disabled={loading}
+                    >
+                      Newbill
+                    </button>
+                    <button
+                      className="btn btn-warning"
+                      onClick={() => handleEdit(invoice)}
+                      disabled={loading}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="btn btn-danger"
+                      onClick={() => handleDelete(invoice.id)}
+                      disabled={loading}
+                    >
+                      Delete
+                    </button>
                   </td>
-
                 </tr>
               ))}
             </tbody>
@@ -351,13 +511,13 @@ const Clients = () => {
                   <div className="col-xs-12">
                     <table className="table table-bordered black-bordered">
                       <thead>
-                        <tr className="trbody" style={{ border: "2px solid" }}>
-                          <th>SI No.</th>
-                          <th>Particulars</th>
-                          <th>HSN/SAC</th>
-                          <th>Hours</th>
-                          <th>Rate</th>
-                          <th>Amount</th>
+                        <tr className="trbody" >
+                          <th style={{ backgroundColor: "#f1f3f4" }}>SI No.</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>Particulars</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>HSN/SAC</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>Hours</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
                         </tr>
                       </thead>
                       <tbody style={{ border: "2px solid" }}>
@@ -425,6 +585,7 @@ const Clients = () => {
                         </p>
                         <h4 className="total-in-words">
                           <span className="currency-text">INR</span>
+                          {numberToWords(Math.floor(selectedInvoice.total_with_gst))}
                         </h4>
                         <div className="top-right-corner">
                           <span>E. & O.E</span>
@@ -438,21 +599,21 @@ const Clients = () => {
                   {selectedInvoice.country === "India" && (
                     <div className="col-xs-12 inside-india">
                       <table className="table table-bordered invoice-table">
-                        <thead style={{ border: "2px solid" }}>
+                        <thead>
                           <tr>
-                            <th rowSpan="2">HSN/SAC</th>
-                            <th rowSpan="2">Taxable Value</th>
-                            <th colSpan="2">Central Tax</th>
-                            <th colSpan="2">State Tax</th>
-                            <th colSpan="2" rowSpan="2">
+                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Central Tax</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">State Tax</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2" rowSpan="2">
                               Total Tax Amount
                             </th>
                           </tr>
                           <tr>
-                            <th>Rate</th>
-                            <th>Amount</th>
-                            <th>Rate</th>
-                            <th>Amount</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
                           </tr>
                         </thead>
                         <tbody style={{ border: "2px solid" }}>
@@ -491,7 +652,8 @@ const Clients = () => {
                       <div>
                         <strong>Tax Amount (in words):</strong>
                         <span className="total-tax-in-words">
-                          <span className="currency-text">INR</span>
+                          <span className="currency-text">INR </span>
+                           {numberToWords(Math.floor(selectedInvoice.total_with_gst))}
                         </span>
                       </div>
                     </div>
@@ -524,14 +686,14 @@ const Clients = () => {
                       SWIFT Code: {selectedInvoice.swift_code}
                     </div>
                     <div className="text-right signatory">
-                      <img
-                        className="logo-image"
-                        src='http://127.0.0.1:8000/media/favicon_cvGw7pn.png'
-                        alt="Logo"
-                        height={100}
-                        crossOrigin="anonymous" // Add this attribute
-                        onLoad={() => setLogoLoaded(true)} // Track loading
-                      />
+                      {selectedInvoice.logo && (
+                        <img
+                          src={`http://127.0.0.1:8000${selectedInvoice.logo}`}
+                          alt="Company Logo"
+                          className="logo-image"
+                        />
+                      )}
+
                       <p>for Grabsolve Infotech</p>
                       <p>Authorized Signatory</p>
                     </div>
@@ -548,5 +710,3 @@ const Clients = () => {
 };
 
 export default Clients;
-
-
