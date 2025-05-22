@@ -45,8 +45,6 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         return self.email
 
 
-
-
 class Invoice(models.Model):
     # Buyer Info (required fields)
     buyer_name = models.CharField(max_length=255)
@@ -188,7 +186,6 @@ class Buyer(models.Model):
     def __str__(self):
         return f"{self.buyer_name} - {self.invoice_id or 'No Invoice'}"
 
-
 class CompanyBill(models.Model):
     company_name = models.CharField(max_length=255, default='Unknown')
     transaction_date = models.DateField(default=timezone.now)  # Changed from selected_date
@@ -197,8 +194,6 @@ class CompanyBill(models.Model):
 
     def __str__(self):
         return self.company_name
-
-
 
 class Salary(models.Model):
     salary_newname = models.CharField(max_length=100, default="N/A")
@@ -209,32 +204,50 @@ class Salary(models.Model):
     def __str__(self):
         return f"{self.salary_name} Salary"
 
-
 class Other(models.Model):
-    TYPE_CHOICES = [
-        ('Fast Expand', 'Fast Expand'),
-        ('Profit', 'Profit'),
-        ('Other', 'Other'),
+    TRANSACTION_TYPE_CHOICES = [
+        ('credit', 'Credit'),
+        ('debit', 'Debit'),
     ]
-    
-    other_type = models.CharField(
-        max_length=20,
-        choices=TYPE_CHOICES,
-        default='Other'
+
+    transaction_type = models.CharField(
+        max_length=6,
+        choices=TRANSACTION_TYPE_CHOICES,
+        default='debit',
+        blank=True,  # Make it optional
+        null=True  
     )
+    other_type = models.CharField(max_length=50)
     other_date = models.DateField()
     other_notice = models.TextField()
     other_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    
 
-    def ___str_(self):
-        return f"Other transaction on {self.other_date}"
+    def __str__(self):  
+        return f"{self.other_type} ({self.transaction_type}) - {self.other_date} - ${abs(self.other_amount)}"
+    
+    def save(self, *args, **kwargs):
+        # Ensure amount is negative for debits and positive for credits
+        if self.transaction_type == 'debit':
+            self.other_amount = -abs(self.other_amount)
+        else:
+            self.other_amount = abs(self.other_amount)
+        super().save(*args, **kwargs)
 
 class BankingDeposit(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateField()
+    
 
     def __str__(self):
         return f"{self.amount} on {self.date}"
+    
+class RemainingAmount(models.Model):
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    last_updated = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Remaining Amount: {self.amount}"
 
 class Employee(models.Model):
     name = models.CharField(max_length=100)
@@ -243,7 +256,7 @@ class Employee(models.Model):
     email = models.EmailField()
     number = models.CharField(max_length=15)
     
-    def __str__(self):
+    def ___str___(self):
         return self.name
 
     class Meta:
@@ -262,10 +275,3 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"Profile for {self.user.email}"
-    
-class RemainingAmount(models.Model):
-    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    last_updated = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"Remaining Amount: {self.amount}"

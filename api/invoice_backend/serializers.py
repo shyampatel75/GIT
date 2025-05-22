@@ -5,7 +5,6 @@ from .models import CompanyBill, Buyer, Salary, Other,BankingDeposit,Employee
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth.models import User
-from .models import UserProfile
 from .models import UserProfile, RemainingAmount
 
 User = get_user_model()
@@ -25,7 +24,7 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['first_name'] = user.first_name
         return token
 
-# serializers.py
+
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
         write_only=True, required=True, style={'input_type': 'password'})
@@ -53,6 +52,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         return User.objects.create_user(**validated_data)
 
 class InvoiceSerializer(serializers.ModelSerializer):
+    
     class Meta:
         model = Invoice
         fields = '__all__'
@@ -123,12 +123,21 @@ class OtherSerializer(serializers.ModelSerializer):
     class Meta:
         model = Other
         fields = '__all__'
+        extra_kwargs = {
+            'other_amount': {'required': True},
+            'transaction_type': {'required': True}
+        }
 
 
 class BankingDepositSerializer(serializers.ModelSerializer):
     class Meta:
-        model = BankingDeposit  # or your model name
+        model = BankingDeposit  
         fields = '__all__'
+
+class RemainingAmountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RemainingAmount
+        fields = ['id', 'amount', 'last_updated']
 
 
 class EmployeeSerializer(serializers.ModelSerializer):
@@ -158,9 +167,3 @@ class UserProfileSerializer(serializers.ModelSerializer):
         if obj.image2:
             return self.context['request'].build_absolute_uri(obj.image2.url)
         return None
-    
-
-class RemainingAmountSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = RemainingAmount
-        fields = ['id', 'amount', 'last_updated']

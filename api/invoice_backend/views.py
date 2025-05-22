@@ -2,7 +2,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status, generics, permissions
 from .models import Invoice, Setting,Statement, Deposit,CompanyBill, Buyer, Salary, Other,BankingDeposit,Employee
-from .serializers import InvoiceSerializer, SettingSerializer, StatementSerializer, DepositSerializer,CompanyBillSerializer, BuyerSerializer, SalarySerializer, OtherSerializer,BankingDepositSerializer,EmployeeSerializer,RemainingAmountSerializer
+from .serializers import InvoiceSerializer,SettingSerializer, StatementSerializer, DepositSerializer,CompanyBillSerializer, BuyerSerializer, SalarySerializer, OtherSerializer,BankingDepositSerializer,EmployeeSerializer,RemainingAmountSerializer,UserProfile,RemainingAmount
 from django.contrib.auth.models import User
 from datetime import datetime
 from django.http import JsonResponse,FileResponse,Http404,HttpResponseBadRequest
@@ -18,9 +18,8 @@ from .serializers import MyTokenObtainPairSerializer, RegisterSerializer, UserSe
 from django.contrib.auth import get_user_model
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import UserProfile
 from .serializers import UserProfileSerializer
-from .models import UserProfile,RemainingAmount
+
 
 class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
@@ -29,12 +28,13 @@ class MyTokenObtainPairView(TokenObtainPairView):
 # ========================
 
 @api_view(['POST'])
-@permission_classes([permissions.AllowAny])
+@permission_classes([AllowAny])
 def register_user(request):
     try:
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.save()
+            user = serializer.save()          
+            #  .save() to return an object instance, based on the validated data.
             return Response({
                 'user': UserSerializer(user).data,
                 'message': 'User created successfully'
@@ -46,7 +46,7 @@ def register_user(request):
         print(traceback.format_exc())  # This will print the full traceback in terminal
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-# views.py
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_user(request):
@@ -65,6 +65,21 @@ def login_user(request):
         print(f"Login error: {e}")
         return Response({'error': str(e)}, status=status.HTTP_401_UNAUTHORIZED)
     
+  
+# @api_view(['POST'])
+# @permission_classes([IsAuthenticated])
+# def logout_user(request):
+#     try:
+#         refresh_token = request.data.get('refresh')
+#         token = RefreshToken(refresh_token)
+#         token.blacklist()
+#         return Response({'message': 'Logout successful'})
+#     except Exception as e:
+#         return Response(
+#             {'error': 'Invalid token'}, 
+#             status=status.HTTP_400_BAD_REQUEST
+#         )
+      
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def get_current_user(request):
@@ -72,102 +87,99 @@ def get_current_user(request):
     serializer = UserSerializer(request.user)
     return Response(serializer.data)
 
-
-
-
-
 # ========================
 # 📦 Invoice APIs
 # ========================
 
-
 class StatementListAPIView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
     serializer_class = StatementSerializer
 
     def get_queryset(self):
         invoice_id = self.kwargs['invoice_id']
-        return Statement.objects.filter(invoice_id=invoice_id)
-
+        return Statement.objects.filter(invoice_id=invoice_id, invoice__user=self.request.user)
 
 class DepositListAPIView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
     serializer_class = DepositSerializer
 
     def get_queryset(self):
         statement_id = self.kwargs['statement_id']
-        return Deposit.objects.filter(statement_id=statement_id) 
+        return Deposit.objects.filter(statement_id=statement_id, statement_invoice_user=self.request.user) 
     
-def download_invoice_pdf(request, invoice_id):
-    try:
-        invoice = Invoice.objects.get(pk=invoice_id)
-        template = get_template("invoice_template.html")
-        html = template.render({"invoice": invoice})
+# def download_invoice_pdf(request, invoice_id):
+#     try:
+#         invoice = Invoice.objects.get(pk=invoice_id)
+#         template = get_template("invoice_template.html")
+#         html = template.render({"invoice": invoice})
 
-        print("Generated HTML:")
-        print(html)
+#         print("Generated HTML:")
+#         print(html)
 
-        buffer = io.BytesIO()
-        pisa_status = pisa.CreatePDF(html, dest=buffer)
+#         buffer = io.BytesIO()
+#         pisa_status = pisa.CreatePDF(html, dest=buffer)
 
-        if pisa_status.err:
-            return HttpResponse("We had some errors <pre>" + html + "</pre>", status=500)
+#         if pisa_status.err:
+#             return HttpResponse("We had some errors <pre>" + html + "</pre>", status=500)
 
-        buffer.seek(0)
-        response = HttpResponse(buffer, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="invoice_{invoice_id}.pdf"'
-        return response
+#         buffer.seek(0)
+#         response = HttpResponse(buffer, content_type='application/pdf')
+#         response['Content-Disposition'] = f'attachment; filename="invoice_{invoice_id}.pdf"'
+#         return response
     
-    except Invoice.DoesNotExist:
-        return HttpResponse(f'Invoice with ID {invoice_id} not found', status=404)
-    except Exception as e:
-        print("Unexpected Error in download_invoice_pdf:", str(e))
-        print(traceback.format_exc())
-        return HttpResponse(f'Error: {str(e)}', status=500)
+#     except Invoice.DoesNotExist:
+#         return HttpResponse(f'Invoice with ID {invoice_id} not found', status=404)
+#     except Exception as e:
+#         print("Unexpected Error in download_invoice_pdf:", str(e))
+#         print(traceback.format_exc())
+#         return HttpResponse(f'Error: {str(e)}', status=500)
 
-def get_next_invoice_number():
-    current_year = datetime.now().year
-    next_year = current_year + 1
-    financial_year = f"{current_year}/{next_year}"
+# def get_next_invoice_number():
+#     current_year = datetime.now().year
+#     next_year = current_year + 1
+#     financial_year = f"{current_year}/{next_year}"
     
-    # Get all invoices for the current financial year
-    invoices = Invoice.objects.filter(financial_year=financial_year)
+#     # Get all invoices for the current financial year
+#     invoices = Invoice.objects.filter(financial_year=financial_year)
     
-    if invoices.exists():
-        # Extract numbers and find the maximum
-        numbers = []
-        for invoice in invoices:
-            try:
-                num_part = invoice.invoice_number.split('-')[0]
-                numbers.append(int(num_part))
-            except (ValueError, IndexError):
-                continue
+#     if invoices.exists():
+#         # Extract numbers and find the maximum
+#         numbers = []
+#         for invoice in invoices:
+#             try:
+#                 num_part = invoice.invoice_number.split('-')[0]
+#                 numbers.append(int(num_part))
+#             except (ValueError, IndexError):
+#                 continue
         
-        if numbers:
-            max_num = max(numbers)
-            next_num = max_num + 1
-        else:
-            next_num = 1
-    else:
-        next_num = 1
+#         if numbers:
+#             max_num = max(numbers)
+#             next_num = max_num + 1
+#         else:
+#             next_num = 1
+#     else:
+#         next_num = 1
     
-    return f"{next_num:02d}-{financial_year}", financial_year
+#     return f"{next_num:02d}-{financial_year}", financial_year
+
+# @api_view(['GET'])
+# def get_latest_invoice_number(request):
+#     latest_invoice = Invoice.objects.order_by('-id').first()
+#     if latest_invoice:
+#         next_invoice_number = latest_invoice.invoice_number + 1
+#     else:
+#         next_invoice_number = 1
+#     return Response({'next_invoice_number': next_invoice_number})
+
+# @csrf_exempt
+# def get_invoices_by_buyer(request):
+#     buyer_name = request.GET.get("name", "")
+#     invoices = Invoice.objects.filter(buyer_name__iexact=buyer_name)
+#     data = list(invoices.values())
+#     return JsonResponse(data, safe=False)
 
 @api_view(['GET'])
-def get_latest_invoice_number(request):
-    latest_invoice = Invoice.objects.order_by('-id').first()
-    if latest_invoice:
-        next_invoice_number = latest_invoice.invoice_number + 1
-    else:
-        next_invoice_number = 1
-    return Response({'next_invoice_number': next_invoice_number})
-
-@csrf_exempt
-def get_invoices_by_buyer(request):
-    buyer_name = request.GET.get("name", "")
-    invoices = Invoice.objects.filter(buyer_name__iexact=buyer_name)
-    data = list(invoices.values())
-    return JsonResponse(data, safe=False)
-
-@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_invoices(request):
     year_range = request.query_params.get('year', None)
     if year_range:
@@ -179,6 +191,7 @@ def get_invoices(request):
     return Response(serializer.data)
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def create_invoice(request):
     data = request.data.copy()
     
@@ -226,19 +239,19 @@ def create_invoice(request):
             "message": str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-@api_view(['GET'])
-def get_next_available_number(request):
-    try:
-        next_number, financial_year = get_next_invoice_number()
-        return Response({
-            "invoice_number": next_number,
-            "financial_year": financial_year
-        })
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
-
-    
+# @api_view(['GET'])
+# def get_next_available_number(request):
+#     try:
+#         next_number, financial_year = get_next_invoice_number()
+#         return Response({
+#             "invoice_number": next_number,
+#             "financial_year": financial_year
+#         })
+#     except Exception as e:
+#         return Response({"error": str(e)}, status=500)
+   
 @api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
 def invoice_detail(request, pk):
     try:
         invoice = Invoice.objects.get(pk=pk)
@@ -270,6 +283,7 @@ class InvoiceDetailView(generics.RetrieveAPIView):
 # ========================
 
 @api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
 def settings_list_create(request):
     if request.method == 'GET':
         settings = Setting.objects.all()
@@ -289,6 +303,7 @@ def settings_list_create(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['PUT'])
+@permission_classes([IsAuthenticated])
 def update_setting(request, pk):
     try:
         setting = Setting.objects.get(pk=pk)
@@ -316,6 +331,7 @@ def delete_setting(request, pk):
 # ========================
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def signup_user(request):
     username = request.data.get('username')
     email = request.data.get('email')
@@ -366,6 +382,7 @@ def get_next_invoice_number():
 # Function to create a Company Transaction
 
 @api_view(['POST', 'GET'])
+@permission_classes([IsAuthenticated])
 def create_company_transaction(request):
     if request.method == 'POST':
         serializer = CompanyBillSerializer(data=request.data)
@@ -382,6 +399,7 @@ def create_company_transaction(request):
 
 # Function to retrieve an individual Company Transaction
 @api_view(['GET', 'DELETE'])
+@permission_classes([IsAuthenticated])
 def company_transaction_detail(request, pk):
     try:
         transaction = CompanyBill.objects.get(pk=pk)
@@ -396,17 +414,16 @@ def company_transaction_detail(request, pk):
         transaction.delete()
         return Response({"detail": "Deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
 
-
-
 # Function to create a Buyer Transaction
 @api_view(['POST', 'GET'])
+@permission_classes([IsAuthenticated])
 def create_buyer_transaction(request):
     try:
         if request.method == 'POST':
             data = request.data.copy()
 
             print("🔍 Raw incoming request.data:", request.data)
-            print("🛠️  Copied data before processing:", data)
+            print("🛠  Copied data before processing:", data)
 
             data['transaction_date'] = data.pop('selected_date', data.get('transaction_date'))
             data['invoice_id'] = data.pop('invoice', data.get('invoice_id'))
@@ -429,6 +446,7 @@ def create_buyer_transaction(request):
 
 # Function to retrieve an individual Buyer Transaction
 @api_view(['GET', 'DELETE'])
+@permission_classes([IsAuthenticated])
 def buyer_transaction_detail(request, pk):
     try:
         transaction = Buyer.objects.get(pk=pk)
@@ -443,10 +461,9 @@ def buyer_transaction_detail(request, pk):
         transaction.delete()
         return Response({"detail": "Deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
 
-
-
 # Function to create a Salary Transaction
 @api_view(['POST', 'GET'])
+@permission_classes([IsAuthenticated])
 def create_salary_transaction(request):
     if request.method == 'POST':
         serializer = SalarySerializer(data=request.data)
@@ -463,6 +480,7 @@ def create_salary_transaction(request):
     
 # Function to retrieve an individual Salary Transaction
 @api_view(['GET', 'DELETE'])
+@permission_classes([IsAuthenticated])
 def salary_transaction_detail(request, pk):
     try:
         transaction = Salary.objects.get(pk=pk)
@@ -477,27 +495,39 @@ def salary_transaction_detail(request, pk):
         transaction.delete()
         return Response({"detail": "Deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
 
-
 # Function to create an Other Transaction
 @api_view(['POST', 'GET'])
+@permission_classes([IsAuthenticated])
 def create_other_transaction(request):
     if request.method == 'POST':
-        # Handle POST request for creating a new other transaction
-        serializer = OtherSerializer(data=request.data)
+        data = request.data.copy()
+        
+        # Only require these fields
+        required_fields = ['other_type', 'other_date', 'other_amount']
+        if any(field not in data for field in required_fields):
+            return Response(
+                {"error": "Missing required fields"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Set default transaction_type if not provided
+        if 'transaction_type' not in data:
+            data['transaction_type'] = None
+        
+        serializer = OtherSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    # Handle GET request to list all other transactions
     elif request.method == 'GET':
-        other_transactions = Other.objects.all()
+        other_transactions = Other.objects.all().order_by('-other_date')
         serializer = OtherSerializer(other_transactions, many=True)
         return Response(serializer.data)
 
-
-# Function to retrieve an individual Other Transaction
+# Keep the detail view the same
 @api_view(['GET', 'DELETE'])
+@permission_classes([IsAuthenticated])
 def other_transaction_detail(request, pk):
     try:
         transaction = Other.objects.get(pk=pk)
@@ -511,11 +541,10 @@ def other_transaction_detail(request, pk):
     elif request.method == 'DELETE':
         transaction.delete()
         return Response({"detail": "Deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
-    
+        
 @api_view(['GET', 'POST'])
 def add_bankingdeposit(request):
     if request.method == 'POST':
-        # Handling POST request (create a new deposit)
         serializer = BankingDepositSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -523,13 +552,12 @@ def add_bankingdeposit(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'GET':
-        # Handling GET request (fetch all deposits)
         deposits = BankingDeposit.objects.all()
         serializer = BankingDepositSerializer(deposits, many=True)
         return Response(serializer.data)
 
-
 @api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
 def employee_list_create(request):
     if request.method == 'GET':
         employees = Employee.objects.all()
@@ -544,6 +572,7 @@ def employee_list_create(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
 def employee_detail(request, pk):
     try:
         employee = Employee.objects.get(pk=pk)
@@ -565,7 +594,7 @@ def employee_detail(request, pk):
         employee.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)  
     
-      
+     
 @api_view(['GET', 'POST', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def user_profile_view(request):
@@ -610,9 +639,11 @@ def user_profile_view(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-@api_view(['GET', 'POST', 'PATCH', 'PUT'])  # Support both for flexibility
+@api_view(['GET', 'POST', 'PATCH', 'PUT'])
+@permission_classes([IsAuthenticated])
 def remaining_amount_view(request):
     # Get or create remaining amount record
+    remaining_amount, created = RemainingAmount.objects.get_or_create(user=request.user)
     remaining_amount = RemainingAmount.objects.last()
     if not remaining_amount:
         remaining_amount = RemainingAmount.objects.create(amount=0.00)
