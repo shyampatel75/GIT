@@ -57,4 +57,5 @@ urlpatterns = [
     path('auth/me/', views.get_current_user, name='current-user'),
     path('auth/login/', MyTokenObtainPairView.as_view(), name='login'),
 
+    path('invoices/by-gst/<str:gst_number>/', views.get_invoices_by_gst, name='get_invoices_by_gst'),
 ]

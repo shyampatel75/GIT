@@ -676,3 +676,13 @@ def remaining_amount_view(request):
     elif request.method == 'GET':
         serializer = RemainingAmountSerializer(remaining_amount)
         return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_invoices_by_gst(request, gst_number):
+    try:
+        invoices = Invoice.objects.filter(buyer_gst=gst_number)
+        serializer = InvoiceSerializer(invoices, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
