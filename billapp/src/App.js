@@ -31,7 +31,7 @@ import OtherTypeTransactions from "./Components/OtherTransactionDetails.js";
 import CompanyTransactions from "./Components/CompanyTransactions.js";
 // import IncomeExpenditure from "./Components/CorrectFileName.js"; // use correct file name
 // import IncomeExpenditure from "./Components/IncomeExpenditure.js";
-
+import BalanceSheettwo from "./Components/Balancesheettwo.js";
 
 const AppContent = () => {
   const location = useLocation();
@@ -65,6 +65,9 @@ const AppContent = () => {
           <Route path="/invoice-detail/:id" element={<ViewsButton />} />
           <Route path="/banking" element={<Banking />} />
           <Route path="/balancesheet" element={<BalanceSheet />} />
+
+          <Route path="/balancesheet2" element={<BalanceSheettwo />} />
+
           <Route path="/profile" element={<Profile />} />
           <Route path="/client-invoices" element={<ClientInvoices />} />
           <Route path="/buyer" element={<Buyer />} />
@@ -75,6 +78,7 @@ const AppContent = () => {
           {/* <Route path="/banking/other/:id" element={<OtherTransactionDetails />} /> */}
           <Route path="/banking/other-type/:type" element={<OtherTypeTransactions />} />
           <Route path="/banking/company/:companyName" element={<CompanyTransactions />} />
+          
 
         </Routes>
       </div>

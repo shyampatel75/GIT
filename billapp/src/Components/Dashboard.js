@@ -15,6 +15,7 @@ const Dashboard = () => {
     { label: "Clients", icon: "bi-person-lines-fill", path: "/clients" },
     { label: "Accounting", icon: "bi-calculator-fill", path: "/billmanager" },
     { label: "Balance Sheet", icon: "bi-layout-text-sidebar-reverse", path: "/balancesheet" },
+    { label: "Balance Sheet 2", icon: "bi-layout-text-window-reverse", path: "/balancesheet2" },
     { label: "Banking", icon: "bi-bank2", path: "/banking" },
     { label: "Buyer", icon: "bi-cart-fill", path: "/buyer" },
     { label: "Employee", icon: "bi-person-badge-fill", path: "/employee" },
@@ -63,17 +64,17 @@ const Dashboard = () => {
       margin: "0 auto",
     },
     title: {
-   textalign: "start",
-    marginbottom: "30px",
-    color: "rgb(51, 51, 51)",
-    fontsize: "20px",
-    marginBottom:"20px"
+      textalign: "start",
+      marginbottom: "30px",
+      color: "rgb(51, 51, 51)",
+      fontsize: "20px",
+      marginBottom: "20px"
     },
- 
+
     chartContainer: {
       marginBottom: "40px",
       padding: "20px",
-   
+
       borderRadius: "8px",
     },
     icon: {
