@@ -207,6 +207,16 @@ const Address = () => {
     });
   };
 
+
+    const showDeleteToast = () => {
+      const toastEl = document.getElementById("deleteToast");
+      if (toastEl) {
+        const bsToast = new window.bootstrap.Toast(toastEl);
+        bsToast.show();
+      }
+    };
+
+
   const handleDelete = async (invoiceId) => {
     if (window.confirm("Are you sure you want to delete this invoice?")) {
       try {
@@ -230,7 +240,7 @@ const Address = () => {
           setInvoices((prevInvoices) =>
             prevInvoices.filter((invoice) => invoice.id !== invoiceId)
           );
-          setSuccess("Invoice deleted successfully!");
+       
         } else {
           const errorData = await res.json();
           throw new Error(errorData.message || 'Failed to delete invoice');
@@ -329,48 +339,69 @@ const Address = () => {
                   </td>
 
                   {/* View Button */}
-                  <td className="d-flex justify-content-evenly">
-                    <button
-                      className="btn btn-outline-primary action-btn"
-                      onClick={() => navigate(`/invoice-detail/${invoice.id}`)}
-                      disabled={loading}
-                    >
-                      <i className="bi bi-eye"></i>
-                    </button>
+                 <td>
+  {/* View Button */}
+  <button
+    className="btn btn-outline-primary action-btn mx-3"
+    onClick={() => navigate(`/invoice-detail/${invoice.id}`)}
+    disabled={loading}
+  >
+    <i className="bi bi-eye"></i>
+  </button>
 
+  {/* Download Button */}
+  <button
+    className="btn btn-outline-success action-btn mx-3"
+    onClick={() => handleDownload(invoice.id)}
+    disabled={loading}
+  >
+    <i className="bi bi-download"></i>
+  </button>
 
-                    {/* Download Button */}
+  {/* Edit Button */}
+  <button
+    className="btn btn-outline-warning action-btn mx-3"
+    onClick={() => handleEdit(invoice.id)}
+    disabled={loading}
+  >
+    <i className="bi bi-pencil-square"></i>
+  </button>
 
-                    <button
-                      className="btn btn-outline-success action-btn"
-                      onClick={() => handleDownload(invoice.id)}
-                      disabled={loading}
-                    >
-                      <i className="bi bi-download"></i>
-                    </button>
+  {/* Delete Button */}
+  <button
+    className="btn btn-outline-danger action-btn mx-3"
+    onClick={() => {
+      handleDelete(invoice.id);
+      showDeleteToast(); // Show toast on delete
+    }}
+    disabled={loading}
+  >
+    <i className="bi bi-trash3"></i>
+  </button>
 
+  {/* Toast */}
+  <div className="position-fixed bottom-0 end-0 p-3" style={{ zIndex: 11 }}>
+    <div
+      id="deleteToast"
+      className="toast hide"
+      role="alert"
+      aria-live="assertive"
+      aria-atomic="true"
+    >
+      <div className="toast-header bg-danger text-white">
+        <strong className="me-auto">Deleted</strong>
+        <button
+          type="button"
+          className="btn-close btn-close-white"
+          data-bs-dismiss="toast"
+          aria-label="Close"
+        ></button>
+      </div>
+      <div className="toast-body">Invoice has been deleted successfully.</div>
+    </div>
+  </div>
+</td>
 
-                    {/* Edit Button */}
-
-                    <button
-                      className="btn btn-outline-warning action-btn"
-                      onClick={() => handleEdit(invoice.id)}
-                      disabled={loading}
-                    >
-                      <i className="bi bi-pencil-square"></i>
-                    </button>
-
-
-                    {/* Delete Button */}
-
-                    <button
-                      className="btn btn-outline-danger action-btn"
-                      onClick={() => handleDelete(invoice.id)}
-                      disabled={loading}
-                    >
-                      <i className="bi bi-trash3"></i>
-                    </button>
-                  </td>
                 </tr>
               ))}
             </tbody>

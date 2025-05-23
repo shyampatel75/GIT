@@ -16,7 +16,6 @@ const YearDetails = () => {
       try {
         const token = localStorage.getItem("access_token");
         if (!token) {
-          // If no token, redirect to login or show error
           setError("You must be logged in to view this page.");
           setLoading(false);
           navigate("/login");
@@ -31,7 +30,6 @@ const YearDetails = () => {
         });
 
         if (res.status === 401) {
-          // Unauthorized, token may be expired or invalid
           setError("Unauthorized. Please log in again.");
           setLoading(false);
           localStorage.removeItem("access_token");
@@ -53,7 +51,6 @@ const YearDetails = () => {
 
         setInvoices(filtered);
 
-        // Group by buyer_name + buyer_gst
         const grouped = {};
         filtered.forEach((invoice) => {
           const key = `${invoice.buyer_name}-${invoice.buyer_gst}`;
@@ -111,11 +108,37 @@ const YearDetails = () => {
                 <td>
                   <button
                     className="btn btn-primary"
-                    onClick={() =>
-                      navigate("/client-invoices", {
-                        state: { client },
-                      })
-                    }
+                    onClick={async () => {
+                      const token = localStorage.getItem("access_token");
+                      try {
+                        const res = await fetch(
+                          `http://localhost:8000/api/invoices/by-gst/${client.buyer_gst}/`,
+                          {
+                            headers: {
+                              Authorization: `Bearer ${token}`,
+                              "Content-Type": "application/json",
+                            },
+                          }
+                        );
+
+                        if (!res.ok)
+                          throw new Error("Failed to fetch client invoices");
+
+                        const data = await res.json();
+
+                        navigate("/client-invoices", {
+                          state: {
+                            client: {
+                              buyer_name: client.buyer_name,
+                              buyer_gst: client.buyer_gst,
+                              invoices: data,
+                            },
+                          },
+                        });
+                      } catch (err) {
+                        alert("Error: " + err.message);
+                      }
+                    }}
                   >
                     View
                   </button>

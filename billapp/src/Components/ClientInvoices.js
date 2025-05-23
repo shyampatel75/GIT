@@ -6,6 +6,7 @@ import html2canvas from "html2canvas";
 const Clientinvoices = () => {
   const { state } = useLocation();
   const navigate = useNavigate();
+  const client = state?.client;
   const [invoices, setInvoices] = useState([]);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [logoLoaded, setLogoLoaded] = useState(false);
@@ -14,7 +15,7 @@ const Clientinvoices = () => {
   const [success, setSuccess] = useState(false);
   const printRef = useRef();
 
-  const client = state?.client;
+  const displayInvoices = client ? client.invoices : invoices;
 
   const fetchInvoices = useCallback(async () => {
     try {
@@ -63,7 +64,6 @@ const Clientinvoices = () => {
         return;
       }
 
-      // Fetch settings data
       const settingsResponse = await fetch(
         `http://localhost:8000/api/settings/`,
         {
@@ -140,10 +140,29 @@ const Clientinvoices = () => {
 
         const imgData = canvas.toDataURL("image/png");
         const pdf = new jsPDF("p", "mm", "a4");
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+
+        const margin = 10;
+        const maxWidth = pageWidth - 2 * margin;
+        const maxHeight = pageHeight - 2 * margin;
+
+        const ratio = canvas.width / canvas.height;
+        let imgWidth = maxWidth;
+        let imgHeight = imgWidth / ratio;
+
+        if (imgHeight > maxHeight) {
+          imgHeight = maxHeight;
+          imgWidth = imgHeight * ratio;
+        }
+
+        const x = (pageWidth - imgWidth) / 2;
+        const y = (pageHeight - imgHeight) / 2;
+
+        pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
         pdf.save(`Invoice_${selectedInvoice.invoice_number}.pdf`);
+
         setSuccess("Invoice downloaded successfully!");
       } catch (err) {
         console.error("PDF generation error:", err);
@@ -202,20 +221,14 @@ const Clientinvoices = () => {
     }
   };
 
-  const displayInvoices = client ? client.invoices : invoices;
-
   return (
-    <div style={{ padding: "40px" }}>
+    <div style={{ paddingLeft: "80px" }}>
       {error && <div className="alert alert-danger">{error}</div>}
       {success && <div className="alert alert-success">{success}</div>}
 
-      {client ? (
-        <h2>
-          Invoices for {client.buyer_name} (GST: {client.buyer_gst})
-        </h2>
-      ) : (
-        <h2>All Invoices</h2>
-      )}
+      <h2>
+        {client ? `${client.buyer_name} - ${client.buyer_gst}` : "All Invoices"}
+      </h2>
 
       <table className="table table-bordered table-hover text-center mt-3">
         <thead className="table-dark">
@@ -243,13 +256,11 @@ const Clientinvoices = () => {
                 <td>{index + 1}</td>
                 <td>{invoice.buyer_name}</td>
                 <td>{invoice.invoice_number}</td>
-                {/* <td>{invoice.invoice_date}</td> */}
                 <td>
                   {invoice.invoice_date
                     ? new Date(invoice.invoice_date).toLocaleDateString("en-GB")
                     : "N/A"}
                 </td>
-
                 <td>
                   {invoice.currency}{" "}
                   {parseFloat(invoice.total_with_gst).toFixed(2)}
@@ -673,14 +684,13 @@ const Clientinvoices = () => {
                       SWIFT Code: {selectedInvoice.swift_code}
                     </div>
                     <div className="text-right signatory">
-                      <img
-                        className="logo-image"
-                        src="http://127.0.0.1:8000/media/favicon_cvGw7pn.png"
-                        alt="Logo"
-                        height={100}
-                        crossOrigin="anonymous" // Add this attribute
-                        onLoad={() => setLogoLoaded(true)} // Track loading
-                      />
+                      {selectedInvoice.logo && (
+                        <img
+                          src={`http://127.0.0.1:8000${selectedInvoice.logo}`}
+                          alt="Company Logo"
+                          className="logo-image"
+                        />
+                      )}
                       <p>for Grabsolve Infotech</p>
                       <p>Authorized Signatory</p>
                     </div>
