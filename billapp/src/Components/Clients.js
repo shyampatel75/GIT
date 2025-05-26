@@ -59,7 +59,7 @@ const Clients = () => {
   }, [navigate]);
 
 
-   const numberToWords = (num) => {
+  const numberToWords = (num) => {
     const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
     const teens = ["Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
     const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
@@ -653,7 +653,7 @@ const Clients = () => {
                         <strong>Tax Amount (in words):</strong>
                         <span className="total-tax-in-words">
                           <span className="currency-text">INR </span>
-                           {numberToWords(Math.floor(selectedInvoice.total_with_gst))}
+                          {numberToWords(Math.floor(selectedInvoice.total_with_gst))}
                         </span>
                       </div>
                     </div>

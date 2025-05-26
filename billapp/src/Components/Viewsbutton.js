@@ -74,27 +74,28 @@ const ViewsButton = () => {
         <div style={{ paddingLeft: "100px" }}>
             <div style={{ paddingRight: "10px" }}>
                 <h2 className="text-center">TAX INVOICE</h2>
-                <div className="table-bordered black-bordered main-box" style={{backgroundColor:"white"}}>
+                <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white" }}>
                     <div className="row date-tables">
                         <div className="col-6">
                             {/* Seller Info */}
                             <table className="table table-bordered black-bordered">
-                                <tbody style={{border: "2px solid"}}>
+                                <tbody style={{ border: "2px solid" }}>
                                     <tr>
                                         <td className="gray-background">
                                             <strong style={{ fontSize: "15px" }}>
-                                                Grabsolve Infotech:
+                                                {settings.company_name}:
                                             </strong>
                                         </td>
                                     </tr>
                                     <tr>
-                                        {/* {data.seller_address} */}
-                                        {settings.seller_address}
-                                        <br />
-                                        Email:{settings.seller_email}
-                                        <br />
-                                        PAN:{settings.seller_pan}
-                                        <br />
+                                        <td style={{ padding: "10px", height: "150px" }}>
+                                             {settings.seller_address}
+                                            <br />
+                                            Email: {settings.seller_email}
+                                            <br />
+                                            PAN: {settings.seller_pan}
+                                            <br />
+                                        </td>
                                     </tr>
                                     <tr>
                                         <td className="gray-background">
@@ -106,7 +107,7 @@ const ViewsButton = () => {
 
                             {/* Buyer Info */}
                             <table className="table table-bordered black-bordered">
-                                <tbody style={{border: "2px solid"}}>
+                                <tbody style={{ border: "2px solid" }}>
                                     <tr>
                                         <td className="gray-background">
                                             <strong>Buyer (Bill to):</strong>  {invoice.buyer_name}
@@ -133,7 +134,7 @@ const ViewsButton = () => {
 
                             {/* Consignee Info */}
                             <table className="table table-bordered black-bordered">
-                                <tbody style={{border: "2px solid"}}>
+                                <tbody style={{ border: "2px solid" }}>
                                     <tr>
                                         <td className="gray-background">
                                             <strong>Consignee (Ship to):</strong> {invoice.consignee_name}
@@ -162,7 +163,7 @@ const ViewsButton = () => {
 
                         <div className="col-6">
                             <table className="table table-bordered black-bordered">
-                                <tbody style={{border: "2px solid"}}>
+                                <tbody style={{ border: "2px solid" }}>
                                     <tr>
                                         <td style={{ width: "50%" }}>Invoice No.</td>
                                         <td>
@@ -193,7 +194,7 @@ const ViewsButton = () => {
                             </table>
 
                             <table className="table table-bordered black-bordered">
-                                <tbody style={{ width: "100%",border: "2px solid"}}>
+                                <tbody style={{ width: "100%", border: "2px solid" }}>
                                     <tr>
                                         <td className="gray-background" >
                                             <strong>Terms to Delivery:</strong>
@@ -239,7 +240,7 @@ const ViewsButton = () => {
                         <div className="col-xs-12">
                             <table className="table table-bordered black-bordered">
                                 <thead>
-                                    <tr className="trbody" style={{border:"2px solid"}}>
+                                    <tr className="trbody" style={{ border: "2px solid" }}>
                                         <th>SI No.</th>
                                         <th>Particulars</th>
                                         <th>HSN/SAC</th>
@@ -248,7 +249,7 @@ const ViewsButton = () => {
                                         <th>Amount</th>
                                     </tr>
                                 </thead>
-                                <tbody style={{border: "2px solid"}}>
+                                <tbody style={{ border: "2px solid" }}>
                                     <tr style={{ height: "111px" }}>
                                         <td>1</td>
                                         <td>{invoice.Particulars}</td>
@@ -338,7 +339,7 @@ const ViewsButton = () => {
                         {invoice.country === "India" && (
                             <div className="col-xs-12 inside-india">
                                 <table className="table table-bordered invoice-table">
-                                    <thead style={{border:"2px solid"}}>
+                                    <thead style={{ border: "2px solid" }}>
                                         <tr >
                                             <th rowSpan="2">HSN/SAC</th>
                                             <th rowSpan="2">Taxable Value</th>
@@ -355,7 +356,7 @@ const ViewsButton = () => {
                                             <th>Amount</th>
                                         </tr>
                                     </thead>
-                                    <tbody style={{border: "2px solid"}}>
+                                    <tbody style={{ border: "2px solid" }}>
                                         <tr>
                                             <td>
                                                 <span className="hns_select_text">{invoice.hsn_code}</span>
@@ -382,7 +383,7 @@ const ViewsButton = () => {
                                             <td></td>
                                             <td className="total-tax-sgst">{invoice.sgst}</td>
                                             <td className="total-tax-amount">
-                                            {invoice.taxtotal}
+                                                {invoice.taxtotal}
                                             </td>
                                         </tr>
                                     </tbody>

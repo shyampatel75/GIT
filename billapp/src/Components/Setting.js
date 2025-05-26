@@ -116,30 +116,50 @@ export default function SettingsPage() {
 
         // If it's a list of settings, pick the latest one
         const setting = Array.isArray(data) ? data[data.length - 1] : data;
-
-        setFormData((prev) => ({
-          ...prev,
-          company_name: setting.company_name || "",
-          seller_address: setting.seller_address || "",
-          seller_pan: setting.seller_pan || "",
-          seller_gstin: setting.seller_gstin || "",
-          seller_email: setting.seller_email || "",
-          bank_account_holder: setting.bank_account_holder || "",
-          bank_name: setting.bank_name || "",
-          account_number: setting.account_number || "",
-          ifsc_code: setting.ifsc_code || "",
-          branch: setting.branch || "",
-          swift_code: setting.swift_code || "",
-          logo: null,
-          stampPreview: setting.logo ? `http://127.0.0.1:8000${setting.logo}` : "",
-        }));
-      } catch (error) {
-        console.error("Failed to fetch settings", error);
-        setError(error.message || "Failed to load settings");
-      } finally {
-        setLoading(false);
+           // If no settings exist, create default ones
+    if (Array.isArray(data) && data.length === 0) {
+      const createResponse = await fetch("http://127.0.0.1:8000/api/settings/", {
+        method: "POST",
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+      
+      if (!createResponse.ok) {
+        throw new Error('Failed to create default settings');
       }
-    };
+      
+      const newSettings = await createResponse.json();
+      data = Array.isArray(newSettings) ? newSettings : [newSettings];
+    }
+
+    // const setting = Array.isArray(data) ? data[data.length - 1] : data;
+
+           setFormData((prev) => ({
+      ...prev,
+      company_name: setting.company_name || "Your Company",
+      seller_address: setting.seller_address || "Your Address",
+      seller_pan: setting.seller_pan || "ABCDE1234F",
+      seller_gstin: setting.seller_gstin || "22AAAAA0000A1Z5",
+      seller_email: setting.seller_email || "your@email.com",
+      bank_account_holder: setting.bank_account_holder || "Your Company",
+      bank_name: setting.bank_name || "Bank Name",
+      account_number: setting.account_number || "123456789012",
+      ifsc_code: setting.ifsc_code || "BANK0001234",
+      branch: setting.branch || "Main Branch",
+      swift_code: setting.swift_code || "SWFT0001",
+      logo: null,
+      stampPreview: setting.logo ? `http://127.0.0.1:8000${setting.logo}` : "",
+    }));
+  } catch (error) {
+    console.error("Failed to fetch settings", error);
+    setError(error.message || "Failed to load settings");
+  } finally {
+    setLoading(false);
+  }
+};
 
     fetchSettings();
   }, [navigate]);

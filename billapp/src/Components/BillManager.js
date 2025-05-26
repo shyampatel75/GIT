@@ -3,17 +3,21 @@ import { useNavigate } from "react-router-dom";
 
 const BillManager = () => {
   const navigate = useNavigate();
-  const [invoices, setInvoices] = useState([]);
-  const [groupedClients, setGroupedClients] = useState([]);
-  const [otherTransactions, setOtherTransactions] = useState([]);
-  const [groupedOther, setGroupedOther] = useState([]);
-  const [companyTransactions, setCompanyTransactions] = useState([]);
-  const [groupedCompany, setGroupedCompany] = useState([]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [filterText, setFilterText] = useState("");
   const [category, setCategory] = useState("all");
   const [allCombined, setAllCombined] = useState([]);
+
+
+  const [invoices, setInvoices] = useState([]);
+const [groupedClients, setGroupedClients] = useState([]);
+const [otherTransactions, setOtherTransactions] = useState([]);
+const [groupedOther, setGroupedOther] = useState([]);
+const [companyTransactions, setCompanyTransactions] = useState([]);
+const [groupedCompany, setGroupedCompany] = useState([]);
+
 
   useEffect(() => {
     fetchAllData();

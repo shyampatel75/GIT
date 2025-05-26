@@ -5,7 +5,7 @@ import YearDetails from "./Components/YearDetails";
 import Clients from "./Components/Clients";
 import Dashboard from "./Components/Dashboard";
 import Address from "./Components/Address.js";
-import Billsfillers from "./Components/Billsillers";
+// import Billsfillers from "./Components/Billsfillers";
 import FilteredResults from "./Components/FilteredResults";
 import TaxInvoice from "./Components/TaxInvoice";
 import Setting from "./Components/Setting";
@@ -26,18 +26,21 @@ import EditInvoice from "./Components/EditInvoice.js";
 import Employee from "./Components/Employee.js";
 import EmployeeDetails from "./Components/EmployeeDetails.js";
 import IncomeExpenditure from "./Components/IncomeExpenditure .js";
-// import OtherTransactionDetails from "./Components/OtherTransactionDetails.js";
 import OtherTypeTransactions from "./Components/OtherTransactionDetails.js";
 import CompanyTransactions from "./Components/CompanyTransactions.js";
-// import IncomeExpenditure from "./Components/CorrectFileName.js"; // use correct file name
-// import IncomeExpenditure from "./Components/IncomeExpenditure.js";
 import BalanceSheettwo from "./Components/Balancesheettwo.js";
 
 const AppContent = () => {
   const location = useLocation();
   const isAuthenticated = localStorage.getItem("isAuthenticated") === "true";
 
-  const hideSidebar = location.pathname === "/" || location.pathname === "/si";
+  // Only hide sidebar on login (/) or signup (/si) pages
+  const hideSidebar = ["/", "/si"].includes(location.pathname);
+
+  // Debug logs (optional – can be removed later)
+  console.log("Current Path:", location.pathname);
+  console.log("Is Authenticated:", isAuthenticated);
+  console.log("Hide Sidebar:", hideSidebar);
 
   return (
     <div>
@@ -55,7 +58,7 @@ const AppContent = () => {
           <Route path="/clients" element={<Clients />} />
           <Route path="/address" element={<Address />} />
           <Route path="/view-invoice/:name" element={<ViewInvoice />} />
-          <Route path="/billsfilter" element={<Billsfillers />} />
+          {/* <Route path="/billsfilter" element={<Billsfillers />} /> */}
           <Route path="/filtered-results" element={<FilteredResults />} />
           <Route path="/tax-invoice" element={<TaxInvoice />} />
           <Route path="/setting" element={<Setting />} />
@@ -65,9 +68,7 @@ const AppContent = () => {
           <Route path="/invoice-detail/:id" element={<ViewsButton />} />
           <Route path="/banking" element={<Banking />} />
           <Route path="/balancesheet" element={<BalanceSheet />} />
-
           <Route path="/balancesheet2" element={<BalanceSheettwo />} />
-
           <Route path="/profile" element={<Profile />} />
           <Route path="/client-invoices" element={<ClientInvoices />} />
           <Route path="/buyer" element={<Buyer />} />
@@ -75,11 +76,8 @@ const AppContent = () => {
           <Route path="/employee" element={<Employee />} />
           <Route path="/employee-details/:id" element={<EmployeeDetails />} />
           <Route path="/incomeExpenditure" element={<IncomeExpenditure />} />
-          {/* <Route path="/banking/other/:id" element={<OtherTransactionDetails />} /> */}
           <Route path="/banking/other-type/:type" element={<OtherTypeTransactions />} />
           <Route path="/banking/company/:companyName" element={<CompanyTransactions />} />
-          
-
         </Routes>
       </div>
     </div>

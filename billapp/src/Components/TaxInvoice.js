@@ -51,27 +51,32 @@ const Taxinvoice = () => {
   const [selectedCountry, setSelectedCountry] = useState({
     name: "India",
     currency: "₹",
-    currencyCode: "INR"
+
   });
   const [isOpen, setIsOpen] = useState(false);
   const [invoiceYear, setInvoiceYear] = useState(getCurrentInvoiceYear());
-  const [invoice_Number, setinvoice_Number] = useState(() => {
-    const savedNumber = localStorage.getItem('lastInvoiceNumber');
-    return savedNumber ? parseInt(savedNumber) : 1;
-  });
+  // const [invoice_Number, setinvoice_Number] = useState(() => {
+  //   const savedNumber = localStorage.getItem('lastInvoiceNumber');
+  //   return savedNumber ? parseInt(savedNumber) : 1;
+  // });
   const [settingsData, setSettingsData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [nextInvoiceNumber, setNextInvoiceNumber] = useState("");
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
   // Helper functions
   const formatToISO = (dateStr) => {
     if (!dateStr) return null;
+
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
     const parts = dateStr.split(/[-/]/);
-    if (parts.length !== 3) return null;
-    const [day, month, year] = parts;
-    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+    if (parts.length !== 3) {
+      const [day, month, year] = parts;
+      return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+    }
+    return null;
   };
 
   const copyBillToShip = () => {
@@ -148,36 +153,50 @@ const Taxinvoice = () => {
     }
   }, []);
 
-  // const fetchLatestInvoiceNumber = useCallback(async () => {
-  //   try {
-  //     setLoading(true);
-  //     const token = localStorage.getItem("access_token");
-  //     if (!token) {
-  //       navigate("/login");
-  //       return;
-  //     }
 
-  //     const response = await fetch("http://localhost:8000/api/invoices/next-invoice-number/", {
-  //       headers: {
-  //         'Authorization': `Bearer ${token}`,
-  //         'Content-Type': 'application/json'
-  //       }
-  //     });
+  // Modify your fetchNextInvoiceNumber function
+  const fetchNextInvoiceNumber = useCallback(async () => {
+    try {
+      const response = await fetch("http://localhost:8000/api/get_next_invoice_number/", {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem("access_token")}`
+        }
+      });
 
-  //     if (response.ok) {
-  //       const data = await response.json();
-  //       const numericPart = parseInt(data.invoice_number.split('-')[0]);
-  //       setinvoice_Number(prev => Math.max(prev, numericPart || 1));
-  //     }
-  //   } catch (error) {
-  //     console.error("Error verifying invoice number:", error);
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // }, [navigate]);
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      setNextInvoiceNumber(data.invoice_number);
+      setFormData(prev => ({
+        ...prev,
+        invoice_number: data.invoice_number,
+        financial_year: data.financial_year
+      }));
+
+    } catch (error) {
+      console.error("Error fetching next invoice number:", error);
+      // Fallback to manual numbering if API fails
+      const currentYear = new Date().getFullYear();
+      const nextYear = currentYear + 1;
+      const financialYear = `${currentYear}/${nextYear}`;
+      const fallbackNumber = `01-${financialYear}`;
+
+      setNextInvoiceNumber(fallbackNumber);
+      setFormData(prev => ({
+        ...prev,
+        invoice_number: fallbackNumber,
+        financial_year: financialYear
+      }));
+    }
+  }, []);
+
 
   // Effects
   useEffect(() => {
+    fetchNextInvoiceNumber();
     fetchCountries();
     fetchSettings();
     // fetchLatestInvoiceNumber();
@@ -188,7 +207,7 @@ const Taxinvoice = () => {
     }, 1000 * 60 * 60 * 24);
 
     return () => clearInterval(interval);
-  }, [fetchCountries, fetchSettings]);
+  }, [fetchNextInvoiceNumber, fetchCountries, fetchSettings,]);
 
   useEffect(() => {
     setFormData(prev => ({
@@ -222,9 +241,18 @@ const Taxinvoice = () => {
     }));
   };
 
+  // Update handleChange function
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+
+    // GST validation
+    if (name === 'buyer_gst' || name === 'consignee_gst') {
+      if (value && value.length !== 15) {
+        setError('GST number must be exactly 15 digits');
+        setTimeout(() => setError(''), 3000);
+      }
+    }
   };
 
   const numberToWords = (num) => {
@@ -232,12 +260,12 @@ const Taxinvoice = () => {
     const teens = ["Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
     const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
     const thousandUnits = ["", "Thousand", "Lakh", "Crore"];
-    
+
     if (num === 0) return "Zero";
     let words = "";
     let unitIndex = 0;
     let integerPart = Math.floor(num);
-    
+
     while (integerPart > 0) {
       let chunk = integerPart % 1000;
       if (chunk) {
@@ -268,68 +296,27 @@ const Taxinvoice = () => {
   };
 
   const calculateTotal = useCallback(() => {
-  const total_hours = parseFloat(formData.total_hours) || 0;
-  const rate = parseFloat(formData.rate) || 0;
-  const base_amount = parseFloat(formData.base_amount);
+    const total_hours = parseFloat(formData.total_hours) || 0;
+    const rate = parseFloat(formData.rate) || 0;
+    const base_amount = parseFloat(formData.base_amount);
 
-  let calculatedBaseAmount;
-  if (total_hours > 0 && rate > 0) {
-    // Calculate from hours and rate
-    calculatedBaseAmount = total_hours * rate;
-  } else {
-    // Use directly entered base amount
-    calculatedBaseAmount = base_amount;
-  }
+    let calculatedBaseAmount;
+    if (total_hours > 0 && rate > 0) {
+      // Calculate from hours and rate
+      calculatedBaseAmount = total_hours * rate;
+    } else {
+      // Use directly entered base amount
+      calculatedBaseAmount = base_amount;
+    }
 
-  if (selectedCountry.name === "India" && calculatedBaseAmount > 0) {
-    const tax = (calculatedBaseAmount * 9) / 100;
-    const total_with_gst = Math.round(calculatedBaseAmount + 2 * tax);
-    const total_tax = tax * 2;
-
-    setFormData(prev => ({
-      ...prev,
-      base_amount: calculatedBaseAmount,
-      cgst: tax,
-      sgst: tax,
-      taxtotal: total_tax,
-      total_with_gst,
-    }));
-  } else {
-    setFormData(prev => ({
-      ...prev,
-      base_amount: calculatedBaseAmount,
-      cgst: 0,
-      sgst: 0,
-      taxtotal: 0,
-      total_with_gst: Math.round(calculatedBaseAmount) || 0,
-    }));
-  }
-}, [formData.total_hours, formData.rate, formData.base_amount, selectedCountry.name]);
-
-
-const handleBaseAmountChange = (e) => {
-  const { name, value } = e.target;
-  setFormData(prev => ({ 
-    ...prev, 
-    [name]: value,
-    // Reset hours and rate when manually entering base amount
-    ...(name === "base_amount" && value && {
-      total_hours: "",
-      rate: ""
-    })
-  }));
-  
-  // Only recalculate if we're changing base_amount directly
-  if (name === "base_amount") {
-    const base_amount = parseFloat(value);
-    if (selectedCountry.name === "India" && base_amount > 0) {
-      const tax = (base_amount * 9) / 100;
-      const total_with_gst = Math.round(base_amount + 2 * tax);
+    if (selectedCountry.name === "India" && calculatedBaseAmount > 0) {
+      const tax = (calculatedBaseAmount * 9) / 100;
+      const total_with_gst = Math.round(calculatedBaseAmount + 2 * tax);
       const total_tax = tax * 2;
 
       setFormData(prev => ({
         ...prev,
-        base_amount,
+        base_amount: calculatedBaseAmount,
         cgst: tax,
         sgst: tax,
         taxtotal: total_tax,
@@ -338,15 +325,56 @@ const handleBaseAmountChange = (e) => {
     } else {
       setFormData(prev => ({
         ...prev,
-        base_amount,
+        base_amount: calculatedBaseAmount,
         cgst: 0,
         sgst: 0,
         taxtotal: 0,
-        total_with_gst: Math.round(base_amount),
+        total_with_gst: Math.round(calculatedBaseAmount) || 0,
       }));
     }
-  }
-};
+  }, [formData.total_hours, formData.rate, formData.base_amount, selectedCountry.name]);
+
+
+  const handleBaseAmountChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+      // Reset hours and rate when manually entering base amount
+      ...(name === "base_amount" && value && {
+        total_hours: "",
+        rate: ""
+      })
+    }));
+
+    // Only recalculate if we're changing base_amount directly
+    if (name === "base_amount") {
+      const base_amount = parseFloat(value);
+      if (selectedCountry.name === "India" && base_amount > 0) {
+        const tax = (base_amount * 9) / 100;
+        const total_with_gst = Math.round(base_amount + 2 * tax);
+        const total_tax = tax * 2;
+
+        setFormData(prev => ({
+          ...prev,
+          base_amount,
+          cgst: tax,
+          sgst: tax,
+          taxtotal: total_tax,
+          total_with_gst,
+        }));
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          base_amount,
+          cgst: 0,
+          sgst: 0,
+          taxtotal: 0,
+          total_with_gst: Math.round(base_amount),
+        }));
+      }
+    }
+  };
 
   useEffect(() => {
     calculateTotal();
@@ -365,154 +393,207 @@ const handleBaseAmountChange = (e) => {
       });
 
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  try {
-    setLoading(true);
-    setError("");
-    setSuccess(false);
-    
-    const token = localStorage.getItem("access_token");
-    if (!token) {
-      navigate("/login");
+  // Modify the handleSubmit function to include PDF generation
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    // Prevent duplicate submission
+    // if (isSubmitted) {
+    //   setError('Invoice already generated. Please modify data to generate again.');
+    //   setTimeout(() => setError(''), 3000);
+    //   return;
+    // }
+
+    // GSTIN length check
+    if (
+      (formData.buyer_gst && formData.buyer_gst.length !== 15) ||
+      (formData.consignee_gst && formData.consignee_gst.length !== 15)
+    ) {
+      setError('GST number must be exactly 15 digits');
+      setTimeout(() => setError(''), 3000);
       return;
     }
 
-    // Format dates
-    const formattedInvoiceDate = formatToISO(formData.invoice_date);
-    const formattedDeliveryDate = formatToISO(formData.delivery_note_date);
+    // Hours/Rate validation for India
+    if (selectedCountry.name === "India") {
+      const hasHoursRate = formData.total_hours && formData.rate;
+      const hasBaseAmount = formData.base_amount;
 
-    if (!formattedInvoiceDate || !formattedDeliveryDate) {
-      throw new Error("Please enter valid dates in DD-MM-YYYY or YYYY-MM-DD format.");
+      if (!hasHoursRate && !hasBaseAmount) {
+        setError('Please provide either Hours and Rate or Base Amount');
+        setTimeout(() => setError(''), 3000);
+        return;
+      }
+
+      if (!hasBaseAmount && (!formData.total_hours || !formData.rate)) {
+        setError('Both Hours and Rate must be entered');
+        setTimeout(() => setError(''), 3000);
+        return;
+      }
     }
 
-    const fullInvoiceNumber = `${String(invoice_Number).padStart(2, "0")}-${invoiceYear}`;
+    try {
+      setLoading(true);
+      setError("");
+      setSuccess(false);
 
-    // Prepare numeric fields - ensure they're valid numbers or null
-    const prepareNumericField = (value) => {
-      const num = parseFloat(value);
-      return isNaN(num) ? null : num;
-    };
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        navigate("/login");
+        return;
+      }
 
-    // Calculate base_amount based on what's provided
-    let base_amount;
-    if (formData.total_hours && formData.rate) {
-      base_amount = parseFloat(formData.total_hours) * parseFloat(formData.rate);
-    } else if (formData.base_amount) {
-      base_amount = parseFloat(formData.base_amount);
-    } else {
-      throw new Error("Please provide either (total hours + rate) OR base amount");
-    }
+      // Format dates
+      const formattedInvoiceDate = formatToISO(formData.invoice_date);
+      const formattedDeliveryDate = formData.delivery_note_date
+        ? formatToISO(formData.delivery_note_date)
+        : null;
 
+      if (!formattedInvoiceDate) {
+        throw new Error("Please enter a valid invoice date in DD-MM-YYYY or YYYY-MM-DD format.");
+      }
+
+      // Helper for number conversion
+      const prepareNumericField = (value) => {
+        const num = parseFloat(value);
+        return isNaN(num) ? null : num;
+      };
+
+      // Calculate base amount
+      let base_amount;
+      if (formData.total_hours && formData.rate) {
+        base_amount = parseFloat(formData.total_hours) * parseFloat(formData.rate);
+      } else if (formData.base_amount) {
+        base_amount = parseFloat(formData.base_amount);
+      } else {
+        throw new Error("Please provide either (total hours + rate) OR base amount");
+      }
+
+      // Final payload - only include fields needed for PDF generation
     const payload = {
-      ...formData,
-      invoice_number: fullInvoiceNumber,
+      buyer_name: formData.buyer_name,
+      buyer_address: formData.buyer_address,
+      buyer_gst: formData.buyer_gst,
+      consignee_name: formData.consignee_name,
+      consignee_address: formData.consignee_address,
+      consignee_gst: formData.consignee_gst,
+      invoice_number: formData.invoice_number, // Use existing number
       invoice_date: formattedInvoiceDate,
+      delivery_note: formData.delivery_note,
+      payment_mode: formData.payment_mode,
       delivery_note_date: formattedDeliveryDate,
+      destination: formData.destination,
+      Terms_to_delivery: formData.Terms_to_delivery,
       country: selectedCountry.name,
       currency: selectedCountry.currencyCode,
-      // Ensure all numeric fields are properly formatted
+      Particulars: formData.Particulars,
+      hsn_code: formData.hsn_code,
       total_hours: prepareNumericField(formData.total_hours),
       rate: prepareNumericField(formData.rate),
-      base_amount: base_amount,
+      base_amount,
       cgst: prepareNumericField(formData.cgst),
       sgst: prepareNumericField(formData.sgst),
       taxtotal: prepareNumericField(formData.taxtotal),
       total_with_gst: prepareNumericField(formData.total_with_gst),
+      remark: formData.remark,
+      financial_year: formData.financial_year,
     };
 
-    const response = await fetch("http://localhost:8000/api/create/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const responseData = await response.json();
-
-    if (!response.ok) {
-      const errorMessages = Object.values(responseData.errors || {}).flat().join(", ");
-      throw new Error(errorMessages || "Failed to save invoice");
-    }
-
-    setSuccess("Invoice created and PDF downloaded successfully!");
-    
-    // Generate PDF
-    await generatePDF(fullInvoiceNumber);
-
-    // Update invoice number
-    setinvoice_Number(prev => {
-      const nextNum = prev + 1;
-      localStorage.setItem('lastInvoiceNumber', nextNum.toString());
-      return nextNum;
-    });
-
-  } catch (err) {
-    console.error("Invoice processing error:", err);
-    setError(err.message || "An error occurred while processing the invoice");
-  } finally {
-    setLoading(false);
-  }
-};
-
-  const generatePDF = async (invoiceNumber) => {
-    const input = pdfRef.current;
-    if (!input) {
-      alert("PDF content not found.");
-      return;
-    }
-
-    const originalVisibility = input.style.visibility;
-    input.style.visibility = "visible";
-
-    try {
-      const logoImg = input.querySelector("img");
-      if (logoImg && !logoImg.complete) {
-        await new Promise((resolve, reject) => {
-          logoImg.onload = resolve;
-          logoImg.onerror = reject;
-        });
-      }
-
-      const canvas = await html2canvas(input, {
-        scale: 2,
-        useCORS: true,
-        logging: true,
-        allowTaint: true
+         // Only create new invoice if this is the first submission
+    if (!isSubmitted) {
+      const response = await fetch("http://localhost:8000/api/create/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
       });
 
-      const pdf = new jsPDF("p", "mm", "a4");
-      const margin = 2;
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
+      const responseData = await response.json();
 
-      const contentWidth = pageWidth - 1 * margin;
-      let contentHeight = (canvas.height * contentWidth) / canvas.width;
-
-      if (contentHeight + margin > pageHeight) {
-        contentHeight = pageHeight - margin;
+      if (!response.ok) {
+        const errorMessages = Object.values(responseData.errors || {}).flat().join(", ");
+        throw new Error(errorMessages || "Failed to save invoice");
       }
 
-      pdf.addImage(
-        canvas.toDataURL("image/png"),
-        "PNG",
-        margin,
-        margin,
-        contentWidth,
-        contentHeight
-      );
+      setIsSubmitted(true);
+      setFormData(prev => ({
+        ...prev,
+        invoice_number: responseData.invoice_number
+      }));
+    }
 
-      pdf.save(`Invoice_${invoiceNumber}.pdf`);
-    } catch (error) {
-      console.error("PDF generation error:", error);
-      setError("Failed to generate PDF");
+      // Generate PDF with the invoice number from backend
+      await generatePDF(formData.invoice_number);
+
+      // Reset form after success (optional)
+      // setFormData((prev) => ({
+      //   ...prev,
+      //   invoice_date: '',
+      //   delivery_note_date: '',
+      //   total_hours: '',
+      //   rate: '',
+      //   base_amount: '',
+      //   cgst: '',
+      //   sgst: '',
+      //   taxtotal: '',
+      //   total_with_gst: '',
+      //   remark: '',
+      // }));
+
+    } catch (err) {
+      console.error("Invoice processing error:", err);
+      setError(err.message || "An error occurred while processing the invoice");
     } finally {
-      input.style.visibility = originalVisibility;
+      setLoading(false);
     }
   };
+
+ const generatePDF = async (invoiceNumber) => {
+  const input = pdfRef.current;
+
+  if (!input) {
+    setError("PDF content not found.");
+    return;
+  }
+
+  try {
+    await new Promise(resolve => setTimeout(resolve, 100)); // Wait for DOM updates
+
+    const canvas = await html2canvas(input, {
+      useCORS: true,
+      allowTaint: true,
+      scale: 2,
+      logging: true,
+      scrollY: -window.scrollY,
+      width: input.offsetWidth,
+      height: input.offsetHeight,
+    });
+
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF("p", "mm", "a4");
+
+    const margin = 10; // 10mm margin
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const availableWidth = pageWidth - 2 * margin;
+    const imgHeight = (canvas.height * availableWidth) / canvas.width;
+
+    // If image height fits on one page, center it vertically
+    const imgY = imgHeight < (pageHeight - 2 * margin)
+      ? (pageHeight - imgHeight) / 2
+      : margin;
+
+    pdf.addImage(imgData, "PNG", margin, imgY, availableWidth, imgHeight);
+    pdf.save(`Invoice_${invoiceNumber}.pdf`);
+    setSuccess("Invoice downloaded successfully!");
+  } catch (error) {
+    console.error("PDF generation error:", error);
+    setError("Failed to generate PDF");
+  } 
+};
+
 
   if (!settingsData) return <p className="text-center mt-4">Loading settings...</p>;
 
@@ -570,7 +651,6 @@ const handleSubmit = async (e) => {
                         value={formData.buyer_name}
                         onChange={handleChange}
                         required
-                        style={{ border: !formData.buyer_name ? '1px solid red' : '' }}
                       />
                       <br />
                       Address:
@@ -584,13 +664,23 @@ const handleSubmit = async (e) => {
                       />
                       <br />
                       GSTIN/UIN:{" "}
+
                       <input
                         type="text"
                         name="buyer_gst"
                         className="billToGST"
                         value={formData.buyer_gst}
                         onChange={handleChange}
+                        maxLength={15}
+                        pattern="\d{15}"
+                        title="15 digit GST number required"
                       />
+
+                      {error && (
+                        <div className="toast-error">
+                          {error}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 </tbody>
@@ -638,6 +728,9 @@ const handleSubmit = async (e) => {
                         className="shipToGST"
                         value={formData.consignee_gst}
                         onChange={handleChange}
+                        maxLength={15}
+                        pattern="\d{15}"
+                        title="15 digit GST number required"
                       />
                     </td>
                   </tr>
@@ -656,10 +749,7 @@ const handleSubmit = async (e) => {
                         style={{ width: "75%", margin: "1px 5px 1px 5px" }}
                         name="invoice_number"
                         className="invoice_Number"
-                        value={`${String(invoice_Number).padStart(
-                          2,
-                          "0"
-                        )}-${invoiceYear}`}
+                        value={formData.invoice_number || "Will be generated"}
                         readOnly
                       />
                     </td>
@@ -859,9 +949,9 @@ const handleSubmit = async (e) => {
                         onChange={(e) => {
                           handleChange(e);
                           setFormData(prev => ({
-        ...prev,
-        base_amount: ""
-      }));
+                            ...prev,
+                            base_amount: ""
+                          }));
                           calculateTotal();
                         }}
                       />
@@ -875,9 +965,9 @@ const handleSubmit = async (e) => {
                         onChange={(e) => {
                           handleChange(e);
                           setFormData(prev => ({
-        ...prev,
-        base_amount: ""
-      }));
+                            ...prev,
+                            base_amount: ""
+                          }));
                           calculateTotal();
                         }}
                       />
@@ -1041,8 +1131,8 @@ const handleSubmit = async (e) => {
               </div>
             </div>
           </div>
-          <div className="row">
-            <div className="col-x-12">
+          <div className="row mb-3">
+            <div className="col-x-12 mb-3">
               <div className="hr">
                 <strong>Company's Bank Details</strong>
                 <br />
@@ -1077,13 +1167,19 @@ const handleSubmit = async (e) => {
       </div>
 
       {/* --------------------------------------------pdf------------------------------------------------------ */}
+      {/* <div
+        ref={pdfRef}
+        style={{ position: "absolute", left: "-9999px" }}
+        
+      > */}
       <div
         ref={pdfRef}
         style={{
-          fontFamily: "Arial, sans-serif",
-          color: "#575757"
+          position: 'absolute',
+          left: '-9999px',
+        
         }}
-        className="bg-white p-4 rounded shadow mt-4"
+        // style={{ position: "absolute", left: "-9999px" }}
       >
         <div style={{ paddingRight: "10px" }}>
           <h2 className="text-center">TAX INVOICE</h2>
@@ -1183,11 +1279,7 @@ const handleSubmit = async (e) => {
                     <tr>
                       <td style={{ width: "50%" }}>Invoice No.</td>
                       <td>
-                        {" "}
-                        {`${String(invoice_Number).padStart(
-                          2,
-                          "0"
-                        )}-${invoiceYear}`}
+                        {formData.invoice_number}
                       </td>
                     </tr>
                     <tr>
@@ -1469,8 +1561,8 @@ const handleSubmit = async (e) => {
               </div>
             )}
 
-            <div className="row">
-              <div className="col-x-12">
+            <div className="row mb-3">
+              <div className="col-x-12 mb-3">
                 <div className="hr">
                   <strong>Company's Bank Details</strong>
                   <br />
