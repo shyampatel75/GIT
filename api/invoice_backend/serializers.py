@@ -1,13 +1,14 @@
 from rest_framework import serializers
 from .models import Invoice
-from .models import Setting,Statement, Deposit
+from .models import Setting,Deposit
 from .models import CompanyBill, Buyer, Salary, Other,BankingDeposit,Employee
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth.models import User
 from .models import UserProfile, RemainingAmount
+from rest_framework_simplejwt.tokens import RefreshToken
 
-User = get_user_model()
+User = get_user_model()    #Django's built-in User model
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -17,13 +18,11 @@ class UserSerializer(serializers.ModelSerializer):
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
-        token = super().get_token(user)
-        
+        token = super().get_token(user)    
         # Add custom claims
         token['email'] = user.email
         token['first_name'] = user.first_name
         return token
-
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
@@ -31,10 +30,19 @@ class RegisterSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(
         write_only=True, required=True, style={'input_type': 'password'})
     mobile = serializers.CharField(required=True, max_length=10)
+    tokens = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = User
-        fields = ('email', 'first_name', 'mobile', 'password', 'password2')
+        fields = ('email', 'first_name', 'mobile', 'password', 'password2', 'tokens')
+
+    def get_tokens(self, obj):
+        user = User.objects.get(email=obj.email)
+        refresh = RefreshToken.for_user(user)
+        return {
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+        }
 
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
@@ -49,7 +57,8 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop('password2')
-        return User.objects.create_user(**validated_data)
+        user = User.objects.create_user(**validated_data)
+        return user
 
 class InvoiceSerializer(serializers.ModelSerializer):
     
@@ -60,9 +69,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'buyer_name': {'required': True},
             'buyer_address': {'required': True},
             'buyer_gst': {'required': True},
-            'invoice_date': {'required': True},
-            'base_amount': {'required': True},
-            'total_with_gst': {'required': True},
+            
         }
 
     def validate(self, data):
@@ -80,7 +87,6 @@ class InvoiceSerializer(serializers.ModelSerializer):
         
         return data
 
-
 class SettingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Setting
@@ -92,15 +98,15 @@ class DepositSerializer(serializers.ModelSerializer):
         fields = ['id', 'deposit_date', 'amount']
 
 
-class StatementSerializer(serializers.ModelSerializer):
-    deposits = DepositSerializer(many=True, read_only=True)
-    total_deposited = serializers.FloatField(read_only=True)
-    remaining_balance = serializers.FloatField(read_only=True)
+# class StatementSerializer(serializers.ModelSerializer):
+#     deposits = DepositSerializer(many=True, read_only=True)
+#     total_deposited = serializers.FloatField(read_only=True)
+#     remaining_balance = serializers.FloatField(read_only=True)
     
 
-    class Meta:
-        model = Statement
-        fields = '__all__'
+#     class Meta:
+#         model = Statement
+#         fields = '__all__'
 
 class CompanyBillSerializer(serializers.ModelSerializer):
     class Meta:
@@ -111,8 +117,6 @@ class BuyerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Buyer
         fields = '__all__'
-
-
 
 class SalarySerializer(serializers.ModelSerializer):
     class Meta:
@@ -135,9 +139,13 @@ class BankingDepositSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class RemainingAmountSerializer(serializers.ModelSerializer):
+    invoice_number = serializers.CharField(source='invoice.invoice_number', read_only=True)
+    buyer_name = serializers.CharField(source='invoice.buyer_name', read_only=True)
+    buyer_gst = serializers.CharField(source='invoice.buyer_gst', read_only=True)
+    
     class Meta:
         model = RemainingAmount
-        fields = ['id', 'amount', 'last_updated']
+        fields = ['id', 'amount', 'invoice_number', 'buyer_name', 'buyer_gst']
 
 
 class EmployeeSerializer(serializers.ModelSerializer):

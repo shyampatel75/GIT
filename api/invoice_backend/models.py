@@ -6,27 +6,28 @@ from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.contrib.auth import get_user_model
+from datetime import datetime
 
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, first_name, mobile, password=None, **extra_fields):
         if not email:
             raise ValueError('Users must have an email address')
-        email = self.normalize_email(email)
+        email = self.normalize_email(email)        #Normalizes the email format.
         user = self.model(
             email=email,
             first_name=first_name,
             mobile=mobile,
             **extra_fields
         )
-        user.set_password(password)
+        user.set_password(password)             #Hashes and sets the password.
         user.save(using=self._db)
         return user
 
     def create_superuser(self, email, first_name, mobile, password, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
-        return self.create_user(email, first_name, mobile, password, **extra_fields)
+        return self.create_user(email, first_name, mobile, password, **extra_fields)   #Calls create_user() with extra permissions.
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
@@ -93,14 +94,45 @@ class Invoice(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        ordering = ['-created_at']
+
     def __str__(self):
         return self.invoice_number
 
     def save(self, *args, **kwargs):
-        # Calculate totals before saving
-        if not self.base_amount:
-            if self.total_hours and self.rate:
-                self.base_amount = self.total_hours * self.rate
+        # Only generate invoice number for new records
+        if not self.pk:
+            current_year = datetime.now().year
+            next_year = current_year + 1
+            self.financial_year = f"{current_year}/{next_year}"
+            
+            # Find the last invoice for this financial year
+            last_invoice = Invoice.objects.filter(
+                financial_year=self.financial_year
+            ).order_by('-invoice_number').first()
+            
+            if last_invoice:
+                try:
+                    # Extract number part (format "01-2025/2026")
+                    num_part = last_invoice.invoice_number.split('-')[0]
+                    next_num = int(num_part) + 1
+                except (ValueError, IndexError):
+                    next_num = 1
+            else:
+                next_num = 1
+            
+            self.invoice_number = f"{next_num:02d}-{self.financial_year}"
+        
+        # Calculate totals
+        self.calculate_totals()
+        
+        super().save(*args, **kwargs)
+
+    def calculate_totals(self):
+        """Calculate financial fields"""
+        if not self.base_amount and self.total_hours and self.rate:
+            self.base_amount = self.total_hours * self.rate
         
         if self.country == 'India' and self.base_amount:
             self.cgst = (self.base_amount * 9) / 100
@@ -112,9 +144,6 @@ class Invoice(models.Model):
             self.sgst = 0
             self.taxtotal = 0
             self.total_with_gst = self.base_amount
-        
-        super().save(*args, **kwargs)
-
 
 class Setting(models.Model):
     # Seller Info
@@ -136,7 +165,6 @@ class Setting(models.Model):
     logo = models.ImageField(upload_to='', null=True, blank=True)
     last_invoice_number = models.IntegerField(default=0)
 
-
     # Link to user who owns these settings
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -145,10 +173,24 @@ class Setting(models.Model):
         blank=True
     )
 
+    @classmethod
+    def create_default_settings(cls):
+        return cls.objects.create(
+            company_name="Your Company",
+            seller_address="Your Address",
+            seller_email="your@email.com",
+            seller_pan="ABCDE1234F",
+            seller_gstin="22AAAAA0000A1Z5",
+            bank_account_holder="Your Company",
+            bank_name="Bank Name",
+            account_number="123456789012",
+            ifsc_code="BANK0001234",
+            branch="Main Branch",
+            swift_code="SWFT0001",
+            last_invoice_number=00
+        )
     def __str__(self):
         return f"{self.company_name} - Settings"
-
-
 
 class Statement(models.Model):
     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='statements')
@@ -243,11 +285,13 @@ class BankingDeposit(models.Model):
         return f"{self.amount} on {self.date}"
     
 class RemainingAmount(models.Model):
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, null=True, blank=True)
+
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    last_updated = models.DateTimeField(auto_now=True)
+    
 
     def __str__(self):
-        return f"Remaining Amount: {self.amount}"
+        return f"{self.invoice.buyer_name} ({self.invoice.buyer_gst}) - Remaining: {self.amount}"
 
 class Employee(models.Model):
     name = models.CharField(max_length=100)
@@ -256,7 +300,7 @@ class Employee(models.Model):
     email = models.EmailField()
     number = models.CharField(max_length=15)
     
-    def ___str___(self):
+    def __str__(self):
         return self.name
 
     class Meta:
