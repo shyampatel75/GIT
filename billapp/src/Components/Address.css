@@ -10,6 +10,7 @@
 }
 
 .downloadbutton, .editbutton, .deletebutton {
+  
   border: none;
   padding: 5px 10px;
   border-radius: 8px;

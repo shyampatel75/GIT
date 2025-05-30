@@ -8,6 +8,7 @@ export default function SettingsPage() {
     seller_address: "",
     seller_pan: "",
     seller_gstin: "",
+    
     seller_email: "",
     bank_account_holder: "",
     bank_name: "",
