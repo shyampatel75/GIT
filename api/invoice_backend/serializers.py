@@ -69,7 +69,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'buyer_name': {'required': True},
             'buyer_address': {'required': True},
             'buyer_gst': {'required': True},
-            
+            'invoice_date': {'required': True},
         }
 
     def validate(self, data):
@@ -106,22 +106,31 @@ class DepositSerializer(serializers.ModelSerializer):
 
 #     class Meta:
 #         model = Statement
-#         fields = '__all__'
+#         fields = '_all_'
 
 class CompanyBillSerializer(serializers.ModelSerializer):
     class Meta:
         model = CompanyBill
         fields = '__all__'
+        
+
 
 class BuyerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Buyer
         fields = '__all__'
+        
 
 class SalarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Salary
         fields = '__all__'
+        extra_kwargs = {
+            'other_amount': {'required': True},
+            'transaction_type': {'required': True},
+            'payment_method': {'required': False},
+            'bank_name': {'required': False}
+        }
 
 class OtherSerializer(serializers.ModelSerializer):
     class Meta:

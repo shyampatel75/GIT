@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.contrib.auth import get_user_model
 from datetime import datetime
+from django.db.models import JSONField 
 
 
 class CustomUserManager(BaseUserManager):
@@ -42,7 +43,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['first_name', 'mobile']
 
-    def __str__(self):
+    def _str_(self):
         return self.email
 
 
@@ -65,7 +66,7 @@ class Invoice(models.Model):
     # Optional fields
     delivery_note = models.CharField(max_length=255, blank=True, null=True,default='')
     payment_mode = models.CharField(max_length=100, blank=True, null=True,default='')
-    delivery_note_date = models.DateField(blank=True, null=True)
+    delivery_note_date = models.DateField(null=True, blank=True)
     destination = models.CharField(max_length=255, blank=True, null=True,default='')
     Terms_to_delivery = models.CharField(max_length=255, blank=True, null=True,default='')
     
@@ -75,7 +76,7 @@ class Invoice(models.Model):
 
     # Product details
     Particulars = models.CharField(max_length=255, blank=True, null=True,default='Consultancy')
-    hsn_code = models.CharField(max_length=10, blank=True, null=True,default='0000')
+    hsn_sac_code = models.CharField(max_length=10, blank=True, null=True,default='0000')
     total_hours = models.FloatField(blank=True, null=True, default=0.0)
     rate = models.FloatField(blank=True, null=True, default=0.0)
     base_amount = models.FloatField()
@@ -97,7 +98,7 @@ class Invoice(models.Model):
     class Meta:
         ordering = ['-created_at']
 
-    def __str__(self):
+    def _str_(self):
         return self.invoice_number
 
     def save(self, *args, **kwargs):
@@ -160,7 +161,13 @@ class Setting(models.Model):
     ifsc_code = models.CharField(max_length=20, default='XYZB0000000')
     branch = models.CharField(max_length=255, default='Main Branch')
     swift_code = models.CharField(max_length=20, default='XYZ000')
-
+    company_code = models.CharField(max_length=20, default='COMPANY000')
+    # HSN_code = models.IntegerField(default=1)
+    HSN_codes = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of HSN codes"
+    )
     # Company Logo
     logo = models.ImageField(upload_to='', null=True, blank=True)
     last_invoice_number = models.IntegerField(default=0)
@@ -175,6 +182,9 @@ class Setting(models.Model):
 
     @classmethod
     def create_default_settings(cls):
+        default_hsn = [{'code': '9983'}]
+        
+    def create_default_settings(cls):
         return cls.objects.create(
             company_name="Your Company",
             seller_address="Your Address",
@@ -187,9 +197,11 @@ class Setting(models.Model):
             ifsc_code="BANK0001234",
             branch="Main Branch",
             swift_code="SWFT0001",
+            company_code="COMPANY0001",
+            HSN_code=1,
             last_invoice_number=00
         )
-    def __str__(self):
+    def _str_(self):
         return f"{self.company_name} - Settings"
 
 class Statement(models.Model):
@@ -198,7 +210,7 @@ class Statement(models.Model):
     notice = models.TextField(blank=True, null=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
 
-    def __str__(self):
+    def _str_(self):
         return f"Statement ({self.date}) - Invoice {self.invoice.invoice_number}"
 
     @property
@@ -215,41 +227,75 @@ class Deposit(models.Model):
     deposit_date = models.DateField()
     amount = models.DecimalField(max_digits=10, decimal_places=2)
 
-    def __str__(self):
+    def _str_(self):
         return f"₹{self.amount} on {self.deposit_date} for Statement {self.statement.id}"
 
 class Buyer(models.Model):
-    buyer_name = models.CharField(max_length=255, null=True, blank=True) 
-    invoice_id = models.CharField(max_length=50, null=True, blank=True)
-    transaction_date = models.DateField(null=True, blank=True)  # Temporary
-    notice = models.CharField(max_length=255, null=False, default="")
-    deposit_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    PAYMENT_CHOICES = [
+        ('Cash', 'Cash'),
+        ('Banking', 'Banking'),
+    ]
 
-    def __str__(self):
-        return f"{self.buyer_name} - {self.invoice_id or 'No Invoice'}"
-
-class CompanyBill(models.Model):
-    company_name = models.CharField(max_length=255, default='Unknown')
+    buyer_name = models.CharField(max_length=255, default='Unknown')
     transaction_date = models.DateField(default=timezone.now)  # Changed from selected_date
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     notice = models.TextField(default="No remarks")
+    payment_method = models.CharField(max_length=50, default='Cash',null=False) 
+    bank_name = models.CharField(max_length=100, null=True, blank=True,default=None)
 
     def __str__(self):
-        return self.company_name
+        return f"{self.buyer_name} - {self.transaction_date}"
+    
 
+
+
+class Bank(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    
+    def _str_(self):
+        return self.name
+
+class CompanyBill(models.Model):
+    PAYMENT_CHOICES = [
+        ('Cash', 'Cash'),
+        ('Banking', 'Banking'),
+    ]
+
+    company_name = models.CharField(max_length=255, null=True, blank=True)  # Changed from buyer_name
+    invoice_id = models.CharField(max_length=50, null=True, blank=True)
+    transaction_date = models.DateField(null=True, blank=True)
+    notice = models.CharField(max_length=255, null=False, default="")
+    amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Changed from deposit_amount
+    payment_method = models.CharField(max_length=10, choices=PAYMENT_CHOICES, null=True, blank=True)
+    bank_name = models.CharField(max_length=100, null=True, blank=True)
+
+    def _str_(self):
+        return f"{self.company_name} - {self.invoice_id or 'No Invoice'}"
+    
 class Salary(models.Model):
+    PAYMENT_CHOICES = [
+        ('Cash', 'Cash'),
+        ('Banking', 'Banking'),
+    ]
+
     salary_newname = models.CharField(max_length=100, default="N/A")
     salary_name = models.CharField(max_length=255)
     salary_amount = models.DecimalField(max_digits=10, decimal_places=2)
     salary_date = models.DateField()
+    payment_method = models.CharField(max_length=10, choices=PAYMENT_CHOICES, null=True, blank=True)
+    bank_name = models.CharField(max_length=100, null=True, blank=True)
 
-    def __str__(self):
+    def _str_(self):
         return f"{self.salary_name} Salary"
 
 class Other(models.Model):
     TRANSACTION_TYPE_CHOICES = [
         ('credit', 'Credit'),
         ('debit', 'Debit'),
+    ]
+    PAYMENT_CHOICES = [
+        ('Cash', 'Cash'),
+        ('Banking', 'Banking'),
     ]
 
     transaction_type = models.CharField(
@@ -263,9 +309,11 @@ class Other(models.Model):
     other_date = models.DateField()
     other_notice = models.TextField()
     other_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_method = models.CharField(max_length=10, choices=PAYMENT_CHOICES, null=True, blank=True)
+    bank_name = models.CharField(max_length=100, null=True, blank=True)
     
 
-    def __str__(self):  
+    def _str_(self):  
         return f"{self.other_type} ({self.transaction_type}) - {self.other_date} - ${abs(self.other_amount)}"
     
     def save(self, *args, **kwargs):
@@ -276,12 +324,13 @@ class Other(models.Model):
             self.other_amount = abs(self.other_amount)
         super().save(*args, **kwargs)
 
+
 class BankingDeposit(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateField()
     
 
-    def __str__(self):
+    def _str_(self):
         return f"{self.amount} on {self.date}"
     
 class RemainingAmount(models.Model):
@@ -290,7 +339,7 @@ class RemainingAmount(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     
 
-    def __str__(self):
+    def _str_(self):
         return f"{self.invoice.buyer_name} ({self.invoice.buyer_gst}) - Remaining: {self.amount}"
 
 class Employee(models.Model):
@@ -300,7 +349,7 @@ class Employee(models.Model):
     email = models.EmailField()
     number = models.CharField(max_length=15)
     
-    def __str__(self):
+    def _str_(self):
         return self.name
 
     class Meta:
@@ -317,5 +366,5 @@ class UserProfile(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    def __str__(self):
+    def _str_(self):
         return f"Profile for {self.user.email}"

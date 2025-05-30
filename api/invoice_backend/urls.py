@@ -39,6 +39,7 @@ urlpatterns = [
 
     path('banking/buyer/', views.create_buyer_transaction, name='create-buyer-transaction'),
     path('banking/buyer/<int:pk>/', views.buyer_transaction_detail, name='buyer-transaction-detail'),  # GET for single
+    path('banks/', views.bank_list, name='bank_list'),
 
     path('banking/salary/', views.create_salary_transaction, name='create-salary-transaction'),
     path('banking/salary/<int:pk>/', views.salary_transaction_detail, name='salary-transaction-detail'),  # GET for single
@@ -54,7 +55,7 @@ urlpatterns = [
     # path('remaining-amount/', views.remaining_amount_view, name='remaining-amount'),
     path('remaining-amounts/', views.remaining_amount_list, name='remaining_amount_list'),
     path('remaining-amounts/<int:pk>/', views.remaining_amount_detail, name='remaining_amount_detail'),
-    
+    path('remaining-balances/', views.get_remaining_balances, name='remaining-balances'),
 
     path('profile/', views.user_profile_view, name='user-profile'),
 

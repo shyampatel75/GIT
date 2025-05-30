@@ -1,4 +1,4 @@
-# settings_app/signals.py
+# invoice_backend/signals.py
 from django.db.models.signals import post_migrate
 from django.dispatch import receiver
 from .models import Setting
@@ -20,4 +20,4 @@ def create_default_settings(sender, **kwargs):
             swift_code="SWFT0001",
             last_invoice_number=0
         )
-        print("Default settings created!")
+        print("✅ Default settings created!")

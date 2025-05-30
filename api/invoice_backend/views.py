@@ -1,7 +1,7 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status, generics, permissions
-from .models import Invoice, Setting, Deposit,CompanyBill, Buyer, Salary, Other,BankingDeposit,Employee
+from .models import Invoice, Setting, Deposit,CompanyBill, Buyer, Salary, Other,BankingDeposit,Employee,Bank
 from .serializers import InvoiceSerializer,SettingSerializer, DepositSerializer,CompanyBillSerializer, BuyerSerializer, SalarySerializer, OtherSerializer,BankingDepositSerializer,EmployeeSerializer,RemainingAmountSerializer,UserProfile,RemainingAmount
 from django.contrib.auth.models import User
 from datetime import datetime
@@ -146,8 +146,7 @@ def get_next_invoice_number(request):
     else:
         next_num = 1
         
-    # Format with leading zeros (3 digits)
-    invoice_number = f"{next_num:03d}-{financial_year}"
+    invoice_number = f"{next_num:2d}-{financial_year}"
     
     return Response({
         'invoice_number': invoice_number,
@@ -231,25 +230,25 @@ class InvoiceDetailView(generics.RetrieveAPIView):
 # ⚙ Setting APIs
 # ========================
 
-@api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
-def settings_list_create(request):
-    if request.method == 'GET':
-        settings = Setting.objects.all()
-        serializer = SettingSerializer(settings, many=True)
-        return Response(serializer.data)
+# @api_view(['GET', 'POST'])
+# @permission_classes([IsAuthenticated])
+# def settings_list_create(request):
+#     if request.method == 'GET':
+#         settings = Setting.objects.all()
+#         serializer = SettingSerializer(settings, many=True)
+#         return Response(serializer.data)
 
-    elif request.method == 'POST':
-        existing_setting = Setting.objects.first()
-        if existing_setting:
-            serializer = SettingSerializer(existing_setting, data=request.data)
-        else:
-            serializer = SettingSerializer(data=request.data)
+#     elif request.method == 'POST':
+#         existing_setting = Setting.objects.first()
+#         if existing_setting:
+#             serializer = SettingSerializer(existing_setting, data=request.data)
+#         else:
+#             serializer = SettingSerializer(data=request.data)
 
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK if existing_setting else status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+#         if serializer.is_valid():
+#             serializer.save()
+#             return Response(serializer.data, status=status.HTTP_200_OK if existing_setting else status.HTTP_201_CREATED)
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
@@ -341,32 +340,35 @@ def company_transaction_detail(request, pk):
 @api_view(['POST', 'GET'])
 @permission_classes([IsAuthenticated])
 def create_buyer_transaction(request):
-    try:
-        if request.method == 'POST':
+    if request.method == 'POST':
+        try:
+            # Get data directly without renaming fields
             data = request.data.copy()
-
-            print("🔍 Raw incoming request.data:", request.data)
-            print("🛠  Copied data before processing:", data)
-
-            data['transaction_date'] = data.pop('selected_date', data.get('transaction_date'))
-            data['invoice_id'] = data.pop('invoice', data.get('invoice_id'))
-
-            print("✅ Final data passed to serializer:", data)
-
+            
+            # Ensure payment_method is provided
+            if 'payment_method' not in data or not data['payment_method']:
+                return Response(
+                    {"payment_method": ["This field is required."]},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
             serializer = BuyerSerializer(data=data)
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
-        elif request.method == 'GET':
-            transactions = Buyer.objects.all()
-            serializer = BuyerSerializer(transactions, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-
-    except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+    elif request.method == 'GET':
+        transactions = Buyer.objects.all()
+        serializer = BuyerSerializer(transactions, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
 # Function to retrieve an individual Buyer Transaction
 @api_view(['GET', 'DELETE'])
 @permission_classes([IsAuthenticated])
@@ -383,6 +385,28 @@ def buyer_transaction_detail(request, pk):
     elif request.method == 'DELETE':
         transaction.delete()
         return Response({"detail": "Deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+    
+# Add new endpoints for bank operations
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def bank_list(request):
+    if request.method == 'GET':
+        banks = Bank.objects.all().order_by('name')
+        bank_names = [bank.name for bank in banks]
+        return Response(bank_names, status=status.HTTP_200_OK)
+    
+    elif request.method == 'POST':
+        bank_name = request.data.get('name', '').strip()
+        if not bank_name:
+            return Response({"error": "Bank name is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            bank, created = Bank.objects.get_or_create(name=bank_name)
+            if created:
+                return Response({"name": bank.name}, status=status.HTTP_201_CREATED)
+            return Response({"name": bank.name}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 # Function to create a Salary Transaction
 @api_view(['POST', 'GET'])
@@ -718,3 +742,48 @@ def settings_list_create(request):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK if existing_setting else status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_remaining_balances(request):
+    try:
+        # Get all invoices
+        invoices = Invoice.objects.all()
+        # Get all buyer transactions
+        buyer_transactions = Buyer.objects.all()
+        
+        # Calculate totals per buyer
+        buyer_totals = {}
+        for txn in buyer_transactions:
+            name = txn.buyer_name
+            buyer_totals[name] = buyer_totals.get(name, 0) + float(txn.deposit_amount or 0)
+        
+        invoice_totals = {}
+        for invoice in invoices:
+            name = invoice.buyer_name
+            invoice_totals[name] = invoice_totals.get(name, 0) + float(invoice.total_with_gst or 0)
+        
+        # Calculate remaining balances
+        remaining_balances = {}
+        all_buyers = set(list(buyer_totals.keys()) + list(invoice_totals.keys()))
+        
+        for buyer in all_buyers:
+            remaining_balances[buyer] = invoice_totals.get(buyer, 0) - buyer_totals.get(buyer, 0)
+        
+        # Prepare response data
+        response_data = [{
+            'buyer_name': buyer,
+            'total_invoiced': invoice_totals.get(buyer, 0),
+            'total_paid': buyer_totals.get(buyer, 0),
+            'remaining_balance': remaining_balances[buyer]
+        } for buyer in all_buyers if remaining_balances[buyer] != 0]
+        
+        return Response(response_data)
+        
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
