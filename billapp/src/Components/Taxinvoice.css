@@ -6,7 +6,7 @@ body {
 }
 
 .container {
-    background-color: #fff;
+    background-color: #8f3636;
     padding: 20px;
     margin-top: 20px;
     box-shadow: 0 0 10px rgba(126, 126, 126, 0.1);
@@ -633,4 +633,3 @@ height: 100%;
   from { transform: translateX(100%); }
   to { transform: translateX(0); }
 }
-

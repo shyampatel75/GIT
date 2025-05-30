@@ -81,23 +81,9 @@ const IncomeExpenditure = () => {
                             <tbody>
                                 {data.map((item, index) => (
                                     <tr key={index}>
-                                        {Object.entries(item).map(([key, value], i) => {
-                                            let displayValue = value;
-
-                                            // Check if value is a valid date string
-                                            if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
-                                                const date = new Date(value);
-                                                if (!isNaN(date)) {
-                                                    const day = String(date.getDate()).padStart(2, '0');
-                                                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                                                    const year = date.getFullYear();
-                                                    displayValue = `${day}/${month}/${year}`;
-                                                }
-                                            }
-
-                                            return <td key={i}>{displayValue}</td>;
-                                        })}
-
+                                        {Object.values(item).map((value, i) => (
+                                            <td key={i}>{value}</td>
+                                        ))}
                                     </tr>
                                 ))}
                             </tbody>

@@ -15,6 +15,7 @@ const Taxinvoice = () => {
   const pdfRef = useRef(null);
 
   // State management
+  
   const [formData, setFormData] = useState({
     buyer_name: location.state?.buyerData?.buyer_name || "",
     buyer_address: location.state?.buyerData?.buyer_address || "",
@@ -32,7 +33,7 @@ const Taxinvoice = () => {
     country: "",
     currency: "",
     Particulars: "",
-    hsn_code: "9983",
+    hsn_code: "",
     total_hours: "",
     rate: "",
     base_amount: "",
@@ -45,13 +46,13 @@ const Taxinvoice = () => {
     financial_year: getCurrentInvoiceYear(),
   });
 
-  const [selectedHsn, setSelectedHsn] = useState("9983");
+  const [selectedHsn, setSelectedHsn] = useState("");
   const [countries, setCountries] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedCountry, setSelectedCountry] = useState({
     name: "India",
     currency: "₹",
-
+    currencyCode: "INR",
   });
   const [isOpen, setIsOpen] = useState(false);
   const [invoiceYear, setInvoiceYear] = useState(getCurrentInvoiceYear());
@@ -59,7 +60,7 @@ const Taxinvoice = () => {
   //   const savedNumber = localStorage.getItem('lastInvoiceNumber');
   //   return savedNumber ? parseInt(savedNumber) : 1;
   // });
-  const [settingsData, setSettingsData] = useState(null);
+  const [settingsData, setSettingsData] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -87,6 +88,15 @@ const Taxinvoice = () => {
       consignee_gst: prev.buyer_gst,
     }));
   };
+
+  useEffect(() => {
+  if (settingsData && settingsData.HSN_codes) {
+    setFormData(prev => ({
+      ...prev,
+      HSN_codes: settingsData.HSN_codes,
+    }));
+  }
+}, [settingsData]);
 
   // Fetch data functions with authentication
   const fetchSettings = useCallback(async () => {
@@ -231,7 +241,18 @@ const Taxinvoice = () => {
     country.name.toLowerCase().includes(search.toLowerCase()) ||
     country.currencyCode.toLowerCase().includes(search.toLowerCase())
   );
-
+const formatDisplayDate = (dateStr) => {
+  if (!dateStr) return "";
+  
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr; // Fallback if invalid date
+  
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  
+  return `${month}-${day}-${year}`;
+};
   // Handlers
   const handleSelectChange = (e) => {
     const { name, value } = e.target;
@@ -470,77 +491,63 @@ const Taxinvoice = () => {
       }
 
       // Final payload - only include fields needed for PDF generation
-    const payload = {
-      buyer_name: formData.buyer_name,
-      buyer_address: formData.buyer_address,
-      buyer_gst: formData.buyer_gst,
-      consignee_name: formData.consignee_name,
-      consignee_address: formData.consignee_address,
-      consignee_gst: formData.consignee_gst,
-      invoice_number: formData.invoice_number, // Use existing number
-      invoice_date: formattedInvoiceDate,
-      delivery_note: formData.delivery_note,
-      payment_mode: formData.payment_mode,
-      delivery_note_date: formattedDeliveryDate,
-      destination: formData.destination,
-      Terms_to_delivery: formData.Terms_to_delivery,
-      country: selectedCountry.name,
-      currency: selectedCountry.currencyCode,
-      Particulars: formData.Particulars,
-      hsn_code: formData.hsn_code,
-      total_hours: prepareNumericField(formData.total_hours),
-      rate: prepareNumericField(formData.rate),
-      base_amount,
-      cgst: prepareNumericField(formData.cgst),
-      sgst: prepareNumericField(formData.sgst),
-      taxtotal: prepareNumericField(formData.taxtotal),
-      total_with_gst: prepareNumericField(formData.total_with_gst),
-      remark: formData.remark,
-      financial_year: formData.financial_year,
-    };
+      const payload = {
+        buyer_name: formData.buyer_name,
+        buyer_address: formData.buyer_address,
+        buyer_gst: formData.buyer_gst,
+        consignee_name: formData.consignee_name,
+        consignee_address: formData.consignee_address,
+        consignee_gst: formData.consignee_gst,
+        invoice_number: formData.invoice_number, // Use existing number
+        invoice_date: formattedInvoiceDate,
+        delivery_note: formData.delivery_note,
+        payment_mode: formData.payment_mode,
+        delivery_note_date: formattedDeliveryDate,
+        destination: formData.destination,
+        Terms_to_delivery: formData.Terms_to_delivery,
+        country: selectedCountry.name,
+        currency: selectedCountry.currencyCode,
+        Particulars: formData.Particulars,
+        hsn_code: formData.hsn_code,
+        total_hours: prepareNumericField(formData.total_hours),
+        rate: prepareNumericField(formData.rate),
+        base_amount,
+        cgst: prepareNumericField(formData.cgst),
+        sgst: prepareNumericField(formData.sgst),
+        taxtotal: prepareNumericField(formData.taxtotal),
+        total_with_gst: prepareNumericField(formData.total_with_gst),
+        remark: formData.remark,
+        financial_year: formData.financial_year,
+      };
 
-         // Only create new invoice if this is the first submission
-    if (!isSubmitted) {
-      const response = await fetch("http://localhost:8000/api/create/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
+      // Only create new invoice if this is the first submission
+      if (!isSubmitted) {
+        const response = await fetch("http://localhost:8000/api/create/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
 
-      const responseData = await response.json();
+        const responseData = await response.json();
 
-      if (!response.ok) {
-        const errorMessages = Object.values(responseData.errors || {}).flat().join(", ");
-        throw new Error(errorMessages || "Failed to save invoice");
+        if (!response.ok) {
+          const errorMessages = Object.values(responseData.errors || {}).flat().join(", ");
+          throw new Error(errorMessages || "Failed to save invoice");
+        }
+
+        setIsSubmitted(true);
+        setFormData(prev => ({
+          ...prev,
+          invoice_number: responseData.invoice_number
+        }));
       }
-
-      setIsSubmitted(true);
-      setFormData(prev => ({
-        ...prev,
-        invoice_number: responseData.invoice_number
-      }));
-    }
 
       // Generate PDF with the invoice number from backend
       await generatePDF(formData.invoice_number);
 
-      // Reset form after success (optional)
-      // setFormData((prev) => ({
-      //   ...prev,
-      //   invoice_date: '',
-      //   delivery_note_date: '',
-      //   total_hours: '',
-      //   rate: '',
-      //   base_amount: '',
-      //   cgst: '',
-      //   sgst: '',
-      //   taxtotal: '',
-      //   total_with_gst: '',
-      //   remark: '',
-      // }));
 
     } catch (err) {
       console.error("Invoice processing error:", err);
@@ -550,7 +557,7 @@ const Taxinvoice = () => {
     }
   };
 
- const generatePDF = async (invoiceNumber) => {
+const generatePDF = async (invoiceNumber) => {
   const input = pdfRef.current;
 
   if (!input) {
@@ -564,35 +571,54 @@ const Taxinvoice = () => {
     const canvas = await html2canvas(input, {
       useCORS: true,
       allowTaint: true,
-      scale: 2,
-      logging: true,
+      scale: 2, // High-res
       scrollY: -window.scrollY,
-      width: input.offsetWidth,
-      height: input.offsetHeight,
     });
 
-    const imgData = canvas.toDataURL("image/png");
+    const imgData = canvas.toDataURL("image/jpeg", 1.0); // JPEG avoids PNG corruption
     const pdf = new jsPDF("p", "mm", "a4");
 
-    const margin = 10; // 10mm margin
+    const margin = 5;
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const availableWidth = pageWidth - 2 * margin;
-    const imgHeight = (canvas.height * availableWidth) / canvas.width;
 
-    // If image height fits on one page, center it vertically
-    const imgY = imgHeight < (pageHeight - 2 * margin)
-      ? (pageHeight - imgHeight) / 2
-      : margin;
+    const imgProps = {
+      width: canvas.width,
+      height: canvas.height,
+    };
 
-    pdf.addImage(imgData, "PNG", margin, imgY, availableWidth, imgHeight);
+    // Convert canvas px size to mm (1 px ≈ 0.264583 mm)
+    const pxToMm = px => px * 0.264583;
+    const imgWidthMm = pxToMm(imgProps.width);
+    const imgHeightMm = pxToMm(imgProps.height);
+
+    // Scale image to fit within available width or height
+    const maxWidth = pageWidth - 2 * margin;
+    const maxHeight = pageHeight - 2 * margin;
+    let scaledWidth = imgWidthMm;
+    let scaledHeight = imgHeightMm;
+
+    if (scaledWidth > maxWidth || scaledHeight > maxHeight) {
+      const widthRatio = maxWidth / imgWidthMm;
+      const heightRatio = maxHeight / imgHeightMm;
+      const scale = Math.min(widthRatio, heightRatio);
+
+      scaledWidth = imgWidthMm * scale;
+      scaledHeight = imgHeightMm * scale;
+    }
+
+    const offsetX = (pageWidth - scaledWidth) / 2;
+    const offsetY = (pageHeight - scaledHeight) / 2;
+
+    pdf.addImage(imgData, "JPEG", offsetX, offsetY, scaledWidth, scaledHeight);
     pdf.save(`Invoice_${invoiceNumber}.pdf`);
     setSuccess("Invoice downloaded successfully!");
   } catch (error) {
     console.error("PDF generation error:", error);
     setError("Failed to generate PDF");
-  } 
+  }
 };
+
 
 
   if (!settingsData) return <p className="text-center mt-4">Loading settings...</p>;
@@ -849,8 +875,16 @@ const Taxinvoice = () => {
                   onClick={() => setIsOpen(!isOpen)}
                 >
                   <div className="flex items-center" style={{ height: "30px" }}>
+                    {selectedCountry.flag && (
+                      <img
+                        src={selectedCountry.flag}
+                        alt={`${selectedCountry.name} flag`}
+                        style={{ width: "20px", marginRight: "8px" }}
+                      />
+                    )}
                     <span className="mr-2">
-                      {selectedCountry.name} - {selectedCountry.currency}
+                      {selectedCountry.name} - {selectedCountry.currency} (
+                      {selectedCountry.currencyCode})
                     </span>
                   </div>
                 </div>
@@ -881,7 +915,15 @@ const Taxinvoice = () => {
                             setSearch(""); // Clear search after selection
                           }}
                         >
-                          {country.name} - {country.currency}
+                          {country.flag && (
+                            <img
+                              src={country.flag}
+                              alt={`${country.name} flag`}
+                              style={{ width: "20px", marginRight: "8px" }}
+                            />
+                          )}
+                          {country.name} - {country.currency} (
+                          {country.currencyCode})
                         </li>
                       ))}
                     </ul>
@@ -890,13 +932,19 @@ const Taxinvoice = () => {
               </div>
 
               {/* Keep "Declare under LUT" separate, so it doesn't slide when dropdown opens */}
-              <div className="mt-4 ">
+              <div className="mt-4">
                 {selectedCountry.name !== "India" && (
-                  <div className="lut">
-                    <p style={{ margin: "0px" }}>Declare under LUT</p>
-                  </div>
+                  <>
+                    <div className="lut">
+                      <p style={{ margin: "0px" }}>Declare under LUT</p>
+                    </div>
+                    <div className="lut mt-3">
+                      <p style={{ margin: "0px" }}>{settingsData.company_code}</p>
+                    </div>
+                  </>
                 )}
               </div>
+
 
               <input type="hidden" id="currencyTitle" value="INR" />
               <input type="hidden" id="currencySymbol" value="₹" />
@@ -936,10 +984,14 @@ const Taxinvoice = () => {
                         value={formData.hsn_code}
                         style={{ height: "46px" }}
                       >
-                        <option value="9983">9983</option>
-                        <option value="8523">8523</option>
-                      </select>
+                         <option value="">Select HSN Code</option>
+    {settingsData?.HSN_codes?.map((code, index) => (
+      <option key={index} value={code}>{code}</option>
+    ))}
+  </select>
                     </td>
+
+
 
                     <td style={{ width: "10%" }}>
                       <input
@@ -975,7 +1027,7 @@ const Taxinvoice = () => {
 
                     <td style={{ width: "200px" }}>
                       <span className="currency-sym">
-                        {selectedCountry.currency}
+                        {selectedCountry.currencyCode}
                       </span>
                       <input
                         style={{ width: "80%" }}
@@ -998,7 +1050,7 @@ const Taxinvoice = () => {
                       <td></td>
                       <td>9%</td>
                       <td id="cgst">
-                        <span className="currency-sym">{selectedCountry.currency}  </span>
+                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
                         {formData.cgst}
                       </td>
                     </tr>
@@ -1014,7 +1066,7 @@ const Taxinvoice = () => {
                       <td></td>
                       <td>9%</td>
                       <td id="sgst">
-                        <span className="currency-sym">{selectedCountry.currency} </span>
+                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
                         {formData.sgst}
                       </td>
                     </tr>
@@ -1026,7 +1078,7 @@ const Taxinvoice = () => {
                     <td>
                       <strong id="total-with-gst">
                         <span className="currency-sym">
-                          {selectedCountry.currency}
+                          {selectedCountry.currencyCode}
                         </span>
                         {formData.total_with_gst}
                       </strong>
@@ -1045,7 +1097,7 @@ const Taxinvoice = () => {
                     <strong>Amount Chargeable (in words):</strong>
                   </p>
                   <h4 className="total-in-words">
-                    <span className="currency-text">INR</span>{" "}
+                    <span className="currency-text">{selectedCountry.currencyCode}</span>{" "}
                     {numberToWords(Math.floor(formData.total_with_gst))}
                   </h4>
                   <div className="top-right-corner">
@@ -1108,7 +1160,7 @@ const Taxinvoice = () => {
               <div>
                 <strong>Tax Amount (in words):</strong>
                 <span className="total-tax-in-words">
-                  <span className="currency-text">INR</span>{" "}
+                  <span className="currency-text">{selectedCountry.currencyCode}</span>{" "}
                   {numberToWords(Math.floor(formData.total_with_gst))}
                 </span>
               </div>
@@ -1177,9 +1229,9 @@ const Taxinvoice = () => {
         style={{
           position: 'absolute',
           left: '-9999px',
-        
+
         }}
-        // style={{ position: "absolute", left: "-9999px" }}
+      // style={{ position: "absolute", left: "-9999px" }}
       >
         <div style={{ paddingRight: "10px" }}>
           <h2 className="text-center">TAX INVOICE</h2>
@@ -1284,7 +1336,7 @@ const Taxinvoice = () => {
                     </tr>
                     <tr>
                       <td>Date</td>
-                      <td>{formData.invoice_date}</td>
+                      <td>{formatDisplayDate(formData.invoice_date)}</td>
                     </tr>
                     <tr>
                       <td>Delivery Note</td>
@@ -1335,8 +1387,16 @@ const Taxinvoice = () => {
                       className="flex items-center"
                       style={{ height: "30px" }}
                     >
+                      {selectedCountry.flag && (
+                        <img
+                          src={selectedCountry.flag}
+                          alt={`${selectedCountry.name} flag`}
+                          style={{ width: "20px", marginRight: "8px" }}
+                        />
+                      )}
                       <span className="mr-2">
-                        {selectedCountry.name} - {selectedCountry.currency}
+                        {selectedCountry.name} - {selectedCountry.currencyCode}(
+                        {selectedCountry.currencyCode})
                       </span>
                     </div>
                   </div>
@@ -1367,7 +1427,15 @@ const Taxinvoice = () => {
                               setSearch(""); // Clear search after selection
                             }}
                           >
-                            {country.name} - {country.currency}
+                            {country.flag && (
+                              <img
+                                src={country.flag}
+                                alt={`${country.name} flag`}
+                                style={{ width: "20px", marginRight: "8px" }}
+                              />
+                            )}
+                            {country.name} - {country.currency}  (
+                            {country.currencyCode})
                           </li>
                         ))}
                       </ul>
@@ -1376,13 +1444,18 @@ const Taxinvoice = () => {
                 </div>
 
                 {/* Keep "Declare under LUT" separate, so it doesn't slide when dropdown opens */}
-                <div className="mt-4 ">
-                  {selectedCountry.name !== "India" && (
+                <div className="mt-4">
+                {selectedCountry.name !== "India" && (
+                  <>
                     <div className="lut">
                       <p style={{ margin: "0px" }}>Declare under LUT</p>
                     </div>
-                  )}
-                </div>
+                    <div className="lut mt-3">
+                      <p style={{ margin: "0px" }}>{settingsData.company_code}</p>
+                    </div>
+                  </>
+                )}
+              </div>
 
                 <input type="hidden" id="currencyTitle" value="INR" />
                 <input type="hidden" id="currencySymbol" value="₹" />
@@ -1414,7 +1487,7 @@ const Taxinvoice = () => {
 
                       <td style={{ width: "200px" }}>
                         <span className="currency-sym">
-                          {selectedCountry.currency}
+                          {selectedCountry.currencyCode}
                         </span>
                         {formData.base_amount}
                       </td>
@@ -1457,7 +1530,7 @@ const Taxinvoice = () => {
                       <td>
                         <strong id="total-with-gst">
                           <span className="currency-sym">
-                            {selectedCountry.currency}
+                            {selectedCountry.currencyCode}
                           </span>{" "}
                           {formData.total_with_gst}
                         </strong>
@@ -1476,7 +1549,7 @@ const Taxinvoice = () => {
                       <strong>Amount Chargeable (in words):</strong>
                     </p>
                     <h4 className="total-in-words">
-                      <span className="currency-text">INR</span>{" "}
+                      <span className="currency-text">{selectedCountry.currencyCode}</span>{" "}
                       {numberToWords(Math.floor(formData.total_with_gst))}
                     </h4>
                     <div className="top-right-corner">
@@ -1544,7 +1617,7 @@ const Taxinvoice = () => {
                     <div>
                       <strong>Tax Amount (in words):</strong>
                       <span className="total-tax-in-words">
-                        <span className="currency-text">INR</span>{" "}
+                        <span className="currency-text">{selectedCountry.currencyCode}</span>{" "}
                         {numberToWords(Math.floor(formData.total_with_gst))}
                       </span>
                     </div>

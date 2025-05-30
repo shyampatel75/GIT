@@ -10,6 +10,7 @@ const Clients = () => {
   const [logoLoaded, setLogoLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+   const [success, setSuccess] = useState(false);
   const printRef = useRef();
 
   const fetchWithAuth = async (url, options = {}) => {
@@ -59,7 +60,7 @@ const Clients = () => {
   }, [navigate]);
 
 
-  const numberToWords = (num) => {
+   const numberToWords = (num) => {
     const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
     const teens = ["Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
     const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
@@ -148,37 +149,67 @@ const Clients = () => {
       return () => clearTimeout(timer);
     }
   }, [selectedInvoice, logoLoaded]);
+  
+const generatePDF = async () => {
+  const input = printRef.current;
+  if (!input) return;
 
-  const generatePDF = async () => {
-    const input = printRef.current;
-    if (input) {
-      try {
-        const canvas = await html2canvas(input, {
-          useCORS: true,
-          allowTaint: true,
-          scale: 2,
-          logging: true,
-        });
+  try {
+    // Wait for all images to load
+    const images = input.querySelectorAll("img");
+    await Promise.all(
+      Array.from(images).map((img) => {
+        if (!img.complete || img.naturalHeight === 0) {
+          return new Promise((resolve) => {
+            img.onload = img.onerror = resolve;
+          });
+        }
+      })
+    );
 
-        const imgData = canvas.toDataURL("image/png");
-        const pdf = new jsPDF("p", "mm", "A4");
+    const canvas = await html2canvas(input, {
+      useCORS: true,
+      allowTaint: true,
+      scale: 2,
+      logging: true,
+    });
 
-        const margin = 10;
-        const pdfWidth = pdf.internal.pageSize.getWidth() - margin * 2;
-        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF("p", "mm", "a4");
 
-        pdf.addImage(imgData, "PNG", margin, margin, pdfWidth, pdfHeight);
-        pdf.save(`Invoice_${selectedInvoice.invoice_number}.pdf`);
-      } catch (err) {
-        console.error("PDF generation error:", err);
-        setError(err.message || "PDF generation error");
-      } finally {
-        setSelectedInvoice(null);
-        setLogoLoaded(false);
-      }
-    }
-  };
+    const margin = 10;
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const availableWidth = pageWidth - 2 * margin;
+    const imgHeight = (canvas.height * availableWidth) / canvas.width;
+    const imgX = margin;
+    const imgY = margin;
 
+    pdf.addImage(imgData, "PNG", imgX, imgY, availableWidth, imgHeight);
+    pdf.save(`Invoice_${selectedInvoice.invoice_number}.pdf`);
+
+    setSuccess("Invoice downloaded successfully!");
+  } catch (err) {
+    console.error("PDF generation error:", err);
+    setError("Failed to generate PDF");
+  } finally {
+    setSelectedInvoice(null);
+    setLogoLoaded(false);
+  }
+};
+
+const formatDate = (dateString) => {
+  if (!dateString) return ''; // Handle empty or invalid dates
+  
+  const date = new Date(dateString);
+  
+  // Extract day, month, and year
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+  const year = date.getFullYear();
+  
+  return `${day}-${month}-${year}`;
+};
   const handleNewBill = (invoice) => {
     navigate('/tax-invoice', {
       state: {
@@ -447,7 +478,7 @@ const Clients = () => {
                         </tr>
                         <tr>
                           <td>Date</td>
-                          <td>{selectedInvoice.invoice_date}</td>
+                          <td>{formatDate(selectedInvoice.invoice_date)}</td>
                         </tr>
                         <tr>
                           <td>Delivery Note</td>
@@ -459,7 +490,7 @@ const Clients = () => {
                         </tr>
                         <tr>
                           <td>Delivery Note Date</td>
-                          <td>{selectedInvoice.delivery_note_date}</td>
+                          <td>{formatDate(selectedInvoice.delivery_note_date)}</td>
                         </tr>
                         <tr>
                           <td>Destination</td>
@@ -653,7 +684,7 @@ const Clients = () => {
                         <strong>Tax Amount (in words):</strong>
                         <span className="total-tax-in-words">
                           <span className="currency-text">INR </span>
-                          {numberToWords(Math.floor(selectedInvoice.total_with_gst))}
+                           {numberToWords(Math.floor(selectedInvoice.total_with_gst))}
                         </span>
                       </div>
                     </div>

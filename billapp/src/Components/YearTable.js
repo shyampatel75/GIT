@@ -9,7 +9,7 @@ const YearTable = () => {
   const [error, setError] = useState("");
   const [user, setUser] = useState(null);
 
-  const startYear = 2022;
+  const startYear = 2024;
   const endYear = currentYear + 1;
   const yearRanges = [];
 

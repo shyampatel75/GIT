@@ -26,3 +26,46 @@
   .gray-background{
     background-color: #f2f2f2 !important;
   }
+  .containers {
+  background: linear-gradient(to right, #f0f2f5, #e2e6ea);
+  padding-top: 20px;
+}
+
+.table {
+  
+  overflow: hidden;
+  box-shadow: 0px 0px 12px rgba(0, 0, 0, 0.05);
+}
+
+.downloadbutton, .editbutton, .deletebutton {
+  border: none;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  transition: 0.3s ease;
+}
+
+.downloadbutton:hover {
+  background-color: #28a745;
+  color: white;
+}
+
+.editbutton:hover {
+  background-color: #ffc107;
+  color: white;
+}
+
+.deletebutton:hover {
+  background-color: #dc3545;
+  color: white;
+}
+
+.address-hover {
+  cursor: pointer;
+  /* text-decoration: underline dotted; */
+}
+
+.alert {
+  margin: 10px 20px;
+  transition: opacity 0.5s ease;
+}

@@ -15,8 +15,12 @@ export default function SettingsPage() {
     ifsc_code: "",
     branch: "",
     swift_code: "",
-    logo: "",
+    company_code: "",
+    HSN_codes: [],
+    logo: null,          // Will store File object for new uploads
+    logoUrl: "",         // Will store URL for existing/preview images
   });
+  const [newHsn, setNewHsn] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -33,9 +37,26 @@ export default function SettingsPage() {
       setFormData((prev) => ({
         ...prev,
         logo: file,
-        stampPreview: URL.createObjectURL(file),
+        logoUrl: URL.createObjectURL(file),
       }));
     }
+  };
+
+  const addHsnCode = () => {
+    if (newHsn.trim()) {
+      setFormData((prev) => ({
+        ...prev,
+        HSN_codes: [...prev.HSN_codes, newHsn.trim()],
+      }));
+      setNewHsn("");
+    }
+  };
+
+  const removeHsnCode = (index) => {
+    setFormData((prev) => ({
+      ...prev,
+      HSN_codes: prev.HSN_codes.filter((_, i) => i !== index),
+    }));
   };
 
   const handleSave = async () => {
@@ -51,6 +72,8 @@ export default function SettingsPage() {
     }
 
     const formDataToSend = new FormData();
+    
+    // Append all regular fields
     formDataToSend.append("company_name", formData.company_name);
     formDataToSend.append("seller_address", formData.seller_address);
     formDataToSend.append("seller_pan", formData.seller_pan);
@@ -62,7 +85,11 @@ export default function SettingsPage() {
     formDataToSend.append("ifsc_code", formData.ifsc_code);
     formDataToSend.append("branch", formData.branch);
     formDataToSend.append("swift_code", formData.swift_code);
-    if (formData.logo) {
+    formDataToSend.append("company_code", formData.company_code);
+    formDataToSend.append("HSN_codes", JSON.stringify(formData.HSN_codes));
+
+    // Only append logo if it's a new file
+    if (formData.logo instanceof File) {
       formDataToSend.append("logo", formData.logo);
     }
 
@@ -70,7 +97,7 @@ export default function SettingsPage() {
       const response = await fetch("http://127.0.0.1:8000/api/settings/", {
         method: "POST",
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: formDataToSend,
       });
@@ -78,10 +105,16 @@ export default function SettingsPage() {
       if (response.ok) {
         const result = await response.json();
         setSuccess(true);
-        console.log(result);
+        // Update the form data with the new logo URL if one was returned
+        if (result.logo) {
+          setFormData(prev => ({
+            ...prev,
+            logoUrl: `http://127.0.0.1:8000${result.logo}`,
+            logo: null // Reset the file object after successful upload
+          }));
+        }
       } else {
         const errorData = await response.json();
-        console.error("Save failed", errorData);
         setError(errorData.message || "Save failed");
       }
     } catch (error) {
@@ -104,78 +137,74 @@ export default function SettingsPage() {
 
         const response = await fetch("http://127.0.0.1:8000/api/settings/", {
           headers: {
-            'Authorization': `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
           },
         });
 
         if (!response.ok) {
-          throw new Error('Failed to fetch settings');
+          throw new Error("Failed to fetch settings");
         }
 
-        const data = await response.json();
+        let data = await response.json();
 
-        // If it's a list of settings, pick the latest one
+        // If no settings exist, create default ones
+        if (Array.isArray(data) && data.length === 0) {
+          const createResponse = await fetch(
+            "http://127.0.0.1:8000/api/settings/",
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({}),
+            }
+          );
+
+          if (!createResponse.ok) {
+            throw new Error("Failed to create default settings");
+          }
+
+          data = await createResponse.json();
+        }
+
+        // Get the settings (handle both array and single object responses)
         const setting = Array.isArray(data) ? data[data.length - 1] : data;
-           // If no settings exist, create default ones
-    if (Array.isArray(data) && data.length === 0) {
-      const createResponse = await fetch("http://127.0.0.1:8000/api/settings/", {
-        method: "POST",
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({}),
-      });
-      
-      if (!createResponse.ok) {
-        throw new Error('Failed to create default settings');
+
+        setFormData({
+          company_name: setting.company_name || "Your Company",
+          seller_address: setting.seller_address || "Your Address",
+          seller_pan: setting.seller_pan || "ABCDE1234F",
+          seller_gstin: setting.seller_gstin || "22AAAAA0000A1Z5",
+          seller_email: setting.seller_email || "your@email.com",
+          bank_account_holder: setting.bank_account_holder || "Your Company",
+          bank_name: setting.bank_name || "Bank Name",
+          account_number: setting.account_number || "123456789012",
+          ifsc_code: setting.ifsc_code || "BANK0001234",
+          branch: setting.branch || "Main Branch",
+          swift_code: setting.swift_code || "SWFT0001",
+          company_code: setting.company_code || "SWFT0001",
+          HSN_codes: setting.HSN_codes || [],
+          logo: null, // Initialize as null - will only be set when a new file is uploaded
+          logoUrl: setting.logo ? `http://127.0.0.1:8000${setting.logo}` : "",
+        });
+      } catch (error) {
+        console.error("Failed to fetch settings", error);
+        setError(error.message || "Failed to load settings");
+      } finally {
+        setLoading(false);
       }
-      
-      const newSettings = await createResponse.json();
-      data = Array.isArray(newSettings) ? newSettings : [newSettings];
-    }
-
-    // const setting = Array.isArray(data) ? data[data.length - 1] : data;
-
-           setFormData((prev) => ({
-      ...prev,
-      company_name: setting.company_name || "Your Company",
-      seller_address: setting.seller_address || "Your Address",
-      seller_pan: setting.seller_pan || "ABCDE1234F",
-      seller_gstin: setting.seller_gstin || "22AAAAA0000A1Z5",
-      seller_email: setting.seller_email || "your@email.com",
-      bank_account_holder: setting.bank_account_holder || "Your Company",
-      bank_name: setting.bank_name || "Bank Name",
-      account_number: setting.account_number || "123456789012",
-      ifsc_code: setting.ifsc_code || "BANK0001234",
-      branch: setting.branch || "Main Branch",
-      swift_code: setting.swift_code || "SWFT0001",
-      logo: null,
-      stampPreview: setting.logo ? `http://127.0.0.1:8000${setting.logo}` : "",
-    }));
-  } catch (error) {
-    console.error("Failed to fetch settings", error);
-    setError(error.message || "Failed to load settings");
-  } finally {
-    setLoading(false);
-  }
-};
+    };
 
     fetchSettings();
-  }, [navigate]);
+  }, [navigate, success]); // Added success to dependencies to refetch after save
 
   return (
     <div style={{ paddingLeft: "100px" }}>
       <h1 className="hedding">Your Company details</h1>
-      {error && (
-        <div className="alert alert-danger">
-          {error}
-        </div>
-      )}
+      {error && <div className="alert alert-danger">{error}</div>}
       {success && (
-        <div className="alert alert-success">
-          Settings saved successfully!
-        </div>
+        <div className="alert alert-success">Settings saved successfully!</div>
       )}
       <div className="formbody">
         <div className="form-box">
@@ -205,6 +234,7 @@ export default function SettingsPage() {
               />
             </div>
           </div>
+          
           <div className="form-row">
             <div className="input-group">
               <label htmlFor="seller_address" className="input-label">
@@ -249,6 +279,7 @@ export default function SettingsPage() {
               />
             </div>
           </div>
+          
           <div className="form-row">
             <div className="fastinput">
               <label className="block text-sm font-medium text-gray-700">
@@ -262,7 +293,6 @@ export default function SettingsPage() {
                 disabled={loading}
               />
             </div>
-
             <div className="fastinput">
               <label className="block text-sm font-medium text-gray-700">
                 Account Number
@@ -276,6 +306,7 @@ export default function SettingsPage() {
               />
             </div>
           </div>
+          
           <div className="form-row">
             <div className="fastinput">
               <label className="block text-sm font-medium text-gray-700">
@@ -289,7 +320,6 @@ export default function SettingsPage() {
                 disabled={loading}
               />
             </div>
-
             <div className="fastinput">
               <label className="block text-sm font-medium text-gray-700">
                 A/c Holder's Name:
@@ -303,6 +333,7 @@ export default function SettingsPage() {
               />
             </div>
           </div>
+          
           <div className="form-row">
             <div className="fastinput">
               <label className="block text-sm font-medium text-gray-700">
@@ -329,12 +360,50 @@ export default function SettingsPage() {
               />
             </div>
           </div>
+
+          <div className="form-row">
+            <div className="fastinput">
+              <label className="block text-sm font-medium text-gray-700">
+                COMPANY Code:
+              </label>
+              <input
+                type="text"
+                name="company_code"
+                value={formData.company_code}
+                onChange={handleChange}
+                disabled={loading}
+              />
+            </div>
+            <div className="fastinput">
+              <div className="formbody">
+                <div className="form-row">
+                  <label>HSN Codes</label>
+                  <div className="hsn-group">
+                    <input
+                      type="text"
+                      value={newHsn}
+                      onChange={(e) => setNewHsn(e.target.value)}
+                      disabled={loading}
+                    />
+                    <button className="mb-2" onClick={addHsnCode} disabled={loading}>
+                      Add HSN Code
+                    </button>
+                    {formData.HSN_codes.map((code, index) => (
+                      <div key={index} className="hsn-item d-flex align-items-center justify-content-between border rounded p-2 mb-2">
+                        <span>{code}</span>
+                        <button className="ms-2" onClick={() => removeHsnCode(index)}>Remove</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="form-row">
             <div className="upload-container">
               <div className="upload-input">
-                <label className="upload-label">
-                  Upload Stamp
-                </label>
+                <label className="upload-label">Upload Logo</label>
                 <input
                   type="file"
                   accept="image/*"
@@ -343,18 +412,19 @@ export default function SettingsPage() {
                   disabled={loading}
                 />
               </div>
-              {formData.stampPreview && (
+              {formData.logoUrl && (
                 <div className="upload-preview">
-                  <p className="preview-text">Uploaded Logo Preview:</p>
+                  <p className="preview-text">Logo Preview:</p>
                   <img
-                    src={formData.stampPreview}
-                    alt="Uploaded Logo"
+                    src={formData.logoUrl}
+                    alt="Company Logo"
                     className="preview-image"
                   />
                 </div>
               )}
             </div>
           </div>
+          
           <button
             className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 updet"
             onClick={handleSave}

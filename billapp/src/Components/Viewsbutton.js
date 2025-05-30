@@ -58,6 +58,18 @@ const ViewsButton = () => {
             .finally(() => setLoading(false));
     }, [id, navigate]);
 
+const formatDate = (dateString) => {
+  if (!dateString) return ''; // Handle empty or invalid dates
+  
+  const date = new Date(dateString);
+  
+  // Extract day, month, and year
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+  const year = date.getFullYear();
+  
+  return `${day}-${month}-${year}`;
+};
     if (loading) {
         return <div>Loading invoice and settings...</div>;
     }
@@ -74,28 +86,27 @@ const ViewsButton = () => {
         <div style={{ paddingLeft: "100px" }}>
             <div style={{ paddingRight: "10px" }}>
                 <h2 className="text-center">TAX INVOICE</h2>
-                <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white" }}>
+                <div className="table-bordered black-bordered main-box" style={{backgroundColor:"white"}}>
                     <div className="row date-tables">
                         <div className="col-6">
                             {/* Seller Info */}
                             <table className="table table-bordered black-bordered">
-                                <tbody style={{ border: "2px solid" }}>
+                                <tbody style={{border: "2px solid"}}>
                                     <tr>
                                         <td className="gray-background">
                                             <strong style={{ fontSize: "15px" }}>
-                                                {settings.company_name}:
+                                                Grabsolve Infotech:
                                             </strong>
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td style={{ padding: "10px", height: "150px" }}>
-                                             {settings.seller_address}
-                                            <br />
-                                            Email: {settings.seller_email}
-                                            <br />
-                                            PAN: {settings.seller_pan}
-                                            <br />
-                                        </td>
+                                        {/* {data.seller_address} */}
+                                        {settings.seller_address}
+                                        <br />
+                                        Email:{settings.seller_email}
+                                        <br />
+                                        PAN:{settings.seller_pan}
+                                        <br />
                                     </tr>
                                     <tr>
                                         <td className="gray-background">
@@ -107,7 +118,7 @@ const ViewsButton = () => {
 
                             {/* Buyer Info */}
                             <table className="table table-bordered black-bordered">
-                                <tbody style={{ border: "2px solid" }}>
+                                <tbody style={{border: "2px solid"}}>
                                     <tr>
                                         <td className="gray-background">
                                             <strong>Buyer (Bill to):</strong>  {invoice.buyer_name}
@@ -134,7 +145,7 @@ const ViewsButton = () => {
 
                             {/* Consignee Info */}
                             <table className="table table-bordered black-bordered">
-                                <tbody style={{ border: "2px solid" }}>
+                                <tbody style={{border: "2px solid"}}>
                                     <tr>
                                         <td className="gray-background">
                                             <strong>Consignee (Ship to):</strong> {invoice.consignee_name}
@@ -163,7 +174,7 @@ const ViewsButton = () => {
 
                         <div className="col-6">
                             <table className="table table-bordered black-bordered">
-                                <tbody style={{ border: "2px solid" }}>
+                                <tbody style={{border: "2px solid"}}>
                                     <tr>
                                         <td style={{ width: "50%" }}>Invoice No.</td>
                                         <td>
@@ -172,7 +183,7 @@ const ViewsButton = () => {
                                     </tr>
                                     <tr>
                                         <td>Date</td>
-                                        <td>{invoice.invoice_date}</td>
+                                        <td>{formatDate(invoice.invoice_date)}</td>
                                     </tr>
                                     <tr>
                                         <td>Delivery Note</td>
@@ -184,7 +195,7 @@ const ViewsButton = () => {
                                     </tr>
                                     <tr>
                                         <td>Delivery Note Date</td>
-                                        <td>{invoice.delivery_note_date}</td>
+                                        <td>{formatDate(invoice.delivery_note_date)}</td>
                                     </tr>
                                     <tr>
                                         <td>Destination</td>
@@ -194,7 +205,7 @@ const ViewsButton = () => {
                             </table>
 
                             <table className="table table-bordered black-bordered">
-                                <tbody style={{ width: "100%", border: "2px solid" }}>
+                                <tbody style={{ width: "100%",border: "2px solid"}}>
                                     <tr>
                                         <td className="gray-background" >
                                             <strong>Terms to Delivery:</strong>
@@ -240,7 +251,7 @@ const ViewsButton = () => {
                         <div className="col-xs-12">
                             <table className="table table-bordered black-bordered">
                                 <thead>
-                                    <tr className="trbody" style={{ border: "2px solid" }}>
+                                    <tr className="trbody" style={{border:"2px solid"}}>
                                         <th>SI No.</th>
                                         <th>Particulars</th>
                                         <th>HSN/SAC</th>
@@ -249,7 +260,7 @@ const ViewsButton = () => {
                                         <th>Amount</th>
                                     </tr>
                                 </thead>
-                                <tbody style={{ border: "2px solid" }}>
+                                <tbody style={{border: "2px solid"}}>
                                     <tr style={{ height: "111px" }}>
                                         <td>1</td>
                                         <td>{invoice.Particulars}</td>
@@ -339,7 +350,7 @@ const ViewsButton = () => {
                         {invoice.country === "India" && (
                             <div className="col-xs-12 inside-india">
                                 <table className="table table-bordered invoice-table">
-                                    <thead style={{ border: "2px solid" }}>
+                                    <thead style={{border:"2px solid"}}>
                                         <tr >
                                             <th rowSpan="2">HSN/SAC</th>
                                             <th rowSpan="2">Taxable Value</th>
@@ -356,7 +367,7 @@ const ViewsButton = () => {
                                             <th>Amount</th>
                                         </tr>
                                     </thead>
-                                    <tbody style={{ border: "2px solid" }}>
+                                    <tbody style={{border: "2px solid"}}>
                                         <tr>
                                             <td>
                                                 <span className="hns_select_text">{invoice.hsn_code}</span>
@@ -383,7 +394,7 @@ const ViewsButton = () => {
                                             <td></td>
                                             <td className="total-tax-sgst">{invoice.sgst}</td>
                                             <td className="total-tax-amount">
-                                                {invoice.taxtotal}
+                                            {invoice.taxtotal}
                                             </td>
                                         </tr>
                                     </tbody>

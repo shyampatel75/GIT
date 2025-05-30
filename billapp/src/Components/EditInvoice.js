@@ -228,6 +228,25 @@ const EditInvoice = () => {
       [e.target.name]: e.target.value,
     }));
   };
+  const formatDisplayDate = (dateStr) => {
+  if (!dateStr) return "";
+  
+  try {
+    // Handle both YYYY-MM-DD and DD-MM-YYYY formats
+    let dateParts;
+    if (dateStr.includes('-')) {
+      dateParts = dateStr.split('-');
+      if (dateParts[0].length === 4) { // YYYY-MM-DD format
+        return `${dateParts[1]}-${dateParts[2]}-${dateParts[0]}`;
+      } else { // DD-MM-YYYY format
+        return `${dateParts[1]}-${dateParts[0]}-${dateParts[2]}`;
+      }
+    }
+    return dateStr; // fallback
+  } catch (e) {
+    return dateStr; // fallback if parsing fails
+  }
+};
 
   // Add this function to your component (near the other utility functions)
   const formatDate = (dateString) => {
@@ -259,6 +278,7 @@ const EditInvoice = () => {
       const updatedFormData = {
         ...formData,
         currency: selectedCountry.currencyCode,
+        delivery_note_date: formData.delivery_note_date || null,
       };
 
       const response = await fetch(
@@ -472,6 +492,7 @@ const EditInvoice = () => {
     <div style={{paddingLeft:"80px"}}>
       <form onSubmit={handleSubmit}>
         {loading && <div className="text-center">Loading invoice data...</div>}
+        
         <div
           style={{
             border: "2px solid",
@@ -479,10 +500,13 @@ const EditInvoice = () => {
             padding: "35px",
           }}
         >
+          
           <div className="row date-tables">
+
             {/* Left column - Seller, Buyer, Consignee info */}
             <div className="col-6">
               {/* Seller info table */}
+              
               <table className="table black-bordered" style={{ width: "100%" }}>
                 <tbody style={{ borderBottom: "2px solid" }}>
                   <tr>
@@ -682,8 +706,13 @@ const EditInvoice = () => {
                         type="date"
                         name="delivery_note_date"
                         className="deliveryNote"
-                        value={formData.delivery_note_date || ""}
-                        onChange={handleChange}
+                        value={formData.delivery_note_date ? formatDate(formData.delivery_note_date) : ""}
+  onChange={(e) => {
+    setFormData((prev) => ({
+      ...prev,
+      delivery_note_date: e.target.value || null,
+    }));
+  }}
                       />
                     </td>
                   </tr>
@@ -1196,11 +1225,13 @@ const EditInvoice = () => {
                         <div className="col-6">
                             <table className="table black-bordered">
                                 <tbody>
-                                    <tr><td>Invoice No.</td><td>{`${String(formData.invoice_number).padStart(2, "0")}-${invoiceYear}`}</td></tr>
-                                    <tr><td>Date</td><td>{formData.invoice_date}</td></tr>
+                                    <tr><td>Invoice No.</td><td>{`${String(formData.invoice_number).padStart(2, "0")}`}</td></tr>
+                                    <tr><td>Date</td><td>{formatDisplayDate(formData.invoice_date)}</td></tr>
                                     <tr><td>Delivery Note</td><td>{formData.delivery_note}</td></tr>
                                     <tr><td>Mode/Terms of Payment</td><td>{formData.payment_mode}</td></tr>
-                                    <tr><td>Delivery Note Date</td><td>{formData.delivery_note_date}</td></tr>
+                                    <tr><td>Delivery Note Date</td>
+                                    <td>{formData.delivery_note_date ? formatDisplayDate(formData.delivery_note_date) : "-"}</td>
+                                      </tr>
                                     <tr><td>Destination</td><td>{formData.destination}</td></tr>
                                 </tbody>
                             </table>

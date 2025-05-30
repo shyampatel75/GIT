@@ -40,7 +40,7 @@ const InvoiceDetails = () => {
 
   useEffect(() => {
     if (!token) return;
-    fetch("http://localhost:8000/api/banking/buyer/", {
+    fetch("http://localhost:8000/api/banking/company/", {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -51,36 +51,35 @@ const InvoiceDetails = () => {
       .catch(() => setBuyerDeposits([]));
   }, [token]);
 
-const handleGeneratePDF = async () => {
-  const element = tableRef.current;
-  element.style.backgroundColor = "#fff";
+  const handleGeneratePDF = async () => {
+    const element = tableRef.current;
+    element.style.backgroundColor = "#fff";
 
-  const canvas = await html2canvas(element, {
-    scale: 2,
-    backgroundColor: "#fff",
-    useCORS: true,
-  });
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      backgroundColor: "#fff",
+      useCORS: true,
+    });
 
-  const pdf = new jsPDF("p", "mm", "a4");
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 10;
+    const pdf = new jsPDF("p", "mm", "a4");
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 10;
 
-  const pdfWidth = pageWidth - margin * 2;
-  const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    const pdfWidth = pageWidth - margin * 2;
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-  pdf.addImage(
-    canvas.toDataURL("image/png"),
-    "PNG",
-    margin,
-    margin,
-    pdfWidth,
-    pdfHeight
-  );
+    pdf.addImage(
+      canvas.toDataURL("image/png"),
+      "PNG",
+      margin,
+      margin,
+      pdfWidth,
+      pdfHeight
+    );
 
-  pdf.save(`Statement-${buyer_name}.pdf`);
-};
-
+    pdf.save(`Statement-${buyer_name}.pdf`);
+  };
 
   const renderTableRows = () => {
     let balance = 0;
@@ -99,7 +98,7 @@ const handleGeneratePDF = async () => {
             {inv.currency} {total.toFixed(2)}
           </td>
           <td className="text-right">
-            {inv.currency}  {balance.toFixed(2)}
+            {inv.currency} {balance.toFixed(2)}
           </td>
         </tr>
       );
@@ -107,13 +106,13 @@ const handleGeneratePDF = async () => {
       buyerDeposits
         .filter((d) => d.invoice_id === inv.invoice_number)
         .forEach((dep, i) => {
-          const amount = Number(dep.deposit_amount) || 0;
+          const amount = Number(dep.amount) || 0;
           balance -= amount;
 
           rows.push(
             <tr key={`dep-${inv.invoice_number}-${i}`} className="bg-green-50">
               <td>{formatDate(dep.selected_date || dep.transaction_date)}</td>
-              <td>{dep.notice || "Deposit"}</td>
+              <td>{dep.notice?.trim() || "Deposit"}</td>
               <td className="text-right">
                 {inv.currency} {amount.toFixed(2)}
               </td>
@@ -152,11 +151,11 @@ const handleGeneratePDF = async () => {
   return (
     <div className="mx-auto bg-white p-6 rounded shadow-md" style={{ paddingLeft: "100px", minHeight: "100vh" }}>
       <div ref={tableRef}>
-      <h2 className="text-2xl font-bold text-center mb-6">Statement of Account</h2>
-      <div className="mb-4">
-        <p><strong>Buyer Name:</strong> {buyer_name}</p>
-        <p><strong>GST Number:</strong> {buyer_gst}</p>
-      </div>
+        <h2 className="text-2xl font-bold text-center mb-6">Statement of Account</h2>
+        <div className="mb-4">
+          <p><strong>Buyer Name:</strong> {buyer_name}</p>
+          <p><strong>GST Number:</strong> {buyer_gst}</p>
+        </div>
 
         <h4 className="w-full text-center py-2" style={{ backgroundColor: "#51add9" }}>Account Activity</h4>
         <table className="w-100 text-sm border mt-2">

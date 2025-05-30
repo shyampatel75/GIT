@@ -127,7 +127,22 @@ const Clientinvoices = () => {
       setLoading(false);
     }
   };
-
+// Add this utility function at the top of your component file
+const formatDate = (dateString) => {
+  if (!dateString) return "N/A";
+  
+  
+  try {
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  } catch (e) {
+    console.error("Error formatting date:", e);
+    return dateString; // fallback to original if parsing fails
+  }
+};
   const generatePDF = async () => {
     const input = printRef.current;
     if (input) {
@@ -227,7 +242,7 @@ const Clientinvoices = () => {
       {success && <div className="alert alert-success">{success}</div>}
 
       <h2>
-        {client ? `${client.buyer_name} - ${client.buyer_gst}` : "All Invoices"}
+        {`client ? ${client.buyer_name} - ${client.buyer_gst} : "All Invoices"`}
       </h2>
 
       <table className="table table-bordered table-hover text-center mt-3">
@@ -416,7 +431,7 @@ const Clientinvoices = () => {
                         </tr>
                         <tr>
                           <td>Date</td>
-                          <td>{selectedInvoice.invoice_date}</td>
+                          <td>{formatDate(selectedInvoice.invoice_date)}</td>
                         </tr>
                         <tr>
                           <td>Delivery Note</td>
@@ -428,7 +443,7 @@ const Clientinvoices = () => {
                         </tr>
                         <tr>
                           <td>Delivery Note Date</td>
-                          <td>{selectedInvoice.delivery_note_date}</td>
+                          <td>{formatDate(selectedInvoice.delivery_note_date)}</td>
                         </tr>
                         <tr>
                           <td>Destination</td>
@@ -484,12 +499,12 @@ const Clientinvoices = () => {
                     <table className="table table-bordered black-bordered">
                       <thead>
                         <tr className="trbody" style={{ border: "2px solid" }}>
-                          <th>SI No.</th>
-                          <th>Particulars</th>
-                          <th>HSN/SAC</th>
-                          <th>Hours</th>
-                          <th>Rate</th>
-                          <th>Amount</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>SI No.</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>Particulars</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>HSN/SAC</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>Hours</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
                         </tr>
                       </thead>
                       <tbody style={{ border: "2px solid" }}>
