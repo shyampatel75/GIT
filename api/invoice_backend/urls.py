@@ -52,6 +52,7 @@ urlpatterns = [
 
     path('add-deposit/', views.add_bankingdeposit, name='add-deposit'),
 
+
     # path('remaining-amount/', views.remaining_amount_view, name='remaining-amount'),
     path('remaining-amounts/', views.remaining_amount_list, name='remaining_amount_list'),
     path('remaining-amounts/<int:pk>/', views.remaining_amount_detail, name='remaining_amount_detail'),
