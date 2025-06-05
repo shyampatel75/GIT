@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 
 const BalanceSheet = () => {
   const [invoices, setInvoices] = useState([]);
@@ -111,7 +110,7 @@ const BalanceSheet = () => {
             <thead className="bg-gray-100">
               <tr>
                 <th className="py-3 px-4 border-b text-left">Name</th>
-                <th className="py-3 px-4 border-b text-left">Date</th>
+               
                 <th className="py-3 px-4 border-b text-right">Amount (₹)</th>
               </tr>
             </thead>
@@ -122,11 +121,7 @@ const BalanceSheet = () => {
                 .map(buyer => (
                   <tr key={`buyer-${buyer.id}`} className="hover:bg-gray-50">
                     <td className="py-3 px-4 border-b">{buyer.buyer_name}</td>
-                    <td className="py-3 px-4 border-b">
-                      {buyer.transaction_date
-                        ? new Date(buyer.transaction_date).toLocaleDateString()
-                        : "N/A"}
-                    </td>
+                  
                     <td className="py-3 px-4 border-b text-right font-mono">
                       ₹ {Math.abs(Number(buyer.deposit_amount || 0)).toFixed(2)}
                     </td>
@@ -137,11 +132,6 @@ const BalanceSheet = () => {
               {creditOthers.map((item) => (
                 <tr key={`other-credit-${item.id}`} className="hover:bg-gray-50">
                   <td className="py-3 px-4 border-b">{item.other_type}</td>
-                  <td className="py-3 px-4 border-b">
-                    {item.other_date
-                      ? new Date(item.other_date).toLocaleDateString()
-                      : "N/A"}
-                  </td>
                   <td className="py-3 px-4 border-b text-right font-mono">
                     ₹ {Number(item.other_amount).toFixed(2)}
                   </td>
@@ -152,11 +142,6 @@ const BalanceSheet = () => {
               {creditCompanies.map((item) => (
                 <tr key={`company-credit-${item.id}`} className="hover:bg-gray-50">
                   <td className="py-3 px-4 border-b">{item.company_name}</td>
-                  <td className="py-3 px-4 border-b">
-                    {item.transaction_date
-                      ? new Date(item.transaction_date).toLocaleDateString()
-                      : "N/A"}
-                  </td>
                   <td className="py-3 px-4 border-b text-right font-mono">
                     ₹ {Number(item.amount).toFixed(2)}
                   </td>
@@ -173,7 +158,7 @@ const BalanceSheet = () => {
             <thead>
               <tr className="bg-gray-100">
                 <th className="py-3 px-4 border-b text-left">Name</th>
-                <th className="py-3 px-4 border-b text-left">Date</th>
+              
                 <th className="py-3 px-4 border-b text-right">Amount (₹)</th>
               </tr>
             </thead>
@@ -183,11 +168,6 @@ const BalanceSheet = () => {
                 .map(invoice => (
                   <tr key={`invoice-${invoice.id}`} className="hover:bg-gray-50">
                     <td className="py-3 px-4 border-b">{invoice.buyer_name}</td>
-                    <td className="py-3 px-4 border-b">
-                      {invoice.invoice_date
-                        ? new Date(invoice.invoice_date).toLocaleDateString()
-                        : "N/A"}
-                    </td>
                     <td className="py-3 px-4 border-b text-right font-mono text-red-600 font-semibold">
                       ₹ {remainingBalances[invoice.buyer_name].toFixed(2)}
                     </td>
@@ -198,11 +178,7 @@ const BalanceSheet = () => {
               {debitOthers.map((item) => (
                 <tr key={`other-debit-${item.id}`} className="hover:bg-gray-50">
                   <td className="py-3 px-4 border-b">{item.other_type}</td>
-                  <td className="py-3 px-4 border-b">
-                    {item.other_date
-                      ? new Date(item.other_date).toLocaleDateString()
-                      : "N/A"}
-                  </td>
+                 
                   <td className="py-3 px-4 border-b text-right font-mono text-red-600 font-semibold">
                     ₹ {Number(item.other_amount).toFixed(2)}
                   </td>
@@ -213,11 +189,6 @@ const BalanceSheet = () => {
               {debitCompanies.map((item) => (
                 <tr key={`company-debit-${item.id}`} className="hover:bg-gray-50">
                   <td className="py-3 px-4 border-b">{item.company_name}</td>
-                  <td className="py-3 px-4 border-b">
-                    {item.transaction_date
-                      ? new Date(item.transaction_date).toLocaleDateString()
-                      : "N/A"}
-                  </td>
                   <td className="py-3 px-4 border-b text-right font-mono text-red-600 font-semibold">
                     ₹ {Number(item.amount).toFixed(2)}
                   </td>

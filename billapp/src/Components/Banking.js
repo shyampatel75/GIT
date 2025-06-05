@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 const Banking = () => {
-  // State variables from both components
+  // State variables
   const [visibleButton, setVisibleButton] = useState(null);
   const [manualEntry, setManualEntry] = useState(false);
   const [manualBankEntry, setManualBankEntry] = useState(false);
@@ -46,8 +46,7 @@ const Banking = () => {
   const [isLoadingTypes, setIsLoadingTypes] = useState(false);
   const [paymentType, setPaymentType] = useState("");
   const [selectedBank, setSelectedBank] = useState("");
-  const [bankList, setBankList] = useState(["SBI", "HDFC", "ICICI"]);
-  const [newBank, setNewBank] = useState("");
+  const [bankList, setBankList] = useState([]);
   const [companyPaymentType, setCompanyPaymentType] = useState("");
   const [companySelectedBank, setCompanySelectedBank] = useState("");
   const [salaryPaymentType, setSalaryPaymentType] = useState("");
@@ -55,11 +54,7 @@ const Banking = () => {
   const [otherPaymentType, setOtherPaymentType] = useState("");
   const [otherSelectedBank, setOtherSelectedBank] = useState("");
   const [companies, setCompanies] = useState([]);
-
-  // const [paymentMethod, setPaymentMethod] = useState('');
-  // const [buyerName, setBuyerName] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
-
 
   // Helper functions
   const handleResponse = (response) => {
@@ -105,7 +100,7 @@ const Banking = () => {
 
   const handleSubmissionError = (error, entity) => {
     console.error(`${entity} submission error:`, error);
-    alert(`Failed to save ${entity}. Please try again.`);
+    alert(`Please try again balance is not funding`);
   };
 
   // Data fetching functions
@@ -124,19 +119,18 @@ const Banking = () => {
 
   const fetchBanks = async () => {
     try {
-      const response = await fetch("http://localhost:8000/api/banks/", {
+      const response = await fetch("http://127.0.0.1:8000/api/bank-accounts/", {
         headers: getAuthHeaders()
       });
       if (response.ok) {
         const data = await response.json();
-        const apiBanks = data.map(bank => bank.name || bank);
-        const combinedBanks = [...new Set([...["SBI", "HDFC", "ICICI"], ...apiBanks])];
-        setBankList(combinedBanks);
+        const bankNames = data.map(bank => bank.bank_name);
+        setBankList(bankNames);
         setBankOptions(data);
       }
     } catch (error) {
       console.error("Error fetching banks:", error);
-      setBankList(["SBI", "HDFC", "ICICI"]);
+      setBankList([]);
     }
   };
 
@@ -178,35 +172,6 @@ const Banking = () => {
   };
 
   // Handler functions
-  const handleAddBank = async () => {
-    const bankNameToAdd = newBank.trim();
-    if (!bankNameToAdd) return;
-
-    try {
-      const response = await fetch("http://localhost:8000/api/banks/", {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ name: bankNameToAdd })
-      });
-
-      if (response.ok) {
-        await fetchBanks();
-        setNewBank("");
-        // Set the new bank as selected in all relevant selectors
-        setCompanySelectedBank(bankNameToAdd);
-        setSelectedBank(bankNameToAdd);
-        setSalarySelectedBank(bankNameToAdd);
-        setOtherSelectedBank(bankNameToAdd);
-        setBankName(bankNameToAdd);
-      } else {
-        const error = await response.json();
-        alert(`Error: ${error.detail || error.error || 'Failed to add bank'}`);
-      }
-    } catch (error) {
-      handleSubmissionError(error, "bank");
-    }
-  };
-
   const handleCompanyBillSubmit = async () => {
     if (!validateRequiredFields([selectedBuyer, selectedDate, depositAmount, companyPaymentType])) return;
 
@@ -216,6 +181,7 @@ const Banking = () => {
     }
 
     try {
+      // First submit the company bill
       const response = await fetch("http://localhost:8000/api/banking/company/", {
         method: "POST",
         headers: getAuthHeaders(),
@@ -230,27 +196,65 @@ const Banking = () => {
         }),
       });
 
-      if (await handleApiResponse(response, "Company bill")) {
-        resetBuyerForm();
-        setCompanyPaymentType("");
-        setCompanySelectedBank("");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(JSON.stringify(errorData));
       }
+
+      // Only process banking transactions if payment method is Banking
+      if (companyPaymentType === "Banking") {
+        // Find the bank in our local state first
+        const matchingBank = bankOptions.find(bank => 
+          bank.bank_name.toLowerCase() === companySelectedBank.toLowerCase()
+        );
+
+        if (matchingBank) {
+          const newAmount = parseFloat(matchingBank.amount) + parseFloat(depositAmount);
+          
+          // Update the bank account
+          const updateResponse = await fetch(
+            `http://127.0.0.1:8000/api/bank-accounts/${matchingBank.id}/`, 
+            {
+              method: "PUT",
+              headers: getAuthHeaders(),
+              body: JSON.stringify({
+                ...matchingBank,
+                amount: newAmount
+              })
+            }
+          );
+
+          if (!updateResponse.ok) {
+            throw new Error('Failed to update bank account');
+          }
+
+          // Update local state to reflect the change
+          setBankOptions(bankOptions.map(bank => 
+            bank.id === matchingBank.id ? {...bank, amount: newAmount} : bank
+          ));
+        }
+      }
+
+      alert("Company bill saved and bank account updated successfully!");
+      resetBuyerForm();
+      setCompanyPaymentType("");
+      setCompanySelectedBank("");
     } catch (error) {
-      handleSubmissionError(error, "company bill");
+      console.error("Submission failed:", error);
+      alert(`Failed to save company bill: ${error.message}`);
     }
   };
 
   const handleBuyerBillSubmit = async () => {
-    // Determine which buyer name to use based on which form is visible
-    const currentBuyerName = visibleButton === 2 ? buyerName : companyName;
-    const currentDate = visibleButton === 2 ? transactionDate : companyDate;
-    const currentAmount = visibleButton === 2 ? amount : companyAmount;
-    const currentNotice = visibleButton === 2 ? notice : companyNotice;
-    const currentPaymentType = visibleButton === 2 ? paymentMethod : paymentType;
-    const currentSelectedBank = visibleButton === 2 ? bankName : selectedBank;
-    const currentManualEntry = visibleButton === 2 ? manualEntry : manualEntry;
+    // Determine which buyer name to use based on manual entry
+    const currentBuyerName = manualEntry ? buyerName : selectedBuyer;
+    const currentDate = transactionDate;
+    const currentAmount = amount;
+    const currentNotice = notice;
+    const currentPaymentType = paymentMethod;
+    const currentSelectedBank = bankName;
 
-    if (!validateRequiredFields([currentBuyerName, currentDate, currentAmount, currentPaymentType])) {
+    if (!currentBuyerName || !currentDate || !currentAmount || !currentPaymentType) {
       alert("Please fill all required fields.");
       return;
     }
@@ -260,25 +264,19 @@ const Banking = () => {
       return;
     }
 
-    // Add to manual buyers if this is a new manual entry
-    if (currentManualEntry && !manualBuyers.includes(currentBuyerName) && !companies.some(c => c.company_name === currentBuyerName)) {
-      setManualBuyers(prev => [...prev, currentBuyerName]);
-    }
-
-    const payload = {
-      buyer_name: currentBuyerName,
-      transaction_date: currentDate,
-      amount: parseFloat(currentAmount),
-      notice: currentNotice || "No remarks",
-      payment_method: currentPaymentType,
-      bank_name: currentPaymentType === "Banking" ? currentSelectedBank : null
-    };
-
     try {
+      // First submit the buyer transaction
       const response = await fetch("http://localhost:8000/api/banking/buyer/", {
         method: "POST",
         headers: getAuthHeaders(),
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          buyer_name: currentBuyerName,
+          transaction_date: currentDate,
+          amount: parseFloat(currentAmount),
+          notice: currentNotice || "No remarks",
+          payment_method: currentPaymentType,
+          bank_name: currentPaymentType === "Banking" ? currentSelectedBank : null
+        }),
       });
 
       if (!response.ok) {
@@ -286,108 +284,223 @@ const Banking = () => {
         throw new Error(JSON.stringify(errorData));
       }
 
-      alert("Buyer record saved successfully!");
+      // If payment method is Banking, update the bank account
+      if (currentPaymentType === "Banking") {
+        // Find the bank in our local state
+        const matchingBank = bankOptions.find(bank => 
+          bank.bank_name.toLowerCase() === currentSelectedBank.toLowerCase()
+        );
 
-      // Reset form
-      if (visibleButton === 2) {
-        setBuyerName("");
-        setTransactionDate("");
-        setAmount("");
-        setNotice("");
-        setPaymentMethod("");
-        setBankName("");
-        setManualEntry(false);
-      } else {
-        setCompanyName("");
-        setCompanyDate("");
-        setCompanyAmount("");
-        setCompanyNotice("");
-        setPaymentType("");
-        setSelectedBank("");
+        if (matchingBank) {
+          const newAmount = parseFloat(matchingBank.amount) - parseFloat(currentAmount);
+          
+          if (newAmount < 0) {
+            throw new Error('Insufficient funds in bank account');
+          }
+
+          // Update the bank account on server
+          const updateResponse = await fetch(
+            `http://127.0.0.1:8000/api/bank-accounts/${matchingBank.id}/`, 
+            {
+              method: "PUT",
+              headers: getAuthHeaders(),
+              body: JSON.stringify({
+                ...matchingBank,
+                amount: newAmount
+              })
+            }
+          );
+
+          if (!updateResponse.ok) {
+            throw new Error('Failed to update bank account');
+          }
+
+          // Update local state to reflect the change
+          setBankOptions(bankOptions.map(bank => 
+            bank.id === matchingBank.id ? {...bank, amount: newAmount} : bank
+          ));
+        }
       }
 
+      alert("Buyer transaction saved successfully!");
+      
+      // Reset form
+      setBuyerName("");
+      setTransactionDate("");
+      setAmount("");
+      setNotice("");
+      setPaymentMethod("");
+      setBankName("");
+      setManualEntry(false);
     } catch (error) {
       console.error("Submission failed:", error);
-      alert(`Failed to save buyer: ${error.message}`);
+      alert(`Failed to save buyer transaction: ${error.message}`);
     }
   };
 
-  const handleSalarySubmit = async () => {
-    if (!validateRequiredFields([salaryName, salary, salaryDate, salaryPaymentType])) return;
+ const handleSalarySubmit = async () => {
+  if (!validateRequiredFields([salaryName, salary, salaryDate, salaryPaymentType])) return;
 
-    if (salaryPaymentType === "Banking" && !salarySelectedBank) {
-      alert("Please select a bank for banking transactions");
-      return;
-    }
+  if (salaryPaymentType === "Banking" && !salarySelectedBank) {
+    alert("Please select a bank for banking transactions");
+    return;
+  }
 
-    try {
-      const response = await fetch("http://localhost:8000/api/banking/salary/", {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          salary_name: salaryName,
-          salary_amount: parseFloat(salary),
-          salary_date: salaryDate,
-          salary_invoice: selectedSalaryInvoice || null,
-          payment_method: salaryPaymentType,
-          bank_name: salaryPaymentType === "Banking" ? salarySelectedBank : null
-        }),
-      });
+  try {
+    const response = await fetch("http://localhost:8000/api/banking/salary/", {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        salary_name: salaryName,
+        salary_amount: parseFloat(salary),
+        salary_date: salaryDate,
+        salary_invoice: selectedSalaryInvoice || null,
+        payment_method: salaryPaymentType,
+        bank_name: salaryPaymentType === "Banking" ? salarySelectedBank : null,
+      }),
+    });
 
-      if (await handleApiResponse(response, "Salary data")) {
-        setSalaryName("");
-        setSalaryAmount("");
-        setSalaryDate("");
-        setSelectedSalaryInvoice("");
-        setSalaryPaymentType("");
-        setSalarySelectedBank("");
+    const success = await handleApiResponse(response, "Salary data");
+
+    if (success && salaryPaymentType === "Banking") {
+      // Find matching bank
+      const matchingBank = bankOptions.find(
+        (bank) => bank.bank_name.toLowerCase() === salarySelectedBank.toLowerCase()
+      );
+
+      if (matchingBank) {
+        const newAmount = parseFloat(matchingBank.amount) - parseFloat(salary);
+
+        if (newAmount < 0) {
+          throw new Error("Insufficient funds in bank account");
+        }
+
+        // Update bank on backend
+        const updateResponse = await fetch(
+          `http://127.0.0.1:8000/api/bank-accounts/${matchingBank.id}/`,
+          {
+            method: "PUT",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+              ...matchingBank,
+              amount: newAmount,
+            }),
+          }
+        );
+
+        if (!updateResponse.ok) {
+          throw new Error("Failed to update bank account after salary submission");
+        }
+
+        // Update local bankOptions state
+        setBankOptions(
+          bankOptions.map((bank) =>
+            bank.id === matchingBank.id ? { ...bank, amount: newAmount } : bank
+          )
+        );
       }
-    } catch (error) {
-      handleSubmissionError(error, "salary data");
-    }
-  };
-
-  const handleOtherSubmit = async () => {
-    if (!validateRequiredFields([otherDate, otherNotice, otherAmount, otherSelector, transactionType, otherPaymentType])) return;
-
-    if (otherPaymentType === "Banking" && !otherSelectedBank) {
-      alert("Please select a bank for banking transactions");
-      return;
     }
 
-    const finalAmount = transactionType === 'debit'
-      ? -Math.abs(parseFloat(otherAmount))
-      : Math.abs(parseFloat(otherAmount));
+    // Clear form
+    setSalaryName("");
+    setSalaryAmount("");
+    setSalaryDate("");
+    setSelectedSalaryInvoice("");
+    setSalaryPaymentType("");
+    setSalarySelectedBank("");
+  } catch (error) {
+    handleSubmissionError(error, "salary data");
+  }
+};
 
-    try {
-      const response = await fetch("http://localhost:8000/api/banking/other/", {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          other_type: otherSelector,
-          other_date: otherDate,
-          other_notice: otherNotice,
-          other_amount: finalAmount,
-          transaction_type: transactionType,
-          payment_method: otherPaymentType,
-          bank_name: otherPaymentType === "Banking" ? otherSelectedBank : null
-        }),
-      });
 
-      if (await handleApiResponse(response, "Other data")) {
-        setOtherSelector('');
-        setOtherDate('');
-        setOtherNotice('');
-        setOtherAmount('');
-        setTransactionType('debit');
-        setOtherPaymentType('');
-        setOtherSelectedBank('');
-        loadTransactionTypes();
+ const handleOtherSubmit = async () => {
+  if (!validateRequiredFields([otherDate, otherNotice, otherAmount, otherSelector, transactionType, otherPaymentType])) return;
+
+  if (otherPaymentType === "Banking" && !otherSelectedBank) {
+    alert("Please select a bank for banking transactions");
+    return;
+  }
+
+  const finalAmount = transactionType === 'debit'
+    ? -Math.abs(parseFloat(otherAmount))
+    : Math.abs(parseFloat(otherAmount));
+
+  try {
+    const response = await fetch("http://localhost:8000/api/banking/other/", {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        other_type: otherSelector,
+        other_date: otherDate,
+        other_notice: otherNotice,
+        other_amount: finalAmount,
+        transaction_type: transactionType,
+        payment_method: otherPaymentType,
+        bank_name: otherPaymentType === "Banking" ? otherSelectedBank : null
+      }),
+    });
+
+    const success = await handleApiResponse(response, "Other data");
+
+    if (success && otherPaymentType === "Banking") {
+      const matchingBank = bankOptions.find(
+        (bank) => bank.bank_name.toLowerCase() === otherSelectedBank.toLowerCase()
+      );
+
+      if (matchingBank) {
+        const currentBankAmount = parseFloat(matchingBank.amount);
+        const adjustmentAmount = parseFloat(otherAmount);
+
+        const newAmount =
+          transactionType === "debit"
+            ? currentBankAmount - adjustmentAmount
+            : currentBankAmount + adjustmentAmount;
+
+        if (newAmount < 0) {
+          throw new Error("Insufficient funds in bank account");
+        }
+
+        const updateResponse = await fetch(
+          `http://127.0.0.1:8000/api/bank-accounts/${matchingBank.id}/`,
+          {
+            method: "PUT",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+              ...matchingBank,
+              amount: newAmount,
+            }),
+          }
+        );
+
+        if (!updateResponse.ok) {
+          throw new Error("Failed to update bank account after 'Other' transaction");
+        }
+
+        // Update local bank state
+        setBankOptions(
+          bankOptions.map((bank) =>
+            bank.id === matchingBank.id ? { ...bank, amount: newAmount } : bank
+          )
+        );
       }
-    } catch (error) {
-      handleSubmissionError(error, "other data");
     }
-  };
+
+    // Reset form
+    setOtherSelector('');
+    setOtherDate('');
+    setOtherNotice('');
+    setOtherAmount('');
+    setTransactionType('debit');
+    setOtherPaymentType('');
+    setOtherSelectedBank('');
+    loadTransactionTypes();
+
+  } catch (error) {
+    handleSubmissionError(error, "other data");
+  }
+};
+
 
   const handleDepositSubmit = async () => {
     try {
@@ -571,37 +684,19 @@ const Banking = () => {
             </select>
 
             {companyPaymentType === "Banking" && (
-              <>
-                <select
-                  className="border px-4 py-2 rounded w-full mb-3"
-                  value={companySelectedBank}
-                  onChange={(e) => setCompanySelectedBank(e.target.value)}
-                  required
-                >
-                  <option value="">-- Select Bank --</option>
-                  {bankList.map((bank, index) => (
-                    <option key={index} value={bank}>{bank}</option>
-                  ))}
-                </select>
-
-                <div className="flex gap-2 mb-3">
-                  <input
-                    type="text"
-                    placeholder="Enter Bank Name"
-                    className="border px-4 py-2 rounded w-full"
-                    value={newBank}
-                    onChange={(e) => setNewBank(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className="bg-green-600 text-white px-4 py-2 rounded"
-                    onClick={handleAddBank}
-                    disabled={!newBank.trim()}
-                  >
-                    Add
-                  </button>
-                </div>
-              </>
+              <select
+                className="border px-4 py-2 rounded w-full mb-3"
+                value={companySelectedBank}
+                onChange={(e) => setCompanySelectedBank(e.target.value)}
+                required
+              >
+                <option value="">-- Select Bank --</option>
+                {bankOptions.map((bank) => (
+                  <option key={bank.id} value={bank.bank_name}>
+                    {bank.bank_name} (Current: {bank.amount})
+                  </option>
+                ))}
+              </select>
             )}
 
             <button
@@ -694,44 +789,19 @@ const Banking = () => {
             </select>
 
             {paymentMethod === "Banking" && (
-              <>
-                <label className="flex items-center mb-3 gap-2">
-                  <input
-                    type="checkbox"
-                    checked={manualBankEntry}
-                    onChange={() => {
-                      setManualBankEntry(!manualBankEntry);
-                      setBankName("");
-                    }}
-                  />
-                  Enter Bank Name Manually
-                </label>
-
-                {manualBankEntry ? (
-                  <input
-                    type="text"
-                    placeholder="Bank Name*"
-                    className="border px-4 py-2 rounded w-full mb-3"
-                    value={bankName}
-                    onChange={(e) => setBankName(e.target.value)}
-                    required
-                  />
-                ) : (
-                  <select
-                    className="border px-4 py-2 rounded w-full mb-3"
-                    value={bankName}
-                    onChange={(e) => setBankName(e.target.value)}
-                    required
-                  >
-                    <option value="">-- Select Bank --</option>
-                    {bankOptions.map((bank, index) => (
-                      <option key={index} value={bank.name || bank}>{bank.name || bank}</option>
-                    ))}
-                  </select>
-                )}
-
-                
-              </>
+              <select
+                className="border px-4 py-2 rounded w-full mb-3"
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                required
+              >
+                <option value="">-- Select Bank --</option>
+                {bankOptions.map((bank) => (
+                  <option key={bank.id} value={bank.bank_name}>
+                    {bank.bank_name} (Current: {bank.amount})
+                  </option>
+                ))}
+              </select>
             )}
 
             <button
@@ -781,37 +851,19 @@ const Banking = () => {
                 </select>
 
                 {salaryPaymentType === "Banking" && (
-                  <>
-                    <select
-                      className="border px-4 py-2 rounded w-full mb-3"
-                      value={salarySelectedBank}
-                      onChange={(e) => setSalarySelectedBank(e.target.value)}
-                      required
-                    >
-                      <option value="">-- Select Bank --</option>
-                      {bankList.map((bank, index) => (
-                        <option key={index} value={bank}>{bank}</option>
-                      ))}
-                    </select>
-
-                    <div className="flex gap-2 mb-3">
-                      <input
-                        type="text"
-                        placeholder="Enter Bank Name"
-                        className="border px-4 py-2 rounded w-full"
-                        value={newBank}
-                        onChange={(e) => setNewBank(e.target.value)}
-                      />
-                      <button
-                        type="button"
-                        className="bg-green-600 text-white px-4 py-2 rounded"
-                        onClick={handleAddBank}
-                        disabled={!newBank.trim()}
-                      >
-                        Add
-                      </button>
-                    </div>
-                  </>
+                  <select
+                    className="border px-4 py-2 rounded w-full mb-3"
+                    value={salarySelectedBank}
+                    onChange={(e) => setSalarySelectedBank(e.target.value)}
+                    required
+                  >
+                    <option value="">-- Select Bank --</option>
+                    {bankOptions.map((bank) => (
+                      <option key={bank.id} value={bank.bank_name}>
+                        {bank.bank_name} (Current: {bank.amount})
+                      </option>
+                    ))}
+                  </select>
                 )}
 
                 <button className="bg-yellow-600 text-white px-4 py-2 rounded" onClick={handleSalarySubmit}>
@@ -915,37 +967,19 @@ const Banking = () => {
             </select>
 
             {otherPaymentType === "Banking" && (
-              <>
-                <select
-                  className="border px-4 py-2 rounded w-full mb-3"
-                  value={otherSelectedBank}
-                  onChange={(e) => setOtherSelectedBank(e.target.value)}
-                  required
-                >
-                  <option value="">-- Select Bank --</option>
-                  {bankList.map((bank, index) => (
-                    <option key={index} value={bank}>{bank}</option>
-                  ))}
-                </select>
-
-                <div className="flex gap-2 mb-3">
-                  <input
-                    type="text"
-                    placeholder="Enter Bank Name"
-                    className="border px-4 py-2 rounded w-full"
-                    value={newBank}
-                    onChange={(e) => setNewBank(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className="bg-green-600 text-white px-4 py-2 rounded"
-                    onClick={handleAddBank}
-                    disabled={!newBank.trim()}
-                  >
-                    Add
-                  </button>
-                </div>
-              </>
+              <select
+                className="border px-4 py-2 rounded w-full mb-3"
+                value={otherSelectedBank}
+                onChange={(e) => setOtherSelectedBank(e.target.value)}
+                required
+              >
+                <option value="">-- Select Bank --</option>
+                {bankOptions.map((bank) => (
+                  <option key={bank.id} value={bank.bank_name}>
+                    {bank.bank_name} (Current: {bank.amount})
+                  </option>
+                ))}
+              </select>
             )}
 
             <button className="bg-red-600 text-white px-4 py-2 rounded" onClick={handleOtherSubmit}>

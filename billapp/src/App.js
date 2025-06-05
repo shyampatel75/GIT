@@ -29,6 +29,7 @@ import IncomeExpenditure from "./Components/IncomeExpenditure .js";
 // import OtherTransactionDetails from "./Components/OtherTransactionDetails.js";
 import OtherTypeTransactions from "./Components/OtherTransactionDetails.js";
 import CompanyTransactions from "./Components/CompanyTransactions.js";
+import BankAdd from "./Components/BankAdd .js";
 // import IncomeExpenditure from "./Components/CorrectFileName.js"; // use correct file name
 // import IncomeExpenditure from "./Components/IncomeExpenditure.js";
 
@@ -75,6 +76,8 @@ const AppContent = () => {
           {/* <Route path="/banking/other/:id" element={<OtherTransactionDetails />} /> */}
           <Route path="/banking/other-type/:type" element={<OtherTypeTransactions />} />
           <Route path="/banking/company/:companyName" element={<CompanyTransactions />} />
+          <Route path="/bankadd" element={<BankAdd />} />
+
 
         </Routes>
       </div>

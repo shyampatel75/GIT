@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { useLocation, useNavigate } from 'react-router-dom';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import "./Taxinvoice.css";
 
 const getCurrentInvoiceYear = () => {
@@ -15,7 +17,6 @@ const Taxinvoice = () => {
   const pdfRef = useRef(null);
 
   // State management
-  
   const [formData, setFormData] = useState({
     buyer_name: location.state?.buyerData?.buyer_name || "",
     buyer_address: location.state?.buyerData?.buyer_address || "",
@@ -53,19 +54,25 @@ const Taxinvoice = () => {
     name: "India",
     currency: "₹",
     currencyCode: "INR",
+    flag: "https://flagcdn.com/in.svg", // Add this line
   });
+  const [states, setStates] = useState([]);
+
+  const [selectedState, setSelectedState] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [invoiceYear, setInvoiceYear] = useState(getCurrentInvoiceYear());
-  // const [invoice_Number, setinvoice_Number] = useState(() => {
-  //   const savedNumber = localStorage.getItem('lastInvoiceNumber');
-  //   return savedNumber ? parseInt(savedNumber) : 1;
-  // });
   const [settingsData, setSettingsData] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [nextInvoiceNumber, setNextInvoiceNumber] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isOpenCountry, setIsOpenCountry] = useState(false);
+  const [searchCountry, setSearchCountry] = useState("");
+  const [isOpenState, setIsOpenState] = useState(false);
+  const [searchState, setSearchState] = useState("");
+
+
 
   // Helper functions
   const formatToISO = (dateStr) => {
@@ -90,47 +97,49 @@ const Taxinvoice = () => {
   };
 
   useEffect(() => {
-  if (settingsData && settingsData.HSN_codes) {
-    setFormData(prev => ({
-      ...prev,
-      HSN_codes: settingsData.HSN_codes,
-    }));
-  }
-}, [settingsData]);
+    if (settingsData?.HSN_codes?.length > 0 && !formData.hsn_code) {
+      setFormData(prev => ({
+        ...prev,
+        hsn_code: settingsData.HSN_codes[0],
+      }));
+    }
+  }, [settingsData]);
+
 
   // Fetch data functions with authentication
-  const fetchSettings = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError("");
-      const token = localStorage.getItem("access_token");
-      if (!token) {
-        navigate("/login");
-        return;
-      }
-
-      const response = await fetch("http://127.0.0.1:8000/api/settings/", {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch settings');
-      }
-
-      const data = await response.json();
-      if (data.length > 0) {
-        setSettingsData(data[data.length - 1]);
-      }
-    } catch (err) {
-      console.error("Error fetching settings:", err);
-      setError(err.message || "Failed to load company settings");
-    } finally {
-      setLoading(false);
+const fetchSettings = useCallback(async () => {
+  try {
+    setLoading(true);
+    setError("");
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      navigate("/login");
+      return;
     }
-  }, [navigate]);
+
+    const response = await fetch("http://127.0.0.1:8000/api/settings/", {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch settings');
+    }
+
+    const data = await response.json();
+    if (data) {
+      setSettingsData(data);
+    }
+  } catch (err) {
+    console.error("Error fetching settings:", err);
+    setError(err.message || "Failed to load company settings");
+  } finally {
+    setLoading(false);
+  }
+}, [navigate]);
+
 
   const fetchCountries = useCallback(async () => {
     try {
@@ -164,7 +173,45 @@ const Taxinvoice = () => {
   }, []);
 
 
-  // Modify your fetchNextInvoiceNumber function
+  useEffect(() => {
+    const fetchIndianStates = async () => {
+      try {
+        const response = await fetch("https://countriesnow.space/api/v0.1/countries/states", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            country: "India",
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+          throw new Error("Failed to fetch states");
+        }
+
+        setStates(data.data.states);
+      } catch (error) {
+        console.error("Error fetching Indian states:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchIndianStates();
+  }, []);
+
+  useEffect(() => {
+    if (selectedCountry.name === "India" && states.length > 0) {
+      setSelectedState("Gujarat");
+    }
+  }, [selectedCountry, states]);
+  const filteredStates = states.filter((state) =>
+    state.name.toLowerCase().includes(searchState.toLowerCase())
+  );
+
   const fetchNextInvoiceNumber = useCallback(async () => {
     try {
       const response = await fetch("http://localhost:8000/api/get_next_invoice_number/", {
@@ -203,13 +250,11 @@ const Taxinvoice = () => {
     }
   }, []);
 
-
   // Effects
   useEffect(() => {
     fetchNextInvoiceNumber();
     fetchCountries();
     fetchSettings();
-    // fetchLatestInvoiceNumber();
 
     const interval = setInterval(() => {
       const newYear = getCurrentInvoiceYear();
@@ -217,7 +262,7 @@ const Taxinvoice = () => {
     }, 1000 * 60 * 60 * 24);
 
     return () => clearInterval(interval);
-  }, [fetchNextInvoiceNumber, fetchCountries, fetchSettings,]);
+  }, [fetchNextInvoiceNumber, fetchCountries, fetchSettings]);
 
   useEffect(() => {
     setFormData(prev => ({
@@ -237,22 +282,24 @@ const Taxinvoice = () => {
   }, [selectedCountry]);
 
   // Filter countries based on search
-  const filteredCountries = countries.filter(country =>
-    country.name.toLowerCase().includes(search.toLowerCase()) ||
-    country.currencyCode.toLowerCase().includes(search.toLowerCase())
+  const filteredCountries = countries.filter((country) =>
+    country.name.toLowerCase().includes(searchCountry.toLowerCase())
   );
-const formatDisplayDate = (dateStr) => {
-  if (!dateStr) return "";
-  
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return dateStr; // Fallback if invalid date
-  
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  
-  return `${month}-${day}-${year}`;
-};
+
+
+  const formatDisplayDate = (dateStr) => {
+    if (!dateStr) return "";
+
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr; // Fallback if invalid date
+
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+
+    return `${day}-${month}-${year}`;
+  };
+
   // Handlers
   const handleSelectChange = (e) => {
     const { name, value } = e.target;
@@ -262,18 +309,12 @@ const formatDisplayDate = (dateStr) => {
     }));
   };
 
-  // Update handleChange function
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
 
-    // GST validation
-    if (name === 'buyer_gst' || name === 'consignee_gst') {
-      if (value && value.length !== 15) {
-        setError('GST number must be exactly 15 digits');
-        setTimeout(() => setError(''), 3000);
-      }
-    }
+    // GST validation - only if field is not empty
+
   };
 
   const numberToWords = (num) => {
@@ -316,6 +357,7 @@ const formatDisplayDate = (dateStr) => {
     return words.trim();
   };
 
+  // Update the calculateTotal function
   const calculateTotal = useCallback(() => {
     const total_hours = parseFloat(formData.total_hours) || 0;
     const rate = parseFloat(formData.rate) || 0;
@@ -323,73 +365,109 @@ const formatDisplayDate = (dateStr) => {
 
     let calculatedBaseAmount;
     if (total_hours > 0 && rate > 0) {
-      // Calculate from hours and rate
       calculatedBaseAmount = total_hours * rate;
     } else {
-      // Use directly entered base amount
       calculatedBaseAmount = base_amount;
     }
 
-    if (selectedCountry.name === "India" && calculatedBaseAmount > 0) {
-      const tax = (calculatedBaseAmount * 9) / 100;
-      const total_with_gst = Math.round(calculatedBaseAmount + 2 * tax);
-      const total_tax = tax * 2;
+    if (selectedCountry.name === "India") {
+      if (selectedState === "Gujarat") {
+        // For Gujarat - CGST + SGST (9% each)
+        const tax = (calculatedBaseAmount * 9) / 100;
+        const total_with_gst = Math.round(calculatedBaseAmount + 2 * tax);
+        const total_tax = tax * 2;
 
-      setFormData(prev => ({
-        ...prev,
-        base_amount: calculatedBaseAmount,
-        cgst: tax,
-        sgst: tax,
-        taxtotal: total_tax,
-        total_with_gst,
-      }));
+        setFormData(prev => ({
+          ...prev,
+          base_amount: calculatedBaseAmount,
+          cgst: tax,
+          sgst: tax,
+          igst: 0, // Reset IGST
+          taxtotal: total_tax,
+          total_with_gst,
+        }));
+      } else {
+        // For other Indian states - IGST (18%)
+        const igst = (calculatedBaseAmount * 18) / 100;
+        const total_with_gst = Math.round(calculatedBaseAmount + igst);
+
+        setFormData(prev => ({
+          ...prev,
+          base_amount: calculatedBaseAmount,
+          cgst: 0, // Reset CGST
+          sgst: 0, // Reset SGST
+          igst: igst,
+          taxtotal: igst,
+          total_with_gst,
+        }));
+      }
     } else {
+      // For non-India - no GST
       setFormData(prev => ({
         ...prev,
         base_amount: calculatedBaseAmount,
         cgst: 0,
         sgst: 0,
+        igst: 0,
         taxtotal: 0,
         total_with_gst: Math.round(calculatedBaseAmount) || 0,
       }));
     }
-  }, [formData.total_hours, formData.rate, formData.base_amount, selectedCountry.name]);
+  }, [formData.total_hours, formData.rate, formData.base_amount, selectedCountry.name, selectedState]);
 
-
+  // Update the handleBaseAmountChange function similarly
   const handleBaseAmountChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value,
-      // Reset hours and rate when manually entering base amount
       ...(name === "base_amount" && value && {
         total_hours: "",
         rate: ""
       })
     }));
 
-    // Only recalculate if we're changing base_amount directly
     if (name === "base_amount") {
       const base_amount = parseFloat(value);
-      if (selectedCountry.name === "India" && base_amount > 0) {
-        const tax = (base_amount * 9) / 100;
-        const total_with_gst = Math.round(base_amount + 2 * tax);
-        const total_tax = tax * 2;
+      if (selectedCountry.name === "India") {
+        if (selectedState === "Gujarat") {
+          // CGST + SGST
+          const tax = (base_amount * 9) / 100;
+          const total_with_gst = Math.round(base_amount + 2 * tax);
+          const total_tax = tax * 2;
 
-        setFormData(prev => ({
-          ...prev,
-          base_amount,
-          cgst: tax,
-          sgst: tax,
-          taxtotal: total_tax,
-          total_with_gst,
-        }));
+          setFormData(prev => ({
+            ...prev,
+            base_amount,
+            cgst: tax,
+            sgst: tax,
+            igst: 0,
+            taxtotal: total_tax,
+            total_with_gst,
+          }));
+        } else {
+          // IGST
+          const igst = (base_amount * 18) / 100;
+          const total_with_gst = Math.round(base_amount + igst);
+
+          setFormData(prev => ({
+            ...prev,
+            base_amount,
+            cgst: 0,
+            sgst: 0,
+            igst: igst,
+            taxtotal: igst,
+            total_with_gst,
+          }));
+        }
       } else {
+        // Non-India
         setFormData(prev => ({
           ...prev,
           base_amount,
           cgst: 0,
           sgst: 0,
+          igst: 0,
           taxtotal: 0,
           total_with_gst: Math.round(base_amount),
         }));
@@ -401,62 +479,83 @@ const formatDisplayDate = (dateStr) => {
     calculateTotal();
   }, [calculateTotal]);
 
-  const toBase64 = (url) =>
-    fetch(url)
-      .then((response) => response.blob())
-      .then((blob) => {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
+  const validateForm = () => {
+    // Required fields validation
+    const requiredFields = [
+      'buyer_name', 'buyer_address', 'invoice_date',
+    ];
+
+    const missingFields = requiredFields.filter(field => !formData[field] || formData[field].trim() === "");
+
+    if (missingFields.length > 0) {
+      missingFields.forEach(field => {
+        const fieldName = field.replace(/_/g, ' ');
+        toast.error(`Please fill in the ${fieldName} field`, {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
         });
       });
-
-
-  // Modify the handleSubmit function to include PDF generation
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    // Prevent duplicate submission
-    // if (isSubmitted) {
-    //   setError('Invoice already generated. Please modify data to generate again.');
-    //   setTimeout(() => setError(''), 3000);
-    //   return;
-    // }
-
-    // GSTIN length check
-    if (
-      (formData.buyer_gst && formData.buyer_gst.length !== 15) ||
-      (formData.consignee_gst && formData.consignee_gst.length !== 15)
-    ) {
-      setError('GST number must be exactly 15 digits');
-      setTimeout(() => setError(''), 3000);
-      return;
+      return false;
     }
 
-    // Hours/Rate validation for India
+    // GST validation for India
     if (selectedCountry.name === "India") {
+
+      const hasBuyerGst = formData.buyer_gst && formData.buyer_gst.trim() !== "";
+      const hasConsigneeGst = formData.consignee_gst && formData.consignee_gst.trim() !== "";
+
+
+
+      // Amount validation for India
       const hasHoursRate = formData.total_hours && formData.rate;
       const hasBaseAmount = formData.base_amount;
 
       if (!hasHoursRate && !hasBaseAmount) {
-        setError('Please provide either Hours and Rate or Base Amount');
-        setTimeout(() => setError(''), 3000);
-        return;
+        toast.error('Please provide either Hours and Rate or Base Amount', {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+        return false;
       }
 
       if (!hasBaseAmount && (!formData.total_hours || !formData.rate)) {
-        setError('Both Hours and Rate must be entered');
-        setTimeout(() => setError(''), 3000);
-        return;
+        toast.error('Both Hours and Rate must be entered', {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+        return false;
       }
     }
 
-    try {
-      setLoading(true);
-      setError("");
-      setSuccess(false);
+    return true;
+  };
+
+   const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  try {
+    setLoading(true);
+    setError("");
+    setSuccess(false);
+
+    // Only validate and submit to API if not already submitted
+    if (!isSubmitted) {
+      if (!validateForm()) {
+        setLoading(false);
+        return;
+      }
 
       const token = localStorage.getItem("access_token");
       if (!token) {
@@ -490,21 +589,21 @@ const formatDisplayDate = (dateStr) => {
         throw new Error("Please provide either (total hours + rate) OR base amount");
       }
 
-      // Final payload - only include fields needed for PDF generation
+      // Final payload
       const payload = {
         buyer_name: formData.buyer_name,
         buyer_address: formData.buyer_address,
-        buyer_gst: formData.buyer_gst,
+        buyer_gst: formData.buyer_gst || "NOTAPPLICABLE",
         consignee_name: formData.consignee_name,
         consignee_address: formData.consignee_address,
         consignee_gst: formData.consignee_gst,
-        invoice_number: formData.invoice_number, // Use existing number
+        invoice_number: formData.invoice_number,
         invoice_date: formattedInvoiceDate,
         delivery_note: formData.delivery_note,
         payment_mode: formData.payment_mode,
         delivery_note_date: formattedDeliveryDate,
         destination: formData.destination,
-        Terms_to_delivery: formData.Terms_to_delivery,
+        
         country: selectedCountry.name,
         currency: selectedCountry.currencyCode,
         Particulars: formData.Particulars,
@@ -520,111 +619,155 @@ const formatDisplayDate = (dateStr) => {
         financial_year: formData.financial_year,
       };
 
-      // Only create new invoice if this is the first submission
-      if (!isSubmitted) {
-        const response = await fetch("http://localhost:8000/api/create/", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        });
+      const response = await fetch("http://localhost:8000/api/create/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
-        const responseData = await response.json();
+      const responseData = await response.json();
 
-        if (!response.ok) {
-          const errorMessages = Object.values(responseData.errors || {}).flat().join(", ");
-          throw new Error(errorMessages || "Failed to save invoice");
-        }
-
-        setIsSubmitted(true);
-        setFormData(prev => ({
-          ...prev,
-          invoice_number: responseData.invoice_number
-        }));
+      if (!response.ok) {
+        const errorMessages = Object.values(responseData.errors || {}).flat().join(", ");
+        throw new Error(errorMessages || "Failed to save invoice");
       }
 
-      // Generate PDF with the invoice number from backend
-      await generatePDF(formData.invoice_number);
-
-
-    } catch (err) {
-      console.error("Invoice processing error:", err);
-      setError(err.message || "An error occurred while processing the invoice");
-    } finally {
-      setLoading(false);
+      setIsSubmitted(true);
+      setFormData(prev => ({
+        ...prev,
+        invoice_number: responseData.invoice_number || prev.invoice_number
+      }));
     }
-  };
 
-const generatePDF = async (invoiceNumber) => {
+    // Always allow PDF generation (even for subsequent downloads)
+    await generatePDF(formData.invoice_number);
+
+    toast.success(isSubmitted ? 'PDF downloaded successfully!' : 'Invoice processed successfully!', {
+      position: "top-right",
+      autoClose: 3000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+    });
+
+  } catch (err) {
+    console.error("Error:", err);
+    toast.error(err.message || "An error occurred", {
+      position: "top-right",
+      autoClose: 3000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+
+ const generatePDF = async (invoiceNumber) => {
   const input = pdfRef.current;
 
   if (!input) {
-    setError("PDF content not found.");
+    toast.error("PDF content not found.", {
+      position: "top-right",
+      autoClose: 3000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+    });
     return;
   }
 
   try {
-    await new Promise(resolve => setTimeout(resolve, 100)); // Wait for DOM updates
+    await new Promise(resolve => setTimeout(resolve, 100)); // Wait for DOM
 
     const canvas = await html2canvas(input, {
       useCORS: true,
       allowTaint: true,
-      scale: 2, // High-res
+      scale: 2,
       scrollY: -window.scrollY,
     });
 
-    const imgData = canvas.toDataURL("image/jpeg", 1.0); // JPEG avoids PNG corruption
+    const imgData = canvas.toDataURL("image/png");
     const pdf = new jsPDF("p", "mm", "a4");
 
-    const margin = 5;
+    const margin = 10;
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-
-    const imgProps = {
-      width: canvas.width,
-      height: canvas.height,
-    };
-
-    // Convert canvas px size to mm (1 px ≈ 0.264583 mm)
-    const pxToMm = px => px * 0.264583;
-    const imgWidthMm = pxToMm(imgProps.width);
-    const imgHeightMm = pxToMm(imgProps.height);
-
-    // Scale image to fit within available width or height
     const maxWidth = pageWidth - 2 * margin;
     const maxHeight = pageHeight - 2 * margin;
-    let scaledWidth = imgWidthMm;
-    let scaledHeight = imgHeightMm;
 
-    if (scaledWidth > maxWidth || scaledHeight > maxHeight) {
-      const widthRatio = maxWidth / imgWidthMm;
-      const heightRatio = maxHeight / imgHeightMm;
-      const scale = Math.min(widthRatio, heightRatio);
+    const imgWidth = canvas.width;
+    const imgHeight = canvas.height;
+    const imgAspectRatio = imgWidth / imgHeight;
 
-      scaledWidth = imgWidthMm * scale;
-      scaledHeight = imgHeightMm * scale;
+    let renderWidth = maxWidth;
+    let renderHeight = maxWidth / imgAspectRatio;
+
+    if (renderHeight > maxHeight) {
+      renderHeight = maxHeight;
+      renderWidth = maxHeight * imgAspectRatio;
     }
 
-    const offsetX = (pageWidth - scaledWidth) / 2;
-    const offsetY = (pageHeight - scaledHeight) / 2;
+    const x = (pageWidth - renderWidth) / 2;
+    const y = (pageHeight - renderHeight) / 2;
 
-    pdf.addImage(imgData, "JPEG", offsetX, offsetY, scaledWidth, scaledHeight);
-    pdf.save(`Invoice_${invoiceNumber}.pdf`);
-    setSuccess("Invoice downloaded successfully!");
+    pdf.addImage(imgData, "PNG", x, y, renderWidth, renderHeight);
+    pdf.save(`Invoice_${formData.buyer_name}_${invoiceNumber}.pdf`);
   } catch (error) {
     console.error("PDF generation error:", error);
-    setError("Failed to generate PDF");
+    toast.error("Failed to generate PDF", {
+      position: "top-right",
+      autoClose: 3000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+    });
   }
 };
 
 
+const handleDownloadPDF = async () => {
+  try {
+    setLoading(true);
+    await generatePDF(formData.invoice_number);
+    toast.success('PDF downloaded successfully!', {
+      position: "top-right",
+      autoClose: 3000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+    });
+  } catch (error) {
+    console.error("PDF download error:", error);
+    toast.error("Failed to download PDF", {
+      position: "top-right",
+      autoClose: 3000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   if (!settingsData) return <p className="text-center mt-4">Loading settings...</p>;
 
+
   return (
     <div style={{ paddingLeft: "70px", fontFamily: "Arial, sans-serif" }} onSubmit={handleSubmit}>
+      <ToastContainer />
       <div style={{ paddingRight: "10px" }}>
         <h2 className="text-center">TAX INVOICE</h2>
 
@@ -677,6 +820,8 @@ const generatePDF = async (invoiceNumber) => {
                         value={formData.buyer_name}
                         onChange={handleChange}
                         required
+      readOnly={isSubmitted}
+
                       />
                       <br />
                       Address:
@@ -687,6 +832,7 @@ const generatePDF = async (invoiceNumber) => {
                         style={{ width: "100%", height: "100px" }}
                         value={formData.buyer_address}
                         onChange={handleChange}
+      readOnly={isSubmitted}
                       />
                       <br />
                       GSTIN/UIN:{" "}
@@ -697,9 +843,10 @@ const generatePDF = async (invoiceNumber) => {
                         className="billToGST"
                         value={formData.buyer_gst}
                         onChange={handleChange}
-                        maxLength={15}
-                        pattern="\d{15}"
+                        // maxLength={20}
+                        // pattern="\d{15}"
                         title="15 digit GST number required"
+      readOnly={isSubmitted}
                       />
 
                       {error && (
@@ -721,7 +868,8 @@ const generatePDF = async (invoiceNumber) => {
                       <button
                         className="copybutton"
                         style={{ float: "right" }}
-                        onClick={copyBillToShip}
+                        onClick={!isSubmitted? copyBillToShip : undefined}
+  disabled={isSubmitted}
                       >
                         Copy
                       </button>
@@ -736,6 +884,7 @@ const generatePDF = async (invoiceNumber) => {
                         className="shipToTitle"
                         value={formData.consignee_name}
                         onChange={handleChange}
+readOnly={isSubmitted}
                       />
                       <br />
                       Address:
@@ -745,6 +894,7 @@ const generatePDF = async (invoiceNumber) => {
                         style={{ width: "100%", height: "100px" }}
                         value={formData.consignee_address}
                         onChange={handleChange}
+readOnly={isSubmitted}
                       />
                       <br />
                       GSTIN/UIN:{" "}
@@ -754,9 +904,10 @@ const generatePDF = async (invoiceNumber) => {
                         className="shipToGST"
                         value={formData.consignee_gst}
                         onChange={handleChange}
-                        maxLength={15}
-                        pattern="\d{15}"
+                        // maxLength={20}
+                        // pattern="\d{15}"
                         title="15 digit GST number required"
+readOnly={isSubmitted}
                       />
                     </td>
                   </tr>
@@ -789,6 +940,7 @@ const generatePDF = async (invoiceNumber) => {
                         value={formData.invoice_date}
                         onChange={handleChange}
                         name="invoice_date"
+readOnly={isSubmitted}
                       />
                     </td>
                   </tr>
@@ -801,6 +953,7 @@ const generatePDF = async (invoiceNumber) => {
                         value={formData.delivery_note}
                         onChange={handleChange}
                         name="delivery_note"
+readOnly={isSubmitted}
                       />
                     </td>
                   </tr>
@@ -813,6 +966,7 @@ const generatePDF = async (invoiceNumber) => {
                         value={formData.payment_mode}
                         onChange={handleChange}
                         name="payment_mode"
+readOnly={isSubmitted}
                       />
                     </td>
                   </tr>
@@ -825,6 +979,7 @@ const generatePDF = async (invoiceNumber) => {
                         className="deliveryNote"
                         value={formData.delivery_note_date}
                         onChange={handleChange}
+readOnly={isSubmitted}
                       />
                     </td>
                   </tr>
@@ -838,6 +993,7 @@ const generatePDF = async (invoiceNumber) => {
                         className="deliveryNote"
                         value={formData.destination}
                         onChange={handleChange}
+readOnly={isSubmitted}
                       />
                     </td>
                   </tr>
@@ -859,6 +1015,7 @@ const generatePDF = async (invoiceNumber) => {
                         style={{ width: "100%", height: "100px" }}
                         value={formData.Terms_to_delivery}
                         onChange={handleChange}
+readOnly={isSubmitted}
                       />
                     </td>
                   </tr>
@@ -866,69 +1023,113 @@ const generatePDF = async (invoiceNumber) => {
               </table>
 
               <div className="relative w-72">
-                {/* Selected Country (Dropdown Trigger) */}
-                <p>
-                  <strong>Country and currency:</strong>
-                </p>
-                <div
-                  className="border border-gray-300 p-2 rounded flex items-center justify-between cursor-pointer bg-white"
-                  onClick={() => setIsOpen(!isOpen)}
-                >
-                  <div className="flex items-center" style={{ height: "30px" }}>
-                    {selectedCountry.flag && (
-                      <img
-                        src={selectedCountry.flag}
-                        alt={`${selectedCountry.name} flag`}
-                        style={{ width: "20px", marginRight: "8px" }}
-                      />
+
+                <div className="d-flex justify-content-evenly gap-4">
+                  {/* Country Selector */}
+                  <div style={{ position: "relative", width: "300px" }}>
+                    <p><strong>Country and currency:</strong></p>
+                    <div
+
+                      className="border border-gray-300 p-2 rounded flex items-center justify-between cursor-pointer bg-white"
+                       onClick={() => !isSubmitted && setIsOpenCountry(!isOpenCountry)}
+    style={{ cursor: isSubmitted ? 'not-allowed' : 'pointer' }}
+  >
+                      <div className="flex items-center" style={{ height: "30px" }}>
+                        {selectedCountry.flag && (
+                          <img
+                            src={selectedCountry.flag}
+                            alt={`${selectedCountry.name} flag`}
+                            style={{ width: "20px", marginRight: "8px" }}
+                          />
+                        )}
+                        <span className="mr-2">
+                          {selectedCountry.name
+                            ? `${selectedCountry.name} - ${selectedCountry.currency} (${selectedCountry.currencyCode})`
+                            : "-- Select Country --"}
+                        </span>
+                      </div>
+</div>
+
+                    {isOpenCountry && (
+                      <div className="absolute bg-white border border-gray-300 w-full mt-1 rounded shadow-lg z-10">
+                        <input
+                          type="text"
+                          className="w-full p-2 border-b border-gray-200 focus:outline-none"
+                          placeholder="Search country..."
+                          value={searchCountry}
+                          onChange={(e) => setSearchCountry(e.target.value)}
+                        />
+                        <ul className="overflow-y-auto list-group" style={{ height: "200px" }}>
+                          {filteredCountries.map((country, index) => (
+                            <li
+                              key={index}
+                              className="p-2 flex items-center hover:bg-gray-100 cursor-pointer"
+                              onClick={() => {
+                                setSelectedCountry(country);
+                                setIsOpenCountry(false);
+                                setSearchCountry("");
+                              }}
+                            >
+                              {country.flag && (
+                                <img
+                                  src={country.flag}
+                                  alt={`${country.name} flag`}
+                                  style={{ width: "20px", marginRight: "8px" }}
+                                />
+                              )}
+                              {country.name} - {country.currency} ({country.currencyCode})
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     )}
-                    <span className="mr-2">
-                      {selectedCountry.name} - {selectedCountry.currency} (
-                      {selectedCountry.currencyCode})
-                    </span>
                   </div>
+
+                  {/* Show State Selector only if selected country is India */}
+                  {selectedCountry.name === "India" && (
+                    <div style={{ position: "relative", width: "300px" }}>
+                      <p><strong>Select State:</strong></p>
+                      <div
+                        className="border border-gray-300 p-2 rounded bg-white cursor-pointer states"
+                        onClick={() => setIsOpenState(!isOpenState)}
+                        style={{}}
+                      >
+                        {selectedState || "-- Select State --"}
+                      </div>
+
+                      {isOpenState && (
+                        <div className="absolute bg-white border border-gray-300 w-full mt-1 rounded shadow-lg z-10">
+                          <input
+                            type="text"
+                            className="w-full p-2 border-b border-gray-200 focus:outline-none"
+                            placeholder="Search state..."
+                            value={searchState}
+                            onChange={(e) => setSearchState(e.target.value)}
+                          />
+                          <ul className="overflow-y-auto" style={{ maxHeight: "200px" }}>
+                            {filteredStates.map((state, index) => (
+                              <li
+                                key={index}
+                                className="p-2 hover:bg-gray-100 cursor-pointer"
+                                onClick={() => {
+                                  setSelectedState(state.name);
+                                  setIsOpenState(false);
+                                  setSearchState("");
+                                }}
+                              >
+                                {state.name}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+
+                  )}
                 </div>
 
-                {/* Dropdown Menu */}
-                {isOpen && (
-                  <div className="absolute bg-white border border-gray-300 w-full mt-1 rounded shadow-lg z-10">
-                    <input
-                      type="text"
-                      className="w-full p-2 border-b border-gray-200 focus:outline-none"
-                      placeholder="Search..."
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
 
-                    {/* Country List */}
-                    <ul
-                      className="overflow-y-auto list-group"
-                      style={{ height: "200px" }}
-                    >
-                      {filteredCountries.map((country, index) => (
-                        <li
-                          key={index}
-                          className="p-2 flex items-center hover:bg-gray-100 cursor-pointer"
-                          onClick={() => {
-                            setSelectedCountry(country);
-                            setIsOpen(false);
-                            setSearch(""); // Clear search after selection
-                          }}
-                        >
-                          {country.flag && (
-                            <img
-                              src={country.flag}
-                              alt={`${country.name} flag`}
-                              style={{ width: "20px", marginRight: "8px" }}
-                            />
-                          )}
-                          {country.name} - {country.currency} (
-                          {country.currencyCode})
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+
               </div>
 
               {/* Keep "Declare under LUT" separate, so it doesn't slide when dropdown opens */}
@@ -951,7 +1152,7 @@ const generatePDF = async (invoiceNumber) => {
             </div>
           </div>
 
-          <div className="row">
+          <div className="row" style={{ marginTop: "20px" }}>
             <div className="col-xs-12">
               <table className="table table-bordered black-bordered" style={{ textAlign: "center" }}>
                 <thead>
@@ -974,6 +1175,7 @@ const generatePDF = async (invoiceNumber) => {
                         value={formData.Particulars}
                         onChange={handleChange}
                         type="text"
+readOnly={isSubmitted}
                       />
                     </td>
                     <td style={{ width: "130px", paddingTop: "16px" }}>
@@ -983,15 +1185,14 @@ const generatePDF = async (invoiceNumber) => {
                         onChange={handleSelectChange}
                         value={formData.hsn_code}
                         style={{ height: "46px" }}
+readOnly={isSubmitted}
                       >
-                         <option value="">Select HSN Code</option>
-    {settingsData?.HSN_codes?.map((code, index) => (
-      <option key={index} value={code}>{code}</option>
-    ))}
-  </select>
+                        <option value="">Select</option>
+                        {settingsData?.HSN_codes?.map((code, index) => (
+                          <option key={index} value={code}>{code}</option>
+                        ))}
+                      </select>
                     </td>
-
-
 
                     <td style={{ width: "10%" }}>
                       <input
@@ -1006,6 +1207,7 @@ const generatePDF = async (invoiceNumber) => {
                           }));
                           calculateTotal();
                         }}
+readOnly={isSubmitted}
                       />
                     </td>
 
@@ -1022,6 +1224,7 @@ const generatePDF = async (invoiceNumber) => {
                           }));
                           calculateTotal();
                         }}
+readOnly={isSubmitted}
                       />
                     </td>
 
@@ -1029,6 +1232,7 @@ const generatePDF = async (invoiceNumber) => {
                       <span className="currency-sym">
                         {selectedCountry.currencyCode}
                       </span>
+
                       <input
                         style={{ width: "80%" }}
                         id="baseAmount"
@@ -1040,46 +1244,63 @@ const generatePDF = async (invoiceNumber) => {
                       />
                     </td>
                   </tr>
-                  {selectedCountry.name === "India" && (
+
+
+                  {selectedCountry.name === "India" && selectedState !== "Gujarat" && (
                     <tr className="inside-india">
                       <td></td>
                       <td>
-                        <span style={{ float: "right" }}>CGST @ 9%</span>
+                        <span style={{ float: "right" }}>IGST @ 18%</span>
                       </td>
                       <td></td>
                       <td></td>
-                      <td>9%</td>
-                      <td id="cgst">
+                      <td>18%</td>
+                      <td id="igst">
                         <span className="currency-sym">{selectedCountry.currencyCode} </span>
-                        {formData.cgst}
+                        {formData.igst}
                       </td>
                     </tr>
                   )}
 
-                  {selectedCountry.name === "India" && (
-                    <tr className="inside-india">
-                      <td></td>
-                      <td>
-                        <span style={{ float: "right" }}>SGST @ 9%</span>
-                      </td>
-                      <td></td>
-                      <td></td>
-                      <td>9%</td>
-                      <td id="sgst">
-                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
-                        {formData.sgst}
-                      </td>
-                    </tr>
+                  {selectedCountry.name === "India" && selectedState === "Gujarat" && (
+                    <>
+                      <tr className="inside-india">
+                        <td></td>
+                        <td>
+                          <span style={{ float: "right" }}>CGST @ 9%</span>
+                        </td>
+                        <td></td>
+                        <td></td>
+                        <td>9%</td>
+                        <td id="cgst">
+                          <span className="currency-sym">{selectedCountry.currencyCode} </span>
+                          {formData.cgst}
+                        </td>
+                      </tr>
+
+                      <tr className="inside-india">
+                        <td></td>
+                        <td>
+                          <span style={{ float: "right" }}>SGST @ 9%</span>
+                        </td>
+                        <td></td>
+                        <td></td>
+                        <td>9%</td>
+                        <td id="sgst">
+                          <span className="currency-sym">{selectedCountry.currencyCode} </span>
+                          {formData.sgst}
+                        </td>
+                      </tr>
+                    </>
                   )}
+
                   <tr>
                     <td colSpan="5" className="text-right">
                       <strong>Total</strong>
                     </td>
                     <td>
                       <strong id="total-with-gst">
-                        <span className="currency-sym">
-                          {selectedCountry.currencyCode}
-                        </span>
+                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
                         {formData.total_with_gst}
                       </strong>
                     </td>
@@ -1098,8 +1319,9 @@ const generatePDF = async (invoiceNumber) => {
                   </p>
                   <h4 className="total-in-words">
                     <span className="currency-text">{selectedCountry.currencyCode}</span>{" "}
-                    {numberToWords(Math.floor(formData.total_with_gst))}
+                    {numberToWords(Math.floor(formData.total_with_gst))} Only
                   </h4>
+
                   <div className="top-right-corner">
                     <span>E. & O.E</span>
                   </div>
@@ -1108,7 +1330,7 @@ const generatePDF = async (invoiceNumber) => {
             </div>
           </div>
 
-          {selectedCountry.name === "India" && (
+          {selectedCountry.name === "India" && selectedState === "Gujarat" && (
             <div className="row">
               <div className="col-xs-12 inside-india">
                 <table className="table table-bordered invoice-table">
@@ -1118,9 +1340,7 @@ const generatePDF = async (invoiceNumber) => {
                       <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
                       <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Central Tax</th>
                       <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">State Tax</th>
-                      <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2" rowSpan="2">
-                        Total Tax Amount
-                      </th>
+                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
                     </tr>
                     <tr>
                       <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
@@ -1131,37 +1351,74 @@ const generatePDF = async (invoiceNumber) => {
                   </thead>
                   <tbody>
                     <tr>
-                      <td>
-                        <span className="hns_select_text">{formData.hsn_code}</span>
-                      </td>
-                      <td className="taxable-value">{formData.base_amount}</td>
+                      <td>{formData.hsn_code}</td>
+                      <td>{formData.base_amount}</td>
                       <td>9%</td>
-                      <td className="tax-cgst">{formData.cgst}</td>
+                      <td>{formData.cgst}</td>
                       <td>9%</td>
-                      <td className="tax-sgst">{formData.sgst}</td>
-                      <td className="all-tax-amount">{formData.taxtotal}</td>
+                      <td>{formData.sgst}</td>
+                      <td>{formData.taxtotal}</td>
                     </tr>
                     <tr className="total-row">
                       <td>Total</td>
-                      <td className="total-taxable">{formData.base_amount}</td>
+                      <td>{formData.base_amount}</td>
                       <td></td>
-                      <td className="total-tax-cgst">{formData.cgst}</td>
+                      <td>{formData.cgst}</td>
                       <td></td>
-                      <td className="total-tax-sgst">{formData.sgst}</td>
-                      <td className="total-tax-amount">{formData.taxtotal}</td>
+                      <td>{formData.sgst}</td>
+                      <td>{formData.taxtotal}</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
             </div>
           )}
+
+          {selectedCountry.name === "India" && selectedState !== "Gujarat" && (
+            <div className="row">
+              <div className="col-xs-12 outside-gujarat">
+                <table className="table table-bordered invoice-table">
+                  <thead>
+                    <tr>
+                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Integrated Tax</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
+                    </tr>
+                    <tr>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>{formData.hsn_code}</td>
+                      <td>{formData.base_amount}</td>
+                      <td>18%</td>
+                      <td>{formData.igst}</td>
+                      <td>{formData.taxtotal}</td>
+                    </tr>
+                    <tr className="total-row">
+                      <td><strong>Total</strong></td>
+                      <td><strong>{formData.base_amount}</strong></td>
+                      <td></td>
+                      <td ><strong>{formData.igst}</strong></td>
+                      <td><strong>{formData.taxtotal}</strong></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+
           <div style={{ padding: "0 0 0 10px" }}>
             <div className="col-xs-12 inside-india">
               <div>
                 <strong>Tax Amount (in words):</strong>
                 <span className="total-tax-in-words">
                   <span className="currency-text">{selectedCountry.currencyCode}</span>{" "}
-                  {numberToWords(Math.floor(formData.total_with_gst))}
+                  {numberToWords(Math.floor(formData.total_with_gst))} Only
                 </span>
               </div>
             </div>
@@ -1178,6 +1435,7 @@ const generatePDF = async (invoiceNumber) => {
                     onChange={handleChange}
                     className="remark"
                     style={{ width: "550px" }}
+readOnly={isSubmitted}
                   />
                 </h5>
               </div>
@@ -1217,13 +1475,17 @@ const generatePDF = async (invoiceNumber) => {
         </div>
         <p className="text-center">This is a Computer Generated Invoice</p>
       </div>
-
+      <div className="pdfbutton">
+        <button
+          onClick={handleSubmit}
+          className="bg-blue-500 text-white px-4 py-2 rounded mt-4"
+          disabled={loading}
+        >
+          {loading ? 'Processing...' : isSubmitted ? 'Download PDF' : 'Generate & Download PDF'}
+        </button>
+      </div>
       {/* --------------------------------------------pdf------------------------------------------------------ */}
-      {/* <div
-        ref={pdfRef}
-        style={{ position: "absolute", left: "-9999px" }}
-        
-      > */}
+
       <div
         ref={pdfRef}
         style={{
@@ -1260,7 +1522,7 @@ const generatePDF = async (invoiceNumber) => {
                     </tr>
                     <tr>
                       <td className="gray-background">
-                        <strong>  GSTIN/UIN:</strong>{settingsData.seller_gstin}
+                        <strong>  GSTIN/UIN: </strong>{settingsData.seller_gstin}
                       </td>
                     </tr>
                   </tbody>
@@ -1271,7 +1533,7 @@ const generatePDF = async (invoiceNumber) => {
                   <tbody>
                     <tr>
                       <td className="gray-background">
-                        <strong>Buyer (Bill to):</strong>{formData.buyer_name}
+                        <strong>Buyer (Bill to): </strong>{formData.buyer_name}
                       </td>
                     </tr>
                     <tr>
@@ -1289,7 +1551,7 @@ const generatePDF = async (invoiceNumber) => {
                     </tr>
                     <tr>
                       <td className="gray-background">
-                        <strong>  GSTIN/UIN:</strong>{formData.buyer_gst}
+                        <strong>  GSTIN/UIN: </strong>{formData.buyer_gst}
                       </td>
                     </tr>
                   </tbody>
@@ -1300,7 +1562,7 @@ const generatePDF = async (invoiceNumber) => {
                   <tbody>
                     <tr>
                       <td className="gray-background">
-                        <strong>Consignee (Ship to):</strong>{formData.consignee_name}
+                        <strong>Consignee (Ship to): </strong>{formData.consignee_name}
                       </td>
                     </tr>
                     <tr>
@@ -1318,7 +1580,7 @@ const generatePDF = async (invoiceNumber) => {
                     </tr>
                     <tr>
                       <td className="gray-background">
-                        <strong>  GSTIN/UIN:</strong>{formData.buyer_gst}
+                        <strong>  GSTIN/UIN: </strong>{formData.buyer_gst}
                       </td>
                     </tr>
                   </tbody>
@@ -1348,7 +1610,7 @@ const generatePDF = async (invoiceNumber) => {
                     </tr>
                     <tr>
                       <td>Delivery Note Date</td>
-                      <td>{formData.delivery_note_date}</td>
+                      <td>{formatDisplayDate(formData.delivery_note_date)}</td>
                     </tr>
                     <tr>
                       <td>Destination</td>
@@ -1395,7 +1657,7 @@ const generatePDF = async (invoiceNumber) => {
                         />
                       )}
                       <span className="mr-2">
-                        {selectedCountry.name} - {selectedCountry.currencyCode}(
+                        {selectedCountry.name} - {selectedCountry.currency} (
                         {selectedCountry.currencyCode})
                       </span>
                     </div>
@@ -1445,17 +1707,17 @@ const generatePDF = async (invoiceNumber) => {
 
                 {/* Keep "Declare under LUT" separate, so it doesn't slide when dropdown opens */}
                 <div className="mt-4">
-                {selectedCountry.name !== "India" && (
-                  <>
-                    <div className="lut">
-                      <p style={{ margin: "0px" }}>Declare under LUT</p>
-                    </div>
-                    <div className="lut mt-3">
-                      <p style={{ margin: "0px" }}>{settingsData.company_code}</p>
-                    </div>
-                  </>
-                )}
-              </div>
+                  {selectedCountry.name !== "India" && (
+                    <>
+                      <div className="lut">
+                        <p style={{ margin: "0px" }}>Declare under LUT</p>
+                      </div>
+                      <div className="lut mt-3">
+                        <p style={{ margin: "0px" }}>{settingsData.company_code}</p>
+                      </div>
+                    </>
+                  )}
+                </div>
 
                 <input type="hidden" id="currencyTitle" value="INR" />
                 <input type="hidden" id="currencySymbol" value="₹" />
@@ -1466,7 +1728,7 @@ const generatePDF = async (invoiceNumber) => {
               <div className="col-xs-12">
                 <table className="table table-bordered black-bordered" style={{ textAlign: "center" }}>
                   <thead>
-                    <tr className="trbody" >
+                    <tr className="trbody">
                       <th style={{ backgroundColor: "#f1f3f4" }}>SI No.</th>
                       <th style={{ backgroundColor: "#f1f3f4" }}>Particulars</th>
                       <th style={{ backgroundColor: "#f1f3f4" }}>HSN/SAC</th>
@@ -1475,63 +1737,97 @@ const generatePDF = async (invoiceNumber) => {
                       <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
                     </tr>
                   </thead>
-
                   <tbody>
-                    <tr style={{ height: "130px" }}>
+                    <tr style={{ height: "111px" }}>
                       <td>1</td>
-                      <td>{formData.Particulars}</td>
-                      <td style={{ width: "130px" }}>{formData.hsn_code}</td>
-                      <td style={{ width: "10%" }}>{formData.total_hours}</td>
+                      <td style={{ width: "526px" }}>
+                        {formData.Particulars}
+                      </td>
+                      <td style={{ width: "130px", paddingTop: "16px" }}>
+                        {formData.hsn_code}
 
-                      <td style={{ width: "10%" }}>{formData.rate}</td>
+                      </td>
+                      <td style={{ width: "10%" }}>
 
+                        {formData.total_hours}
+                      </td>
+                      <td style={{ width: "10%" }}>
+
+                        {formData.rate}
+                      </td>
                       <td style={{ width: "200px" }}>
-                        <span className="currency-sym">
-                          {selectedCountry.currencyCode}
-                        </span>
+                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
+                        {/* <input
+                          style={{ width: "80%" }}
+                          id="baseAmount"
+                          name="base_amount"
+                          type="number"
+                          value={formData.base_amount}
+                          onChange={handleBaseAmountChange}
+                          readOnly={formData.total_hours > 0 && formData.rate > 0}
+                        /> */}
                         {formData.base_amount}
                       </td>
                     </tr>
-                    {selectedCountry.name === "India" && (
+
+                    {/* IGST for other states */}
+                    {selectedCountry.name === "India" && selectedState !== "Gujarat" && (
                       <tr className="inside-india">
                         <td></td>
                         <td>
-                          <span style={{ float: "right" }}>CGST @ 9%</span>
+                          <span style={{ float: "right" }}>IGST @ 18%</span>
                         </td>
                         <td></td>
                         <td></td>
-                        <td>9%</td>
-                        <td id="cgst">
-                          <span className="currency-sym">₹</span>
-                          {formData.cgst}
+                        <td>18%</td>
+                        <td id="igst">
+                          <span className="currency-sym">{selectedCountry.currencyCode} </span>
+                          {formData.igst}
                         </td>
                       </tr>
                     )}
 
-                    {selectedCountry.name === "India" && (
-                      <tr className="inside-india">
-                        <td></td>
-                        <td>
-                          <span style={{ float: "right" }}>SGST @ 9%</span>
-                        </td>
-                        <td></td>
-                        <td></td>
-                        <td>9%</td>
-                        <td id="sgst">
-                          <span className="currency-sym">₹</span>
-                          {formData.sgst}
-                        </td>
-                      </tr>
+                    {/* CGST/SGST for Gujarat */}
+                    {selectedCountry.name === "India" && selectedState === "Gujarat" && (
+                      <>
+                        <tr className="inside-india">
+                          <td></td>
+                          <td>
+                            <span style={{ float: "right" }}>CGST @ 9%</span>
+                          </td>
+                          <td></td>
+                          <td></td>
+                          <td>9%</td>
+                          <td id="cgst">
+                            <span className="currency-sym">{selectedCountry.currencyCode} </span>
+                            {formData.cgst}
+                          </td>
+                        </tr>
+
+                        <tr className="inside-india">
+                          <td></td>
+                          <td>
+                            <span style={{ float: "right" }}>SGST @ 9%</span>
+                          </td>
+                          <td></td>
+                          <td></td>
+                          <td>9%</td>
+                          <td id="sgst">
+                            <span className="currency-sym">{selectedCountry.currencyCode} </span>
+                            {formData.sgst}
+                          </td>
+                        </tr>
+                      </>
                     )}
+
+                    {/* Total row */}
                     <tr>
                       <td colSpan="5" className="text-right">
                         <strong>Total</strong>
                       </td>
                       <td>
                         <strong id="total-with-gst">
-                          <span className="currency-sym">
-                            {selectedCountry.currencyCode}
-                          </span>{" "}
+                          <span className="currency-sym">{selectedCountry.currencyCode} </span>
                           {formData.total_with_gst}
                         </strong>
                       </td>
@@ -1539,6 +1835,7 @@ const generatePDF = async (invoiceNumber) => {
                   </tbody>
                 </table>
               </div>
+
             </div>
 
             <div className="row">
@@ -1550,7 +1847,7 @@ const generatePDF = async (invoiceNumber) => {
                     </p>
                     <h4 className="total-in-words">
                       <span className="currency-text">{selectedCountry.currencyCode}</span>{" "}
-                      {numberToWords(Math.floor(formData.total_with_gst))}
+                      {numberToWords(Math.floor(formData.total_with_gst))} Only
                     </h4>
                     <div className="top-right-corner">
                       <span>E. & O.E</span>
@@ -1565,60 +1862,88 @@ const generatePDF = async (invoiceNumber) => {
                 <div className="col-xs-12 inside-india">
                   <table className="table table-bordered invoice-table">
                     <thead>
-                      <tr>
-                        <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
-                        <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
-                        <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Central Tax</th>
-                        <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">State Tax</th>
-                        <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2" rowSpan="2">
-                          Total Tax Amount
-                        </th>
-                      </tr>
-                      <tr>
-                        <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                        <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                        <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                        <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                      </tr>
+                      {selectedState !== "Gujarat" ? (
+                        <>
+                          <tr>
+                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Integrated Tax</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
+                          </tr>
+                          <tr>
+                            <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                          </tr>
+                        </>
+                      ) : (
+                        <>
+                          <tr>
+                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Central Tax</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">State Tax</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
+                          </tr>
+                          <tr>
+                            <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                            <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                          </tr>
+                        </>
+                      )}
                     </thead>
+
                     <tbody>
                       <tr>
-                        <td>
-                          <span className="hns_select_text">{formData.hsn_code}</span>
-                        </td>
-                        <td className="taxable-value">
-                          {formData.base_amount}
-                        </td>
-                        <td>9%</td>
-                        <td className="tax-cgst">{formData.cgst}</td>
-                        <td>9%</td>
-                        <td className="tax-sgst">{formData.sgst}</td>
-                        <td className="all-tax-amount">{formData.taxtotal}</td>
+                        <td>{formData.hsn_code}</td>
+                        <td>{formData.base_amount}</td>
+                        {selectedState === "Gujarat" ? (
+                          <>
+                            <td>9%</td>
+                            <td>{formData.cgst}</td>
+                            <td>9%</td>
+                            <td>{formData.sgst}</td>
+                            <td>{formData.taxtotal}</td>
+                          </>
+                        ) : (
+                          <>
+                            <td>18%</td>
+                            <td>{formData.igst}</td>
+                            <td>{formData.taxtotal}</td>
+                          </>
+                        )}
                       </tr>
                       <tr className="total-row">
                         <td>Total</td>
-
-                        <td className="total-taxable">
-                          {formData.base_amount}
-                        </td>
-                        <td></td>
-                        <td className="total-tax-cgst">{formData.cgst}</td>
-                        <td></td>
-                        <td className="total-tax-sgst">{formData.sgst}</td>
-                        <td className="total-tax-amount">
-                          {formData.taxtotal}
-                        </td>
+                        <td>{formData.base_amount}</td>
+                        {selectedState === "Gujarat" ? (
+                          <>
+                            <td></td>
+                            <td>{formData.cgst}</td>
+                            <td></td>
+                            <td>{formData.sgst}</td>
+                            <td>{formData.taxtotal}</td>
+                          </>
+                        ) : (
+                          <>
+                            <td></td>
+                            <td>{formData.igst}</td>
+                            <td>{formData.taxtotal}</td>
+                          </>
+                        )}
                       </tr>
                     </tbody>
                   </table>
                 </div>
+
                 <div style={{ padding: "0 0 0 10px" }}>
                   <div className="col-xs-12 inside-india">
                     <div>
-                      <strong>Tax Amount (in words):</strong>
+                      <strong>Tax Amount (in words): </strong>
                       <span className="total-tax-in-words">
                         <span className="currency-text">{selectedCountry.currencyCode}</span>{" "}
-                        {numberToWords(Math.floor(formData.total_with_gst))}
+                        {numberToWords(Math.floor(formData.total_with_gst))} Only
                       </span>
                     </div>
                   </div>
@@ -1633,6 +1958,7 @@ const generatePDF = async (invoiceNumber) => {
                 </div>
               </div>
             )}
+
 
             <div className="row mb-3">
               <div className="col-x-12 mb-3">
@@ -1669,14 +1995,7 @@ const generatePDF = async (invoiceNumber) => {
           <p className="text-center" style={{ marginBottom: "0px" }}>This is a Computer Generated Invoice</p>
         </div>
       </div>
-      <div className="pdfbutton">
-        <button
-          onClick={handleSubmit}
-          className="bg-blue-500 text-white px-4 py-2 rounded mt-4"
-        >
-          Download PDF
-        </button>
-      </div>
+
     </div>
   );
 };

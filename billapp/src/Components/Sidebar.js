@@ -80,7 +80,7 @@ const Sidebar = () => {
           {menuItems.map((item, index) => (
             <li
               key={index}
-              className={`nav-item ${location.pathname === item.path ? "active" : ""} `}
+              className={`nav-item ${location.pathname === item.path ? "active" : ""}`}
               onClick={() => navigate(item.path)}
             >
               <i className={`bi ${item.icon}`}></i> <span>{item.label}</span>

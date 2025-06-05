@@ -8,7 +8,6 @@ export default function SettingsPage() {
     seller_address: "",
     seller_pan: "",
     seller_gstin: "",
-    
     seller_email: "",
     bank_account_holder: "",
     bank_name: "",
@@ -60,71 +59,66 @@ export default function SettingsPage() {
     }));
   };
 
-  const handleSave = async () => {
-    setLoading(true);
-    setError("");
-    setSuccess(false);
+const handleSave = async () => {
+  setLoading(true);
+  setError("");
+  setSuccess(false);
 
-    const token = localStorage.getItem("access_token");
-    if (!token) {
-      setError("You need to login first");
-      navigate("/login");
-      return;
+  const token = localStorage.getItem("access_token");
+  if (!token) {
+    setError("You need to login first");
+    navigate("/login");
+    return;
+  }
+
+  const formDataToSend = new FormData();
+  
+  // Append all fields
+  Object.keys(formData).forEach(key => {
+    if (key !== 'logoUrl' && key !== 'logo') {
+      formDataToSend.append(key, formData[key]);
     }
+  });
 
-    const formDataToSend = new FormData();
-    
-    // Append all regular fields
-    formDataToSend.append("company_name", formData.company_name);
-    formDataToSend.append("seller_address", formData.seller_address);
-    formDataToSend.append("seller_pan", formData.seller_pan);
-    formDataToSend.append("seller_gstin", formData.seller_gstin);
-    formDataToSend.append("seller_email", formData.seller_email);
-    formDataToSend.append("bank_account_holder", formData.bank_account_holder);
-    formDataToSend.append("bank_name", formData.bank_name);
-    formDataToSend.append("account_number", formData.account_number);
-    formDataToSend.append("ifsc_code", formData.ifsc_code);
-    formDataToSend.append("branch", formData.branch);
-    formDataToSend.append("swift_code", formData.swift_code);
-    formDataToSend.append("company_code", formData.company_code);
-    formDataToSend.append("HSN_codes", JSON.stringify(formData.HSN_codes));
+  // Handle HSN codes
+  formDataToSend.set('HSN_codes', JSON.stringify(formData.HSN_codes));
 
-    // Only append logo if it's a new file
-    if (formData.logo instanceof File) {
-      formDataToSend.append("logo", formData.logo);
-    }
+  // Append logo only if it's a new file
+  if (formData.logo instanceof File) {
+    formDataToSend.append("logo", formData.logo);
+  }
 
-    try {
-      const response = await fetch("http://127.0.0.1:8000/api/settings/", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formDataToSend,
-      });
+  try {
+    const response = await fetch("http://127.0.0.1:8000/api/settings/", {
+      method: "POST",  // Using POST to handle both create and update
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formDataToSend,
+    });
 
-      if (response.ok) {
-        const result = await response.json();
-        setSuccess(true);
-        // Update the form data with the new logo URL if one was returned
-        if (result.logo) {
-          setFormData(prev => ({
-            ...prev,
-            logoUrl: `http://127.0.0.1:8000${result.logo}`,
-            logo: null // Reset the file object after successful upload
-          }));
-        }
-      } else {
-        const errorData = await response.json();
-        setError(errorData.message || "Save failed");
+    if (response.ok) {
+      const result = await response.json();
+      setSuccess(true);
+      // Update logo URL if changed
+      if (result.logo) {
+        setFormData(prev => ({
+          ...prev,
+          logoUrl: `http://127.0.0.1:8000${result.logo}`,
+          logo: null
+        }));
       }
-    } catch (error) {
-      console.error("Error:", error);
-      setError("An error occurred while saving");
-    } finally {
-      setLoading(false);
+    } else {
+      const errorData = await response.json();
+      setError(errorData.message || "Save failed");
     }
-  };
+  } catch (error) {
+    console.error("Error:", error);
+    setError("An error occurred while saving");
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     const fetchSettings = async () => {

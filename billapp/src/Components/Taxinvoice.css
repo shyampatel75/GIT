@@ -6,7 +6,7 @@ body {
 }
 
 .container {
-    background-color: #8f3636;
+    background-color: #fff;
     padding: 20px;
     margin-top: 20px;
     box-shadow: 0 0 10px rgba(126, 126, 126, 0.1);
@@ -621,7 +621,7 @@ height: 100%;
   position: fixed;
   bottom: 20px;
   right: 20px;
-  background: #ff4444;
+  background: #4451ff;
   color: white;
   padding: 15px;
   border-radius: 4px;
@@ -632,4 +632,47 @@ height: 100%;
 @keyframes slideIn {
   from { transform: translateX(100%); }
   to { transform: translateX(0); }
+}
+
+
+/* Add to your Taxinvoice.css */
+.input-error {
+  border: 1px solid #6644ff !important;
+}
+
+.error-message {
+  color: #6644ff;
+  font-size: 12px;
+  margin-top: 4px;
+  display: block;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.Toastify__toast {
+  font-size: 14px;
+}
+
+.Toastify__toast--error {
+  background-color: #ffffff;
+}
+
+.input-error {
+  border: 1px solid rgb(167, 230, 21);
+}
+
+.error-message {
+  color: rgb(0, 255, 170);
+  font-size: 12px;
+}
+
+.Toastify__progress-bar--error {
+    background: rgb(29, 54, 163);
+}
+
+.states{
+    padding-top: 10px !important;
+    height: 47px;
 }

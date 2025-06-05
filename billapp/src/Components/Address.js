@@ -17,13 +17,14 @@ const Address = () => {
   const fetchInvoices = useCallback(async () => {
     try {
       setLoading(true);
+      setError(""); // Clear previous errors
       const token = localStorage.getItem("access_token");
       if (!token) {
         navigate("/login");
         return;
       }
 
-      const response = await fetch("http://localhost:8000/api/invoices/", {
+      const response = await fetch("http://localhost:8000/api/grouped-invoices/", {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -31,14 +32,17 @@ const Address = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch invoices');
+        // Try to get error details from response
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
       setInvoices(data);
+      setSuccess("Invoices loaded successfully");
     } catch (err) {
       console.error("Error fetching invoices:", err);
-      setError(err.message || "Failed to load invoices");
+      setError(err.message || "Failed to load invoices. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -47,6 +51,7 @@ const Address = () => {
   useEffect(() => {
     fetchInvoices();
   }, [fetchInvoices]);
+ 
 
   const handleDownload = async (invoiceId) => {
     try {
@@ -93,7 +98,7 @@ const Address = () => {
       // Preload the logo image
       const logoImg = new Image();
       logoImg.crossOrigin = "Anonymous";
-      logoImg.src = 'http://127.0.0.1:8000/media/favicon_cvGw7pn.png';
+      logoImg.src = `http://127.0.0.1:8000/media/favicon_cvGw7pn.png`;
       logoImg.onload = () => setLogoLoaded(true);
 
     } catch (err) {
@@ -207,6 +212,16 @@ const Address = () => {
     });
   };
 
+
+  const showDeleteToast = () => {
+    const toastEl = document.getElementById("deleteToast");
+    if (toastEl) {
+      const bsToast = new window.bootstrap.Toast(toastEl);
+      bsToast.show();
+    }
+  };
+
+
   const handleDelete = async (invoiceId) => {
     if (window.confirm("Are you sure you want to delete this invoice?")) {
       try {
@@ -230,7 +245,7 @@ const Address = () => {
           setInvoices((prevInvoices) =>
             prevInvoices.filter((invoice) => invoice.id !== invoiceId)
           );
-          setSuccess("Invoice deleted successfully!");
+
         } else {
           const errorData = await res.json();
           throw new Error(errorData.message || 'Failed to delete invoice');
@@ -250,7 +265,7 @@ const Address = () => {
 
   return (
     <div className="containers" style={{ height: "100vh" }}>
-      {/* Alert Messages */}
+      {/* Alert Messages
       {error && (
         <div className="alert alert-danger" role="alert">
           {error}
@@ -260,7 +275,7 @@ const Address = () => {
         <div className="alert alert-success" role="alert">
           {success}
         </div>
-      )}
+      )} */}
 
       {/* New Bill Button */}
       <div className="d-grid gap-2 d-md-flex justify-content-md-end pt-2 pb-2 px-4">
@@ -292,87 +307,94 @@ const Address = () => {
                 <th>Buyer</th>
                 <th>Address</th>
                 <th>Total</th>
-                <th>items</th>
-
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {loading && invoices.length === 0 ? (
+              {loading ? (
                 <tr>
-                  <td colSpan="8" className="text-center">Loading invoices...</td>
+                  <td colSpan="5" className="text-center">
+                    <div className="spinner-border text-primary" role="status">
+                      <span className="visually-hidden">Loading...</span>
+                    </div>
+                  </td>
                 </tr>
-              ) : invoices.map((invoice, index) => (
-                <tr key={invoice.id}>
-                  <td>{index + 1}</td>
-
-                  {/* Buyer Name with Avatar */}
-                  <td>
-                    {invoice.buyer_name}
-                  </td>
-
-                  {/* Click-to-copy Address */}
-                  <td
-                    className="truncate address-hover"
-                    title={invoice.buyer_address}
-                    onClick={() => {
-                      navigator.clipboard.writeText(invoice.buyer_address);
-                      setSuccess("Address copied to clipboard!");
-                    }}
-                  >
-                    {invoice.buyer_address.length > 20
-                      ? invoice.buyer_address.slice(0, 20) + "..."
-                      : invoice.buyer_address}
-                  </td>
-
-                  <td>
-                    {invoice.currency} {parseFloat(invoice.total_with_gst).toFixed(2)}
-                  </td>
-
-                  {/* View Button */}
-                  <td className="d-flex justify-content-evenly">
-                    <button
-                      className="btn btn-outline-primary action-btn"
-                      onClick={() => navigate(`/invoice-detail/${invoice.id}`)}
-                      disabled={loading}
+              ) : error ? (
+                <tr>
+                  <td colSpan="5" className="text-center text-danger">
+                    {error}
+                    <button 
+                      className="btn btn-link"
+                      onClick={fetchInvoices}
                     >
-                      <i className="bi bi-eye"></i>
-                    </button>
-
-
-                    {/* Download Button */}
-
-                    <button
-                      className="btn btn-outline-success action-btn"
-                      onClick={() => handleDownload(invoice.id)}
-                      disabled={loading}
-                    >
-                      <i className="bi bi-download"></i>
-                    </button>
-
-
-                    {/* Edit Button */}
-
-                    <button
-                      className="btn btn-outline-warning action-btn"
-                      onClick={() => handleEdit(invoice.id)}
-                      disabled={loading}
-                    >
-                      <i className="bi bi-pencil-square"></i>
-                    </button>
-
-
-                    {/* Delete Button */}
-
-                    <button
-                      className="btn btn-outline-danger action-btn"
-                      onClick={() => handleDelete(invoice.id)}
-                      disabled={loading}
-                    >
-                      <i className="bi bi-trash3"></i>
+                      Retry
                     </button>
                   </td>
                 </tr>
-              ))}
+              ) : invoices.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="text-center">
+                    No invoices found
+                  </td>
+                </tr>
+              ) : (
+                invoices.flatMap((group) => (
+                  group.invoices.map((invoice, idx) => (
+                    <tr key={invoice.id}>
+                      <td>{idx === 0 ? group.serial_number : ''}</td>
+          <td>{group.buyer_name}</td>
+                      <td
+                        className="truncate address-hover"
+                        title={group.buyer_address}
+                        onClick={() => {
+                          navigator.clipboard.writeText(group.buyer_address);
+                          setSuccess("Address copied to clipboard!");
+                        }}
+                      >
+                        {group.buyer_address.length > 20
+              ? group.buyer_address.substring(0, 20) + "..."
+              : group.buyer_address}
+                      </td>
+                      <td>
+                        {invoice.currency} {parseFloat(invoice.total_with_gst).toFixed(2)}
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-outline-primary action-btn mx-1"
+                          onClick={() => navigate(`/invoice-detail/${invoice.id}`)}
+                          disabled={loading}
+                        >
+                          <i className="bi bi-eye"></i>
+                        </button>
+                        <button
+                          className="btn btn-outline-success action-btn mx-1"
+                          onClick={() => handleDownload(invoice.id)}
+                          disabled={loading}
+                        >
+                          <i className="bi bi-download"></i>
+                        </button>
+                        <button
+                          className="btn btn-outline-warning action-btn mx-1"
+                          onClick={() => handleEdit(invoice.id)}
+                          disabled={loading}
+                        >
+                          <i className="bi bi-pencil-square"></i>
+                        </button>
+                        <button
+                          className="btn btn-outline-danger action-btn mx-1"
+                          onClick={() => {
+                            handleDelete(invoice.id);
+                            showDeleteToast();
+                          }}
+                          disabled={loading}
+                        >
+                          <i className="bi bi-trash3"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ))
+              )}
             </tbody>
           </table>
         </div>

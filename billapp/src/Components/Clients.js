@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import './Address.css';
 
 const Clients = () => {
   const navigate = useNavigate();
@@ -10,7 +11,7 @@ const Clients = () => {
   const [logoLoaded, setLogoLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-   const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState(false);
   const printRef = useRef();
 
   const fetchWithAuth = async (url, options = {}) => {
@@ -25,7 +26,6 @@ const Clients = () => {
       const response = await fetch(url, { ...options, headers });
       if (!response.ok) {
         if (response.status === 401) {
-          // Token might be expired, redirect to login
           navigate('/login');
           return null;
         }
@@ -39,28 +39,28 @@ const Clients = () => {
     }
   };
 
-  useEffect(() => {
-    const fetchInvoices = async () => {
+  const fetchInvoices = useCallback(async () => {
+    try {
       setLoading(true);
       setError("");
-      try {
-        const data = await fetchWithAuth("http://localhost:8000/api/invoices/");
-        if (data) {
-          setInvoices(data);
-        }
-      } catch (err) {
-        console.error("Error fetching invoices:", err);
-        setError(err.message || "Error fetching invoices");
-      } finally {
-        setLoading(false);
+      const data = await fetchWithAuth("http://localhost:8000/api/grouped-invoices/");
+      if (data) {
+        setInvoices(data);
+        setSuccess("Invoices loaded successfully");
       }
-    };
-
-    fetchInvoices();
+    } catch (err) {
+      console.error("Error fetching invoices:", err);
+      setError(err.message || "Error fetching invoices");
+    } finally {
+      setLoading(false);
+    }
   }, [navigate]);
 
+  useEffect(() => {
+    fetchInvoices();
+  }, [fetchInvoices]);
 
-   const numberToWords = (num) => {
+  const numberToWords = (num) => {
     const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
     const teens = ["Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
     const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
@@ -100,8 +100,6 @@ const Clients = () => {
     return words.trim();
   };
 
-
-
   const handleDownload = async (invoiceId) => {
     try {
       setLoading(true);
@@ -109,14 +107,14 @@ const Clients = () => {
 
       // Fetch invoice data with auth
       const pdfBasicDetail = await fetchWithAuth(
-        ` http://localhost:8000/api/invoices/${invoiceId}/`
+        `http://localhost:8000/api/invoices/${invoiceId}/`
       );
 
       if (!pdfBasicDetail) return;
 
       // Fetch settings data with auth
       const pdfMainDetails = await fetchWithAuth(
-        ` http://localhost:8000/api/settings/`
+        `http://localhost:8000/api/settings/`
       );
 
       if (!pdfMainDetails) return;
@@ -149,67 +147,46 @@ const Clients = () => {
       return () => clearTimeout(timer);
     }
   }, [selectedInvoice, logoLoaded]);
-  
-const generatePDF = async () => {
-  const input = printRef.current;
-  if (!input) return;
 
-  try {
-    // Wait for all images to load
-    const images = input.querySelectorAll("img");
-    await Promise.all(
-      Array.from(images).map((img) => {
-        if (!img.complete || img.naturalHeight === 0) {
-          return new Promise((resolve) => {
-            img.onload = img.onerror = resolve;
-          });
-        }
-      })
-    );
+  const generatePDF = async () => {
+    const input = printRef.current;
+    if (input) {
+      try {
+        const canvas = await html2canvas(input, {
+          useCORS: true,
+          allowTaint: true,
+          scale: 2,
+          logging: true,
+        });
 
-    const canvas = await html2canvas(input, {
-      useCORS: true,
-      allowTaint: true,
-      scale: 2,
-      logging: true,
-    });
+        const imgData = canvas.toDataURL("image/png");
+        const pdf = new jsPDF("p", "mm", "A4");
 
-    const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF("p", "mm", "a4");
+        const margin = 10;
+        const pdfWidth = pdf.internal.pageSize.getWidth() - margin * 2;
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-    const margin = 10;
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const availableWidth = pageWidth - 2 * margin;
-    const imgHeight = (canvas.height * availableWidth) / canvas.width;
-    const imgX = margin;
-    const imgY = margin;
+        pdf.addImage(imgData, "PNG", margin, margin, pdfWidth, pdfHeight);
+        pdf.save(`Invoice_${selectedInvoice.invoice_number}.pdf`);
+      } catch (err) {
+        console.error("PDF generation error:", err);
+        setError(err.message || "PDF generation error");
+      } finally {
+        setSelectedInvoice(null);
+        setLogoLoaded(false);
+      }
+    }
+  };
 
-    pdf.addImage(imgData, "PNG", imgX, imgY, availableWidth, imgHeight);
-    pdf.save(`Invoice_${selectedInvoice.invoice_number}.pdf`);
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  };
 
-    setSuccess("Invoice downloaded successfully!");
-  } catch (err) {
-    console.error("PDF generation error:", err);
-    setError("Failed to generate PDF");
-  } finally {
-    setSelectedInvoice(null);
-    setLogoLoaded(false);
-  }
-};
-
-const formatDate = (dateString) => {
-  if (!dateString) return ''; // Handle empty or invalid dates
-  
-  const date = new Date(dateString);
-  
-  // Extract day, month, and year
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-based
-  const year = date.getFullYear();
-  
-  return `${day}-${month}-${year}`;
-};
   const handleNewBill = (invoice) => {
     navigate('/tax-invoice', {
       state: {
@@ -286,11 +263,16 @@ const formatDate = (dateString) => {
 
   return (
     <div className="containers" style={{ height: "100vh" }}>
-      {error && (
+      {/* {error && (
         <div className="alert alert-danger">
           {error}
         </div>
       )}
+      {success && (
+        <div className="alert alert-success">
+          {success}
+        </div>
+      )} */}
       {loading && (
         <div className="text-center mt-3">
           <div className="spinner-border" role="status">
@@ -317,59 +299,99 @@ const formatDate = (dateString) => {
               <tr>
                 <th>No.</th>
                 <th>Buyer Name</th>
+                <th>Address</th>
                 <th>Bill Number</th>
                 <th>Total Amount</th>
                 <th>items</th>
               </tr>
             </thead>
             <tbody>
-              {invoices.map((invoice, index) => (
-                <tr key={invoice.id}>
-                  <td>{index + 1}</td>
-                  <td>{invoice.buyer_name}</td>
-                  <td>{invoice.invoice_number}</td>
-                  <td>
-                    {invoice.currency} {parseFloat(invoice.total_with_gst).toFixed(2)}
+              {loading ? (
+                <tr>
+                  <td colSpan="6" className="text-center">
+                    <div className="spinner-border" role="status">
+                      <span className="visually-hidden">Loading...</span>
+                    </div>
                   </td>
-                  <td className="d-flex flex-wrap gap-2 justify-content-center">
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => navigate(`/invoice-detail/${invoice.id}`)}
-                      disabled={loading}
-                    >
-                      View
-                    </button>
-                    <button
-                      className="btn btn-success"
-                      onClick={() => handleDownload(invoice.id)}
-                      disabled={loading}
-                    >
-                      Download
-                    </button>
-                    <button
-                      className="btn btn-secondary"
-                      onClick={() => handleNewBill(invoice)}
-                      disabled={loading}
-                    >
-                      Newbill
-                    </button>
-                    <button
-                      className="btn btn-warning"
-                      onClick={() => handleEdit(invoice)}
-                      disabled={loading}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="btn btn-danger"
-                      onClick={() => handleDelete(invoice.id)}
-                      disabled={loading}
-                    >
-                      Delete
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan="6" className="text-center text-danger">
+                    {error}
+                    <button className="btn btn-link" onClick={fetchInvoices}>
+                      Retry
                     </button>
                   </td>
                 </tr>
-              ))}
+              ) : invoices.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="text-center">
+                    No invoices found
+                  </td>
+                </tr>
+              ) : (
+                invoices.flatMap((group) => (
+                  group.invoices.map((invoice, idx) => (
+                    <tr key={invoice.id}>
+                      <td>{idx === 0 ? group.serial_number : ''}</td>
+                      <td>{group.buyer_name}</td>
+                      <td
+                        className="truncate address-hover"
+                        title={group.buyer_address}
+                        onClick={() => {
+                          navigator.clipboard.writeText(group.buyer_address);
+                          setSuccess("Address copied to clipboard!");
+                        }}
+                      >
+                        {group.buyer_address.length > 20
+                          ? group.buyer_address.substring(0, 20) + "..."
+                          : group.buyer_address}
+                      </td>
+                      <td>{invoice.invoice_number}</td>
+                      <td>
+                        {invoice.currency} {parseFloat(invoice.total_with_gst).toFixed(2)}
+                      </td>
+                      <td className="d-flex flex-wrap gap-2 justify-content-center">
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => navigate(`/invoice-detail/${invoice.id}`)}
+                          disabled={loading}
+                        >
+                          View
+                        </button>
+                        <button
+                          className="btn btn-success"
+                          onClick={() => handleDownload(invoice.id)}
+                          disabled={loading}
+                        >
+                          Download
+                        </button>
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => handleNewBill(invoice)}
+                          disabled={loading}
+                        >
+                          Newbill
+                        </button>
+                        <button
+                          className="btn btn-warning"
+                          onClick={() => handleEdit(invoice)}
+                          disabled={loading}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="btn btn-danger"
+                          onClick={() => handleDelete(invoice.id)}
+                          disabled={loading}
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ))
+              )}
             </tbody>
           </table>
         </div>

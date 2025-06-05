@@ -3,17 +3,21 @@ import { useNavigate } from "react-router-dom";
 
 const BillManager = () => {
   const navigate = useNavigate();
-  const [invoices, setInvoices] = useState([]);
-  const [groupedClients, setGroupedClients] = useState([]);
-  const [otherTransactions, setOtherTransactions] = useState([]);
-  const [groupedOther, setGroupedOther] = useState([]);
-  const [companyTransactions, setCompanyTransactions] = useState([]);
-  const [groupedCompany, setGroupedCompany] = useState([]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [filterText, setFilterText] = useState("");
   const [category, setCategory] = useState("all");
   const [allCombined, setAllCombined] = useState([]);
+
+
+  const [invoices, setInvoices] = useState([]);
+const [groupedClients, setGroupedClients] = useState([]);
+const [otherTransactions, setOtherTransactions] = useState([]);
+const [groupedOther, setGroupedOther] = useState([]);
+const [companyTransactions, setCompanyTransactions] = useState([]);
+const [groupedCompany, setGroupedCompany] = useState([]);
+
 
   useEffect(() => {
     fetchAllData();
@@ -89,6 +93,7 @@ const BillManager = () => {
           amount: inv.total_amount,
           date: inv.invoice_date,
           note: inv.note || "-",
+          original: inv,  // <- Add this line
         })),
         ...otherData.map((txn) => ({
           source: "Other",
@@ -96,6 +101,7 @@ const BillManager = () => {
           amount: txn.other_amount,
           date: txn.other_date,
           note: txn.other_notice || "-",
+          original: txn,  // <- Add this line
         })),
         ...companyData.map((txn) => ({
           source: "Company",
@@ -103,8 +109,10 @@ const BillManager = () => {
           amount: txn.amount,
           date: txn.transaction_date,
           note: txn.notice || "-",
+          original: txn,  // <- Add this line
         })),
       ];
+
       setAllCombined(allFormatted);
 
     } catch (err) {
@@ -134,7 +142,6 @@ const BillManager = () => {
     <div style={{ padding: "10px 21px 10px 82px" }}>
       {error && <div className="alert alert-danger">{error}</div>}
       <h3>Bill Manager</h3>
-
       <div className="mb-3 d-flex align-items-center gap-2">
         <select
           className="form-select"
@@ -151,13 +158,12 @@ const BillManager = () => {
         <input
           type="text"
           className="form-control"
-          placeholder={`Filter by ${
-            category === "other"
-              ? "Type or Amount"
-              : category === "company"
+          placeholder={`Filter by ${category === "other"
+            ? "Type or Amount"
+            : category === "company"
               ? "Company Name or Amount"
               : "Name or GST"
-          }`}
+            }`}
           value={filterText}
           onChange={(e) => setFilterText(e.target.value)}
           style={{ maxWidth: "300px" }}
@@ -175,42 +181,77 @@ const BillManager = () => {
         </div>
       ) : (
         <>
-         {category === "all" && (
-  <>
-    <h4>All Transactions</h4>
-    {allCombined.length === 0 ? (
-      <p>No transactions found.</p>
-    ) : (
-      <table className="table table-bordered table-hover text-center">
-        <thead className="table-dark">
-          <tr>
-            <th>No.</th>
-            <th>Type</th>
-            <th>Name</th>
-            <th>Date</th>
-            <th>Note</th>
-          </tr>
-        </thead>
-        <tbody>
-          {allCombined.map((txn, index) => (
-            <tr key={index}>
-              <td>{index + 1}</td>
-              <td>{txn.source}</td>
-              <td>{txn.name}</td>
-              <td>
-                {txn.date && !isNaN(new Date(txn.date))
-                  ? new Date(txn.date).toLocaleDateString("en-GB")
-                  : "-"}
-              </td>
-              <td>{txn.note}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    )}
-  </>
-)}
-
+          {category === "all" && (
+            <>
+              <h4>All Transactions</h4>
+              {allCombined.length === 0 ? (
+                <p>No transactions found.</p>
+              ) : (
+                <>
+                  <table className="table table-bordered table-hover text-center">
+                    <thead className="table-dark">
+                      <tr>
+                        <th>No.</th>
+                        <th>Type</th>
+                        <th>Name</th>
+                        <th>Date</th>
+                        <th>Note</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allCombined
+                        .filter((txn) =>
+                          txn.source.toLowerCase().includes(filterText.toLowerCase()) ||
+                          txn.name.toLowerCase().includes(filterText.toLowerCase()) ||
+                          txn.note.toLowerCase().includes(filterText.toLowerCase())
+                        )
+                        .sort((a, b) => {
+                          const dateA = new Date(a.date);
+                          const dateB = new Date(b.date);
+                          // Handle invalid dates by pushing them to the end
+                          if (isNaN(dateA)) return 1;
+                          if (isNaN(dateB)) return -1;
+                          return dateA - dateB; // ascending order
+                        })
+                        .map((txn, index) => (
+                          <tr
+                            key={index}
+                            style={{ cursor: "pointer" }}
+                            onClick={() => {
+                              const { source, original } = txn;
+                              if (source === "Invoice") {
+                                navigate("/invoice-details/:id", {
+                                  state: {
+                                    buyer_name: original.buyer_name,
+                                    buyer_gst: original.buyer_gst,
+                                  },
+                                });
+                              } else if (source === "Other") {
+                                navigate(`/banking/other-type/${original.other_type}`);
+                              } else if (source === "Company") {
+                                navigate(`/banking/company/${original.company_name}`, {
+                                  state: { company_name: original.company_name },
+                                });
+                              }
+                            }}
+                          >
+                            <td>{index + 1}</td>
+                            <td>{txn.source}</td>
+                            <td>{txn.name}</td>
+                            <td>
+                              {txn.date && !isNaN(new Date(txn.date))
+                                ? new Date(txn.date).toLocaleDateString("en-GB")
+                                : "-"}
+                            </td>
+                            <td>{txn.note}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+            </>
+          )}
 
           {category === "invoice" && (
             <>
