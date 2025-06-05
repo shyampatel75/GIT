@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Invoice,Setting,Statement, Deposit,Buyer, CompanyBill, Salary, Other,BankingDeposit,RemainingAmount,Employee
+from .models import Invoice,Setting,Statement, Deposit,Buyer, CompanyBill, Salary, Other,BankingDeposit,Employee
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
@@ -16,7 +16,7 @@ admin.site.register(Salary)
 admin.site.register(Other)
 admin.site.register(Employee)
 admin.site.register(BankingDeposit)
-admin.site.register(RemainingAmount)
+# admin.site.register(RemainingAmount)
 
 
 

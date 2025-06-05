@@ -1,8 +1,11 @@
+# from django.forms import DecimalField
+from django.db import models
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics, permissions
-from .models import Invoice, Setting, Deposit,CompanyBill, Buyer, Salary, Other,BankingDeposit,Employee,Bank
-from .serializers import InvoiceSerializer,SettingSerializer, DepositSerializer,CompanyBillSerializer, BuyerSerializer, SalarySerializer, OtherSerializer,BankingDepositSerializer,EmployeeSerializer,RemainingAmountSerializer,UserProfile,RemainingAmount
+from .models import Invoice, Setting, Deposit,CompanyBill, Buyer, Salary, Other,BankingDeposit,Employee,Bank,BankAccount
+from .serializers import InvoiceSerializer,SettingSerializer, DepositSerializer,CompanyBillSerializer, BuyerSerializer, SalarySerializer, OtherSerializer,BankingDepositSerializer,EmployeeSerializer,UserProfile,BankAccountSerializer
 from django.contrib.auth.models import User
 from datetime import datetime
 from django.http import JsonResponse,FileResponse,Http404,HttpResponseBadRequest
@@ -19,6 +22,10 @@ from django.contrib.auth import get_user_model
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import UserProfileSerializer
+from django.db.models import Sum, F
+from decimal import Decimal
+from django.db.models import DecimalField
+from collections import defaultdict
 
 
 
@@ -186,17 +193,7 @@ def create_invoice(request):
             "status": "error",
             "message": str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-       
-# @api_view(['GET'])
-# def get_next_available_number(request):
-#     try:
-#         next_number, financial_year = get_next_invoice_number()
-#         return Response({
-#             "invoice_number": next_number,
-#             "financial_year": financial_year
-#         })
-#     except Exception as e:
-#         return Response({"error": str(e)}, status=500)
+
    
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
@@ -229,26 +226,6 @@ class InvoiceDetailView(generics.RetrieveAPIView):
 # ========================
 # ⚙ Setting APIs
 # ========================
-
-# @api_view(['GET', 'POST'])
-# @permission_classes([IsAuthenticated])
-# def settings_list_create(request):
-#     if request.method == 'GET':
-#         settings = Setting.objects.all()
-#         serializer = SettingSerializer(settings, many=True)
-#         return Response(serializer.data)
-
-#     elif request.method == 'POST':
-#         existing_setting = Setting.objects.first()
-#         if existing_setting:
-#             serializer = SettingSerializer(existing_setting, data=request.data)
-#         else:
-#             serializer = SettingSerializer(data=request.data)
-
-#         if serializer.is_valid():
-#             serializer.save()
-#             return Response(serializer.data, status=status.HTTP_200_OK if existing_setting else status.HTTP_201_CREATED)
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
@@ -586,127 +563,6 @@ def user_profile_view(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-# @api_view(['GET', 'POST', 'PATCH', 'PUT'])
-# @permission_classes([IsAuthenticated])
-# def remaining_amount_view(request):
-#     # Get or create remaining amount record
-#     remaining_amount, created = RemainingAmount.objects.get_or_create(user=request.user)
-#     remaining_amount = RemainingAmount.objects.last()
-#     if not remaining_amount:
-#         remaining_amount = RemainingAmount.objects.create(amount=0.00)
-
-#     if request.method == 'POST':
-#         serializer = RemainingAmountSerializer(data=request.data)
-#         if serializer.is_valid():
-#             serializer.save()
-#             return Response(serializer.data, status=status.HTTP_201_CREATED)
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-#     elif request.method in ['PATCH', 'PUT']:
-#         # For PUT, we'll merge existing data with request data
-#         if request.method == 'PUT':
-#             data = {**RemainingAmountSerializer(remaining_amount).data, **request.data}
-#         else:
-#             data = request.data
-            
-#         serializer = RemainingAmountSerializer(
-#             remaining_amount, 
-#             data=data, 
-#             partial=(request.method == 'PATCH')
-#         )
-        
-#         if serializer.is_valid():
-#             serializer.save()
-#             return Response(serializer.data)
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-#     elif request.method == 'GET':
-#         serializer = RemainingAmountSerializer(remaining_amount)
-#         return Response(serializer.data)
-    
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_buyer_remaining_amount(request, buyer_gst):
-    try:
-        # Find invoices with this GST number
-        invoices = Invoice.objects.filter(buyer_gst=buyer_gst)
-        
-        if not invoices.exists():
-            return Response(
-                {"detail": "No invoices found with this GST number"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
-        # Get buyer name from first invoice (assuming same buyer for same GST)
-        buyer_name = invoices.first().buyer_name
-        
-        # Find remaining amount - now using buyer_name instead of GST
-        remaining_amount = RemainingAmount.objects.filter(
-            buyer__buyer_name=buyer_name
-        ).first()
-        
-        if not remaining_amount:
-            return Response(
-                {"detail": "No remaining amount record found for this buyer"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-            
-        # Serialize with both GST and buyer info
-        response_data = {
-            "buyer_name": buyer_name,
-            "buyer_gst": buyer_gst,
-            
-            "amount": str(remaining_amount.amount),
-            
-        }
-        
-        return Response(response_data)
-        
-    except Exception as e:
-        return Response(
-            {"detail": str(e)},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-
-# List all or create new RemainingAmount
-@api_view(['GET', 'POST'])
-def remaining_amount_list(request):
-    if request.method == 'GET':
-        remaining_amounts = RemainingAmount.objects.all()
-        serializer = RemainingAmountSerializer(remaining_amounts, many=True)
-        return Response(serializer.data)
-    
-    elif request.method == 'POST':
-        serializer = RemainingAmountSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-# Retrieve, update, or delete a specific RemainingAmount by id (pk)
-@api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
-def remaining_amount_detail(request, pk):
-    try:
-        remaining_amount = RemainingAmount.objects.get(pk=pk)
-    except RemainingAmount.DoesNotExist:
-        return Response(status=status.HTTP_404_NOT_FOUND)
-
-    if request.method == 'GET':
-        serializer = RemainingAmountSerializer(remaining_amount)
-        return Response(serializer.data)
-
-    elif request.method in ['PUT', 'PATCH']:
-        partial = (request.method == 'PATCH')
-        serializer = RemainingAmountSerializer(remaining_amount, data=request.data, partial=partial)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    elif request.method == 'DELETE':
-        remaining_amount.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -723,67 +579,268 @@ def get_invoices_by_gst(request, gst_number):
 @permission_classes([IsAuthenticated])
 def settings_list_create(request):
     if request.method == 'GET':
-        # # Ensure at least one settings exists
-        # if Setting.objects.count() == 0:
-        #     Setting.objects.create_default_settings()
-            
-        settings = Setting.objects.all()
-        serializer = SettingSerializer(settings, many=True)
+        # Get settings for current user or create default if none exists
+        setting, created = Setting.objects.get_or_create(user=request.user)
+        serializer = SettingSerializer(setting)
         return Response(serializer.data)
 
     elif request.method == 'POST':
-        existing_setting = Setting.objects.first()
-        if existing_setting:
-            serializer = SettingSerializer(existing_setting, data=request.data)
-        else:
-            serializer = SettingSerializer(data=request.data)
-
+        # Always work with the current user's settings
+        setting, created = Setting.objects.get_or_create(user=request.user)
+        serializer = SettingSerializer(setting, data=request.data, partial=True)
+        
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK if existing_setting else status.HTTP_201_CREATED)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def company_balance(request, buyer_gst):
+    try:
+        # Get invoices ordered by date
+        invoices = Invoice.objects.filter(buyer_gst=buyer_gst).order_by('invoice_date')
+        first_invoice = invoices.first()
+        
+        # Initialize response data
+        response_data = {
+            "buyer_gst": buyer_gst,
+            "buyer_name": first_invoice.buyer_name if first_invoice else "",
+            "currency": first_invoice.currency if first_invoice else "",
+            "invoices": []
+        }
+
+        # Process each invoice individually
+        for invoice in invoices:
+            # Get deposits for this specific invoice
+            deposits = CompanyBill.objects.filter(
+                invoice_id=invoice.invoice_number
+            ).order_by('transaction_date')
+
+            # Calculate totals for this invoice
+            invoice_amount = invoice.total_with_gst or Decimal('0.00')
+            deposit_total = deposits.aggregate(
+                total=Sum('amount', output_field=DecimalField(max_digits=20, decimal_places=2))
+            )['total'] or Decimal('0.00')
+            
+            remaining_balance = invoice_amount - deposit_total
+
+            # Build transaction history with running balances for this invoice
+            transactions = []
+            running_balance = invoice_amount  # Start with full invoice amount
+            
+            # Add the invoice itself as first transaction
+            transactions.append({
+                'date': invoice.invoice_date.isoformat(),
+                'type': 'invoice',
+                'description': invoice.invoice_number,
+                'debit': float(invoice_amount),
+                'credit': None,
+                'balance': float(running_balance)
+            })
+
+            # Add each deposit
+            for deposit in deposits:
+                running_balance -= deposit.amount
+                transactions.append({
+                    'date': deposit.transaction_date.isoformat(),
+                    'type': 'deposit',
+                    'description': deposit.notice or "Deposit",
+                    'debit': None,
+                    'credit': float(deposit.amount),
+                    'balance': float(running_balance)
+                })
+
+            # Add invoice data to response
+            response_data['invoices'].append({
+                'invoice_number': invoice.invoice_number,
+                'invoice_date': invoice.invoice_date.isoformat(),
+                'invoice_amount': float(invoice_amount),
+                'deposit_total': float(deposit_total),
+                'remaining_balance': float(remaining_balance),
+                'transactions': transactions
+            })
+
+        # Calculate overall totals (optional - remove if not needed)
+        if invoices:
+            response_data['total_invoice_amount'] = float(invoices.aggregate(
+                total=Sum('total_with_gst', output_field=DecimalField(max_digits=20, decimal_places=2))
+            )['total'] or Decimal('0.00'))
+            
+            all_deposits = CompanyBill.objects.filter(
+                invoice_id__in=invoices.values_list('invoice_number', flat=True)
+            )
+            response_data['total_deposit_amount'] = float(all_deposits.aggregate(
+                total=Sum('amount', output_field=DecimalField(max_digits=20, decimal_places=2))
+            )['total'] or Decimal('0.00'))
+            
+            response_data['total_remaining_balance'] = response_data['total_invoice_amount'] - response_data['total_deposit_amount']
+
+        return Response(response_data)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
+    
+# @api_view(['POST'])
+# @permission_classes([IsAuthenticated])
+# def calculate_totals(request):
+#     try:
+#         data = request.data
+        
+#         # Validate inputs
+#         try:
+#             total_hours = float(data.get('total_hours', 0)) if data.get('total_hours') not in [None, ''] else 0
+#             rate = float(data.get('rate', 0)) if data.get('rate') not in [None, ''] else 0
+#             base_amount = float(data.get('base_amount', 0)) if data.get('base_amount') not in [None, ''] else 0
+#             country = data.get('country', 'India')
+#         except (TypeError, ValueError):
+#             return Response({'error': 'Invalid numeric values provided'}, status=400)
+        
+#         # Validate at least one calculation method is provided
+#         if not (total_hours and rate) and not base_amount:
+#             return Response({'error': 'Please provide either (hours and rate) or base amount'}, status=400)
+        
+#         # Calculate base amount
+#         if total_hours > 0 and rate > 0:
+#             calculated_base = total_hours * rate
+#         else:
+#             calculated_base = base_amount
+        
+#         # Initialize response
+#         response_data = {
+#             'base_amount': round(calculated_base, 2),
+#             'cgst': 0,
+#             'sgst': 0,
+#             'taxtotal': 0,
+#             'total_with_gst': round(calculated_base, 2)
+#         }
+        
+#         # Calculate taxes if India
+#         if country == 'India' and calculated_base > 0:
+#             tax = round((calculated_base * 9) / 100, 2)
+#             response_data.update({
+#                 'cgst': tax,
+#                 'sgst': tax,
+#                 'taxtotal': round(tax * 2, 2),
+#                 'total_with_gst': round(calculated_base + (2 * tax), 2)
+#             })
+        
+#         return Response(response_data)
+    
+#     except Exception as e:
+#         return Response({'error': str(e)}, status=400)
+
+
+
+
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def bank_account_list_create(request):
+    if request.method == 'GET':
+        accounts = BankAccount.objects.filter(is_deleted=False)  # only active ones
+        serializer = BankAccountSerializer(accounts, many=True)
+        return Response(serializer.data)
+
+    elif request.method == 'POST':
+        serializer = BankAccountSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def bank_account_detail(request, pk):
+    try:
+        account = BankAccount.objects.get(pk=pk)
+    except BankAccount.DoesNotExist:
+        return Response({"error": "Bank account not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = BankAccountSerializer(account)
+        return Response(serializer.data)
+
+    elif request.method == 'PUT':
+        serializer = BankAccountSerializer(account, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        account.is_deleted = True  # soft delete
+        account.save()
+        return Response({"message": "Bank account soft-deleted."}, status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def restore_bank_account(request, pk):
+    try:
+        account = BankAccount.objects.get(pk=pk, is_deleted=True)
+        account.is_deleted = False
+        account.save()
+        return Response({"message": "Bank account restored."}, status=status.HTTP_200_OK)
+    except BankAccount.DoesNotExist:
+        return Response({"error": "Bank account not found or not deleted."}, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def soft_deleted_bank_accounts(request):
+    accounts = BankAccount.objects.filter(is_deleted=True)
+    serializer = BankAccountSerializer(accounts, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def soft_deleted_bank_account_detail(request, pk):
+    try:
+        account = BankAccount.objects.get(pk=pk, is_deleted=True)
+        serializer = BankAccountSerializer(account)
+        return Response(serializer.data)
+    except BankAccount.DoesNotExist:
+        return Response({"error": "Soft-deleted bank account not found."}, status=status.HTTP_404_NOT_FOUND)
 
 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def get_remaining_balances(request):
+def grouped_invoices(request):
+    # Get all invoices ordered by buyer details
+    invoices = Invoice.objects.all().order_by(
+        'buyer_name', 
+        'buyer_address', 
+        'buyer_gst',
+        '-invoice_date'  # Optional: newest first within groups
+    )
+    
+    # Group invoices by buyer details
+    groups = defaultdict(list)
+    for invoice in invoices:
+        key = (invoice.buyer_name, invoice.buyer_address, invoice.buyer_gst)
+        groups[key].append(invoice)
+    
+    # Prepare response data
+    result = []
+    for idx, (key, invoice_list) in enumerate(groups.items(), start=1):
+        result.append({
+            'serial_number': idx,
+            'buyer_name': key[0],
+            'buyer_address': key[1],
+            'buyer_gst': key[2],
+            'invoices': InvoiceSerializer(invoice_list, many=True).data
+        })
+    
+    return Response(result)
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def permanently_delete_bank_account(request, pk):
     try:
-        # Get all invoices
-        invoices = Invoice.objects.all()
-        # Get all buyer transactions
-        buyer_transactions = Buyer.objects.all()
-        
-        # Calculate totals per buyer
-        buyer_totals = {}
-        for txn in buyer_transactions:
-            name = txn.buyer_name
-            buyer_totals[name] = buyer_totals.get(name, 0) + float(txn.deposit_amount or 0)
-        
-        invoice_totals = {}
-        for invoice in invoices:
-            name = invoice.buyer_name
-            invoice_totals[name] = invoice_totals.get(name, 0) + float(invoice.total_with_gst or 0)
-        
-        # Calculate remaining balances
-        remaining_balances = {}
-        all_buyers = set(list(buyer_totals.keys()) + list(invoice_totals.keys()))
-        
-        for buyer in all_buyers:
-            remaining_balances[buyer] = invoice_totals.get(buyer, 0) - buyer_totals.get(buyer, 0)
-        
-        # Prepare response data
-        response_data = [{
-            'buyer_name': buyer,
-            'total_invoiced': invoice_totals.get(buyer, 0),
-            'total_paid': buyer_totals.get(buyer, 0),
-            'remaining_balance': remaining_balances[buyer]
-        } for buyer in all_buyers if remaining_balances[buyer] != 0]
-        
-        return Response(response_data)
-        
-    except Exception as e:
-        return Response(
-            {'error': str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        account = BankAccount.objects.get(pk=pk, is_deleted=True)
+        account.delete()  # This performs a hard delete
+        return Response({"message": "Bank account permanently deleted."}, status=status.HTTP_204_NO_CONTENT)
+    except BankAccount.DoesNotExist:
+        return Response({"error": "Soft-deleted bank account not found."}, status=status.HTTP_404_NOT_FOUND)

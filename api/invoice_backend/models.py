@@ -46,12 +46,11 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     def _str_(self):
         return self.email
 
-
 class Invoice(models.Model):
     # Buyer Info (required fields)
     buyer_name = models.CharField(max_length=255)
     buyer_address = models.TextField()
-    buyer_gst = models.CharField(max_length=20)
+    buyer_gst = models.CharField(max_length=20, blank=True, null=True)
     
     # Consignee Info (optional)
     consignee_name = models.CharField(max_length=255, blank=True, null=True)
@@ -148,60 +147,34 @@ class Invoice(models.Model):
 
 class Setting(models.Model):
     # Seller Info
-    company_name = models.CharField(max_length=255, default='Unknown')
-    seller_address = models.TextField(default='Not Provided')
-    seller_email = models.EmailField(default='noemail@example.com')
-    seller_pan = models.CharField(max_length=20, default='UNKNOWN')
-    seller_gstin = models.CharField(max_length=20, default='UNKNOWN')
+    company_name = models.CharField(max_length=255, default='Your Company')
+    seller_address = models.TextField(default='Your Address')
+    seller_email = models.EmailField(default='your@email.com')
+    seller_pan = models.CharField(max_length=20, default='ABCDE1234F')
+    seller_gstin = models.CharField(max_length=20, default='22AAAAA0000A1Z5')
 
     # Company Bank Details
-    bank_account_holder = models.CharField(max_length=255, default='Company Account')
-    bank_name = models.CharField(max_length=255, default='XYZ Bank')
-    account_number = models.CharField(max_length=50, default='000000000000')
-    ifsc_code = models.CharField(max_length=20, default='XYZB0000000')
+    bank_account_holder = models.CharField(max_length=255, default='Your Name')
+    bank_name = models.CharField(max_length=255, default='Bank Name')
+    account_number = models.CharField(max_length=50, default='1234567890')
+    ifsc_code = models.CharField(max_length=20, default='ABCD0123456')
     branch = models.CharField(max_length=255, default='Main Branch')
-    swift_code = models.CharField(max_length=20, default='XYZ000')
-    company_code = models.CharField(max_length=20, default='COMPANY000')
-    # HSN_code = models.IntegerField(default=1)
-    HSN_codes = models.JSONField(
-        default=list,
-        blank=True,
-        help_text="List of HSN codes"
-    )
-    # Company Logo
-    logo = models.ImageField(upload_to='', null=True, blank=True)
+    swift_code = models.CharField(max_length=20, default='SWIFT0001')
+    company_code = models.CharField(max_length=20, default='COMP0001')
+    
+    HSN_codes = models.JSONField(default=list)
+    logo = models.ImageField(upload_to='company_logos/', null=True, blank=True)
     last_invoice_number = models.IntegerField(default=0)
+    
+    # Link to user (one-to-one relationship)
+    user = models.OneToOneField(
+    settings.AUTH_USER_MODEL,
+    on_delete=models.CASCADE,
+    primary_key=True
+)
 
-    # Link to user who owns these settings
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True
-    )
 
-    @classmethod
-    def create_default_settings(cls):
-        default_hsn = [{'code': '9983'}]
-        
-    def create_default_settings(cls):
-        return cls.objects.create(
-            company_name="Your Company",
-            seller_address="Your Address",
-            seller_email="your@email.com",
-            seller_pan="ABCDE1234F",
-            seller_gstin="22AAAAA0000A1Z5",
-            bank_account_holder="Your Company",
-            bank_name="Bank Name",
-            account_number="123456789012",
-            ifsc_code="BANK0001234",
-            branch="Main Branch",
-            swift_code="SWFT0001",
-            company_code="COMPANY0001",
-            HSN_code=1,
-            last_invoice_number=00
-        )
-    def _str_(self):
+    def __str__(self):
         return f"{self.company_name} - Settings"
 
 class Statement(models.Model):
@@ -216,11 +189,6 @@ class Statement(models.Model):
     @property
     def total_deposited(self):
         return sum(deposit.amount for deposit in self.deposits.all())
-
-    @property
-    def remaining_balance(self):
-        return self.amount - self.total_deposited
-
 
 class Deposit(models.Model):
     statement = models.ForeignKey(Statement, on_delete=models.CASCADE, related_name='deposits')
@@ -240,14 +208,11 @@ class Buyer(models.Model):
     transaction_date = models.DateField(default=timezone.now)  # Changed from selected_date
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     notice = models.TextField(default="No remarks")
-    payment_method = models.CharField(max_length=50, default='Cash',null=False) 
+    payment_method = models.CharField(max_length=100, null=False, default='Cash')
     bank_name = models.CharField(max_length=100, null=True, blank=True,default=None)
 
     def __str__(self):
         return f"{self.buyer_name} - {self.transaction_date}"
-    
-
-
 
 class Bank(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -312,7 +277,6 @@ class Other(models.Model):
     payment_method = models.CharField(max_length=10, choices=PAYMENT_CHOICES, null=True, blank=True)
     bank_name = models.CharField(max_length=100, null=True, blank=True)
     
-
     def _str_(self):  
         return f"{self.other_type} ({self.transaction_type}) - {self.other_date} - ${abs(self.other_amount)}"
     
@@ -329,19 +293,9 @@ class BankingDeposit(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateField()
     
-
     def _str_(self):
         return f"{self.amount} on {self.date}"
     
-class RemainingAmount(models.Model):
-    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, null=True, blank=True)
-
-    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    
-
-    def _str_(self):
-        return f"{self.invoice.buyer_name} ({self.invoice.buyer_gst}) - Remaining: {self.amount}"
-
 class Employee(models.Model):
     name = models.CharField(max_length=100)
     joining_date = models.DateField()
@@ -368,3 +322,14 @@ class UserProfile(models.Model):
 
     def _str_(self):
         return f"Profile for {self.user.email}"
+
+
+
+class BankAccount(models.Model):
+    bank_name = models.CharField(max_length=100)
+    account_number = models.CharField(max_length=50)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    is_deleted = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.bank_name} - {self.account_number}"

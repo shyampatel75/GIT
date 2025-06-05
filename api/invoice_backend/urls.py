@@ -1,8 +1,6 @@
 from django.urls import path
 from . import views
-from .views import InvoiceDetailView
-from .views import MyTokenObtainPairView
-
+from .views import InvoiceDetailView, MyTokenObtainPairView
 
 urlpatterns = [
     # Invoice paths
@@ -11,61 +9,47 @@ urlpatterns = [
     path('create/', views.create_invoice, name='create-invoice'),
     path('update/<int:pk>/', views.invoice_detail, name='update-invoice'),
     path('delete/<int:pk>/', views.invoice_detail, name='delete-invoice'),
-
-    path('get_next_invoice_number/', views.get_next_invoice_number,name='get_next_invoice_number'),
-    # path("invoices/by-buyer/", views.get_invoices_by_buyer),
-    # path('api/last-invoice/', views.get_latest_invoice_number, name='last-invoice'),
-    # path('invoices/next-invoice-number/', views.generate_next_invoice_number, name='next-invoice-number'),
-    # path('invoices/<int:invoice_id>/download/', views.download_invoice_pdf, name='download-invoice'),
-    # path('invoices/next-invoice-number/', views.get_next_available_number, name='next-invoice-number'),
+    path('get_next_invoice_number/', views.get_next_invoice_number, name='get_next_invoice_number'),
+    path('invoices/by-gst/<str:gst_number>/', views.get_invoices_by_gst, name='get_invoices_by_gst'),
+    path('grouped-invoices/', views.grouped_invoices, name='grouped-invoices'),
 
     # Settings paths
     path('settings/', views.settings_list_create, name='settings-list-create'),
     path('settings/<int:pk>/', views.update_setting, name='update-setting'),
     path('settings/<int:pk>/delete/', views.delete_setting, name='delete-setting'),
 
-    # Signup
-    # path('signup/', views.signup_user, name='signup'),
-
-    # Statement and Deposit paths (with class-based view)
-    # path('statements/<int:invoice_id>/', views.statement_list, name='statement-list'),
-    # path('deposits/<int:statement_id>/', views.deposit_list, name='deposit-list'),
-    # path('invoices/<int:invoice_id>/statements/', StatementListAPIView.as_view(), name='statement-list'),
-    # path('statement/<int:statement_id>/deposits/', DepositListAPIView.as_view(), name='deposit-list'),
+    # User profile & authentication
+    path('profile/', views.user_profile_view, name='user-profile'),
+    path('auth/register/', views.register_user, name='register'),
+    path('auth/me/', views.get_current_user, name='current-user'),
+    path('auth/login/', MyTokenObtainPairView.as_view(), name='login'),
 
     # Banking Transaction paths
     path('banking/company/', views.create_company_transaction, name='create-company-transaction'),
-    path('banking/company/<int:pk>/', views.company_transaction_detail, name='company-transaction-detail'),  # GET for single
+    path('banking/company/<int:pk>/', views.company_transaction_detail, name='company-transaction-detail'),
 
     path('banking/buyer/', views.create_buyer_transaction, name='create-buyer-transaction'),
-    path('banking/buyer/<int:pk>/', views.buyer_transaction_detail, name='buyer-transaction-detail'),  # GET for single
-    path('banks/', views.bank_list, name='bank_list'),
+    path('banking/buyer/<int:pk>/', views.buyer_transaction_detail, name='buyer-transaction-detail'),
 
     path('banking/salary/', views.create_salary_transaction, name='create-salary-transaction'),
-    path('banking/salary/<int:pk>/', views.salary_transaction_detail, name='salary-transaction-detail'),  # GET for single
-    
+    path('banking/salary/<int:pk>/', views.salary_transaction_detail, name='salary-transaction-detail'),
+
     path('banking/other/', views.create_other_transaction, name='create-other-transaction'),
-    path('banking/other/<int:pk>/', views.other_transaction_detail, name='other-transaction-detail'),  # GET for single
+    path('banking/other/<int:pk>/', views.other_transaction_detail, name='other-transaction-detail'),
 
     path('banking/employee/', views.employee_list_create, name='employee-list-create'),
     path('employees/<int:pk>/', views.employee_detail, name='employee-detail'),
 
     path('add-deposit/', views.add_bankingdeposit, name='add-deposit'),
 
+    # Bank account management
+    path('bank-accounts/', views.bank_account_list_create, name='bank-account-list-create'),
+    path('bank-accounts/<int:pk>/', views.bank_account_detail, name='bank-account-detail'),
+    path('bank-accounts/<int:pk>/restore/', views.restore_bank_account, name='restore-account'),
+    path('bank-accounts/deleted/', views.soft_deleted_bank_accounts, name='soft-deleted-bank-accounts'),
+    path('bank-accounts/deleted/<int:pk>/', views.soft_deleted_bank_account_detail, name='soft-deleted-bank-account-detail'),
 
-    # path('remaining-amount/', views.remaining_amount_view, name='remaining-amount'),
-    path('remaining-amounts/', views.remaining_amount_list, name='remaining_amount_list'),
-    path('remaining-amounts/<int:pk>/', views.remaining_amount_detail, name='remaining_amount_detail'),
-    path('remaining-balances/', views.get_remaining_balances, name='remaining-balances'),
-
-    path('profile/', views.user_profile_view, name='user-profile'),
-
-    path('auth/register/', views.register_user, name='register'),
-    # path('auth/login/', views.login_user, name='login'),
-    path('auth/me/', views.get_current_user, name='current-user'),
-    path('auth/login/', MyTokenObtainPairView.as_view(), name='login'),
-
-    path('invoices/by-gst/<str:gst_number>/', views.get_invoices_by_gst, name='get_invoices_by_gst'),
-
-
+    # Company balance utility
+    path('company-balance/<str:buyer_gst>/', views.company_balance, name='company-balance'),
+    path('bank-accounts/deleted/<int:pk>/permanent-delete/', views.permanently_delete_bank_account, name='permanently-delete-account'),
 ]
