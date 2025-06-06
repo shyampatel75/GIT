@@ -13,8 +13,7 @@ const ViewsButton = () => {
     useEffect(() => {
         const token = localStorage.getItem("access_token");
         if (!token) {
-            // If no token, redirect to login or show error
-            navigate("/login"); // Adjust the path as needed
+            navigate("/login");
             return;
         }
 
@@ -36,21 +35,38 @@ const ViewsButton = () => {
                     const errText = await settingsRes.text();
                     throw new Error(`Settings fetch failed: ${errText}`);
                 }
+                
                 const invoiceData = await invoiceRes.json();
                 const settingsData = await settingsRes.json();
 
+                // Enhanced debugging
+                console.log("Settings API Response:", settingsData);
+                console.log("Settings data type:", typeof settingsData);
+                console.log("Is Array:", Array.isArray(settingsData));
+
                 setInvoice(invoiceData);
-                if (Array.isArray(settingsData) && settingsData.length > 0) {
-                    setSettings(settingsData[0]);
+
+                // Handle different possible response formats
+                if (Array.isArray(settingsData)) {
+                    if (settingsData.length > 0) {
+                        setSettings(settingsData[0]);
+                    } else {
+                        throw new Error("Settings array is empty");
+                    }
+                } else if (settingsData && typeof settingsData === 'object') {
+                    // If it's a single object, use it directly
+                    setSettings(settingsData);
                 } else {
-                    throw new Error("Settings data empty or invalid");
+                    throw new Error("Settings data format is invalid");
                 }
+                
                 setError("");
             })
             .catch((err) => {
                 console.error("Error fetching data:", err);
                 setError(err.message || "Failed to fetch data");
-                // Optionally redirect on auth failure
+                
+                // Handle authentication errors
                 if (err.message.includes("401") || err.message.includes("403")) {
                     navigate("/login");
                 }
@@ -58,24 +74,32 @@ const ViewsButton = () => {
             .finally(() => setLoading(false));
     }, [id, navigate]);
 
-const formatDate = (dateString) => {
-  if (!dateString) return ''; // Handle empty or invalid dates
-  
-  const date = new Date(dateString);
-  
-  // Extract day, month, and year
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-based
-  const year = date.getFullYear();
-  
-  return `${day}-${month}-${year}`;
-};
+    const formatDate = (dateString) => {
+        if (!dateString) return '';
+        
+        const date = new Date(dateString);
+        
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        
+        return `${day}-${month}-${year}`;
+    };
+
     if (loading) {
         return <div>Loading invoice and settings...</div>;
     }
 
     if (error) {
-        return <div style={{ color: "red" }}>Error: {error}</div>;
+        return (
+            <div style={{ color: "red", padding: "20px" }}>
+                <h3>Error: {error}</h3>
+                <p>Please check the console for more details.</p>
+                <button onClick={() => window.location.reload()}>
+                    Retry
+                </button>
+            </div>
+        );
     }
 
     if (!invoice || !settings) {
@@ -100,17 +124,18 @@ const formatDate = (dateString) => {
                                         </td>
                                     </tr>
                                     <tr>
-                                        {/* {data.seller_address} */}
-                                        {settings.seller_address}
-                                        <br />
-                                        Email:{settings.seller_email}
-                                        <br />
-                                        PAN:{settings.seller_pan}
-                                        <br />
+                                        <td>
+                                            {settings.seller_address}
+                                            <br />
+                                            Email: {settings.seller_email}
+                                            <br />
+                                            PAN: {settings.seller_pan}
+                                            <br />
+                                        </td>
                                     </tr>
                                     <tr>
                                         <td className="gray-background">
-                                            <strong>  GSTIN/UIN:</strong>{settings.seller_gstin}
+                                            <strong>GSTIN/UIN:</strong> {settings.seller_gstin}
                                         </td>
                                     </tr>
                                 </tbody>
@@ -121,7 +146,7 @@ const formatDate = (dateString) => {
                                 <tbody style={{border: "2px solid"}}>
                                     <tr>
                                         <td className="gray-background">
-                                            <strong>Buyer (Bill to):</strong>  {invoice.buyer_name}
+                                            <strong>Buyer (Bill to):</strong> {invoice.buyer_name}
                                         </td>
                                     </tr>
                                     <tr>
@@ -137,7 +162,7 @@ const formatDate = (dateString) => {
                                     </tr>
                                     <tr>
                                         <td className="gray-background">
-                                            <strong>  GSTIN/UIN:</strong>{invoice.buyer_gst}
+                                            <strong>GSTIN/UIN:</strong> {invoice.buyer_gst}
                                         </td>
                                     </tr>
                                 </tbody>
@@ -160,12 +185,11 @@ const formatDate = (dateString) => {
                                             }}
                                         >
                                             {invoice.consignee_address}
-
                                         </td>
                                     </tr>
                                     <tr>
                                         <td className="gray-background">
-                                            <strong>  GSTIN/UIN:</strong>{invoice.consignee_gst}
+                                            <strong>GSTIN/UIN:</strong> {invoice.consignee_gst}
                                         </td>
                                     </tr>
                                 </tbody>
@@ -177,9 +201,7 @@ const formatDate = (dateString) => {
                                 <tbody style={{border: "2px solid"}}>
                                     <tr>
                                         <td style={{ width: "50%" }}>Invoice No.</td>
-                                        <td>
-                                            {invoice.invoice_number}
-                                        </td>
+                                        <td>{invoice.invoice_number}</td>
                                     </tr>
                                     <tr>
                                         <td>Date</td>
@@ -205,9 +227,9 @@ const formatDate = (dateString) => {
                             </table>
 
                             <table className="table table-bordered black-bordered">
-                                <tbody style={{ width: "100%",border: "2px solid"}}>
+                                <tbody style={{ width: "100%", border: "2px solid"}}>
                                     <tr>
-                                        <td className="gray-background" >
+                                        <td className="gray-background">
                                             <strong>Terms to Delivery:</strong>
                                         </td>
                                     </tr>
@@ -216,30 +238,24 @@ const formatDate = (dateString) => {
                                             maxWidth: "250px",
                                             overflowWrap: "break-word",
                                             height: "150px",
-                                        }}>{invoice.Terms_to_delivery}</td>
+                                        }}>
+                                            {invoice.Terms_to_delivery}
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
 
                             <div className="relative w-72">
-                                {/* Selected Country (Dropdown Trigger) */}
                                 <p>
                                     <strong>Country and currency:</strong>
                                 </p>
-                                <div
-                                    className="border border-gray-300 p-2 rounded flex items-center justify-between cursor-pointer bg-white" >
-
-                                    <div
-                                        className="flex items-center"
-                                        style={{ height: "30px" }}
-                                    >
+                                <div className="border border-gray-300 p-2 rounded flex items-center justify-between cursor-pointer bg-white">
+                                    <div className="flex items-center" style={{ height: "30px" }}>
                                         <span className="mr-2">
-                                            {/* {selectedCountry.name} - {selectedCountry.currency} */}
                                             {invoice.country} {invoice.currency}
                                         </span>
                                     </div>
                                 </div>
-
                             </div>
 
                             <input type="hidden" id="currencyTitle" value="INR" />
@@ -247,6 +263,7 @@ const formatDate = (dateString) => {
                         </div>
                     </div>
 
+                    {/* Rest of the component remains the same */}
                     <div className="row">
                         <div className="col-xs-12">
                             <table className="table table-bordered black-bordered">
@@ -267,12 +284,10 @@ const formatDate = (dateString) => {
                                         <td style={{ width: "130px" }}>{invoice.hsn_code}</td>
                                         <td style={{ width: "10%" }}>{invoice.total_hours}</td>
                                         <td style={{ width: "10%" }}>{invoice.rate}</td>
-
                                         <td style={{ width: "200px" }}>
                                             <span className="currency-sym">
                                                 {invoice.currency} {invoice.base_amount}
                                             </span>
-
                                         </td>
                                     </tr>
                                     {invoice.country === "India" && (
@@ -286,13 +301,9 @@ const formatDate = (dateString) => {
                                                 <td></td>
                                                 <td>9%</td>
                                                 <td id="cgst">
-                                                    <span className="currency-sym">{invoice.currency} {invoice.cgst} </span>
-
+                                                    <span className="currency-sym">{invoice.currency} {invoice.cgst}</span>
                                                 </td>
                                             </tr>
-
-
-
                                             <tr className="inside-india">
                                                 <td></td>
                                                 <td>
@@ -303,7 +314,6 @@ const formatDate = (dateString) => {
                                                 <td>9%</td>
                                                 <td id="sgst">
                                                     <span className="currency-sym">{invoice.currency} {invoice.sgst}</span>
-
                                                 </td>
                                             </tr>
                                         </>
@@ -314,10 +324,8 @@ const formatDate = (dateString) => {
                                         </td>
                                         <td>
                                             <strong id="total-with-gst">
-                                                <span className="currency-sym">
-
-                                                </span>
-                                                {invoice.currency}   {invoice.total_with_gst}
+                                                <span className="currency-sym"></span>
+                                                {invoice.currency} {invoice.total_with_gst}
                                             </strong>
                                         </td>
                                     </tr>
@@ -335,7 +343,7 @@ const formatDate = (dateString) => {
                                     </p>
                                     <h4 className="total-in-words">
                                         <span className="currency-text">INR</span>{" "}
-                                        {/* {numberToWords(Math.floor(formData.total_with_gst))} */}
+                                        {/* Add number to words conversion here */}
                                     </h4>
                                     <div className="top-right-corner">
                                         <span>E. & O.E</span>
@@ -345,20 +353,17 @@ const formatDate = (dateString) => {
                         </div>
                     </div>
 
-
-                    <div className="row">
-                        {invoice.country === "India" && (
+                    {invoice.country === "India" && (
+                        <div className="row">
                             <div className="col-xs-12 inside-india">
                                 <table className="table table-bordered invoice-table">
                                     <thead style={{border:"2px solid"}}>
-                                        <tr >
+                                        <tr>
                                             <th rowSpan="2">HSN/SAC</th>
                                             <th rowSpan="2">Taxable Value</th>
                                             <th colSpan="2">Central Tax</th>
                                             <th colSpan="2">State Tax</th>
-                                            <th colSpan="2" rowSpan="2">
-                                                Total Tax Amount
-                                            </th>
+                                            <th colSpan="2" rowSpan="2">Total Tax Amount</th>
                                         </tr>
                                         <tr>
                                             <th>Rate</th>
@@ -372,10 +377,7 @@ const formatDate = (dateString) => {
                                             <td>
                                                 <span className="hns_select_text">{invoice.hsn_code}</span>
                                             </td>
-                                            <td className="taxable-value">
-                                                {/* {formData.base_amount} */}
-                                                {invoice.base_amount}
-                                            </td>
+                                            <td className="taxable-value">{invoice.base_amount}</td>
                                             <td>9%</td>
                                             <td className="tax-cgst">{invoice.cgst}</td>
                                             <td>9%</td>
@@ -384,44 +386,37 @@ const formatDate = (dateString) => {
                                         </tr>
                                         <tr className="total-row">
                                             <td>Total</td>
-
-                                            <td className="total-taxable">
-                                                {/* {formData.base_amount} */}
-                                                {invoice.base_amount}
-                                            </td>
+                                            <td className="total-taxable">{invoice.base_amount}</td>
                                             <td></td>
                                             <td className="total-tax-cgst">{invoice.cgst}</td>
                                             <td></td>
                                             <td className="total-tax-sgst">{invoice.sgst}</td>
-                                            <td className="total-tax-amount">
-                                            {invoice.taxtotal}
-                                            </td>
+                                            <td className="total-tax-amount">{invoice.taxtotal}</td>
                                         </tr>
                                     </tbody>
                                 </table>
                             </div>
-                        )}
-                        <div style={{ padding: "0 0 0 20px" }}>
-                            <div className="col-xs-12 inside-india">
-                                <div>
-                                    <strong>Tax Amount (in words):</strong>
-                                    <span className="total-tax-in-words">
-                                        <span className="currency-text">INR</span>{" "}
-                                        {/* {numberToWords(Math.floor(formData.total_with_gst))} */}
-                                    </span>
+                            <div style={{ padding: "0 0 0 20px" }}>
+                                <div className="col-xs-12 inside-india">
+                                    <div>
+                                        <strong>Tax Amount (in words):</strong>
+                                        <span className="total-tax-in-words">
+                                            <span className="currency-text">INR</span>{" "}
+                                            {/* Add number to words conversion here */}
+                                        </span>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="col-xs-12">
-                                <div>
-                                    <h4>
-                                        <strong>Remarks:</strong>
-                                    </h4>
-                                    <h5 className="html-remark">{invoice.remark}</h5>
+                                <div className="col-xs-12">
+                                    <div>
+                                        <h4>
+                                            <strong>Remarks:</strong>
+                                        </h4>
+                                        <h5 className="html-remark">{invoice.remark}</h5>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-
+                    )}
 
                     <div className="row">
                         <div className="col-x-12">
@@ -441,15 +436,14 @@ const formatDate = (dateString) => {
                                 SWIFT Code: {settings.swift_code}
                             </div>
                             <div className="text-right signatory">
-                                {/* {data.logo && (
-                    <img
-                      src={`http://127.0.0.1:8000${data.logo}`}
-                      alt="Company Logo"
-                      className="logo-image"
-                    />
-                  )} */}
-                                <img className="logo-image" src={`http://127.0.0.1:8000${settings.logo}`} alt="Logo" height={100} />
-
+                                {settings.logo && (
+                                    <img 
+                                        className="logo-image" 
+                                        src={`http://127.0.0.1:8000${settings.logo}`} 
+                                        alt="Logo" 
+                                        height={100} 
+                                    />
+                                )}
                                 <p>for Grabsolve Infotech</p>
                                 <p>Authorized Signatory</p>
                             </div>
@@ -458,9 +452,6 @@ const formatDate = (dateString) => {
                 </div>
                 <p className="text-center">This is a Computer Generated Invoice</p>
             </div>
-
-
-
         </div>
     );
 };

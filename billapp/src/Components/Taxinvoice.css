@@ -676,3 +676,30 @@ height: 100%;
     padding-top: 10px !important;
     height: 47px;
 }
+.inr-conversion {
+  font-size: 0.8em;
+  color: #666;
+  margin-top: 5px;
+}
+
+.inr-conversion {
+  font-size: 0.8em;
+  color: #666;
+  margin-top: 5px;
+}
+
+.inr-conversion-words {
+  font-size: 0.9em;
+  color: #666;
+  margin-top: 5px;
+  display: block;
+}
+
+.exchange-rate-note {
+  font-size: 0.9em;
+  color: #666;
+  margin-top: 5px;
+  padding: 5px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}

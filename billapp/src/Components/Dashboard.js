@@ -9,20 +9,19 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
- const menuItems = [
-  { label: "Bills", icon: "bi-receipt-cutoff", path: "/year-table" },
-  { label: "Clients", icon: "bi-person-lines-fill", path: "/clients" },
-  { label: "Address", icon: "bi-house-add-fill", path: "/address" },
-  { label: "Accounting", icon: "bi-calculator-fill", path: "/billmanager" },
-  { label: "Balance Sheet", icon: "bi-layout-text-sidebar-reverse", path: "/balancesheet" },
-  { label: "Balance Sheet 2", icon: "bi-layout-text-window-reverse", path: "/balancesheet2" },
-  { label: "Banking", icon: "bi-bank2", path: "/banking" },
-  { label: "Bank Add", icon: "bi-building-add", path: "/bankadd" },  // ✅ New item added here
-  { label: "Buyer", icon: "bi-cart-fill", path: "/buyer" },
-  { label: "Employee", icon: "bi-person-badge-fill", path: "/employee" },
-  { label: "Income Expenditure", icon: "bi-wallet-fill", path: "/incomeExpenditure" },
-];
-
+  const menuItems = [
+    { label: "Bills", icon: "bi-receipt-cutoff", path: "/year-table" },
+    { label: "Clients", icon: "bi-person-lines-fill", path: "/clients" },
+    { label: "Address", icon: "bi-house-add-fill", path: "/address" },
+    { label: "Accounting", icon: "bi-calculator-fill", path: "/billmanager" },
+    { label: "Balance Sheet", icon: "bi-layout-text-sidebar-reverse", path: "/balancesheet" },
+    { label: "Balance Sheet 2", icon: "bi-layout-text-window-reverse", path: "/balancesheet2" },
+    { label: "Banking", icon: "bi-bank2", path: "/banking" },
+    { label: "Bank Add", icon: "bi-building-add", path: "/bankadd" },
+    { label: "Buyer", icon: "bi-cart-fill", path: "/buyer" },
+    { label: "Employee", icon: "bi-person-badge-fill", path: "/employee" },
+    { label: "Income Expenditure", icon: "bi-wallet-fill", path: "/incomeExpenditure" },
+  ];
 
   const verifyToken = useCallback(async () => {
     const token = localStorage.getItem("access_token");
@@ -66,17 +65,14 @@ const Dashboard = () => {
       margin: "0 auto",
     },
     title: {
-      textalign: "start",
-      marginbottom: "30px",
+      textAlign: "start",
+      marginBottom: "20px",
       color: "rgb(51, 51, 51)",
-      fontsize: "20px",
-      marginBottom: "20px"
+      fontSize: "20px",
     },
-
     chartContainer: {
       marginBottom: "40px",
       padding: "20px",
-
       borderRadius: "8px",
     },
     icon: {
@@ -111,6 +107,7 @@ const Dashboard = () => {
       <div style={styles.container}>
         <h1 style={styles.title}>Dashboard</h1>
 
+        {/* Uncomment to show chart */}
         {/* <div style={styles.chartContainer}>
           <h4 className="mb-3">Customer Overview</h4>
           <Newscustomerchart />

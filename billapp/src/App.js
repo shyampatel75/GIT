@@ -30,6 +30,7 @@ import IncomeExpenditure from "./Components/IncomeExpenditure .js";
 import OtherTypeTransactions from "./Components/OtherTransactionDetails.js";
 import CompanyTransactions from "./Components/CompanyTransactions.js";
 import BankAdd from "./Components/BankAdd .js";
+import BuyerTransaction from "./Components/BuyerTransaction.js";
 // import IncomeExpenditure from "./Components/CorrectFileName.js"; // use correct file name
 // import IncomeExpenditure from "./Components/IncomeExpenditure.js";
 
@@ -77,6 +78,9 @@ const AppContent = () => {
           <Route path="/banking/other-type/:type" element={<OtherTypeTransactions />} />
           <Route path="/banking/company/:companyName" element={<CompanyTransactions />} />
           <Route path="/bankadd" element={<BankAdd />} />
+          
+<Route path="/banking/buyer/:buyerName" element={<BuyerTransaction />} />
+
 
 
         </Routes>

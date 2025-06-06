@@ -10,14 +10,11 @@ const BillManager = () => {
   const [category, setCategory] = useState("all");
   const [allCombined, setAllCombined] = useState([]);
 
-
   const [invoices, setInvoices] = useState([]);
-const [groupedClients, setGroupedClients] = useState([]);
-const [otherTransactions, setOtherTransactions] = useState([]);
-const [groupedOther, setGroupedOther] = useState([]);
-const [companyTransactions, setCompanyTransactions] = useState([]);
-const [groupedCompany, setGroupedCompany] = useState([]);
-
+  const [groupedClients, setGroupedClients] = useState([]);
+  const [otherTransactions, setOtherTransactions] = useState([]);
+  const [buyerTransactions, setBuyerTransactions] = useState([]);
+  const [groupedBuyers, setGroupedBuyers] = useState([]);
 
   useEffect(() => {
     fetchAllData();
@@ -34,7 +31,7 @@ const [groupedCompany, setGroupedCompany] = useState([]);
         "Content-Type": "application/json",
       };
 
-      // Invoices
+      // Fetch Invoices
       const invoiceRes = await fetch("http://localhost:8000/api/invoices/", { headers });
       if (!invoiceRes.ok) throw new Error("Failed to fetch invoices.");
       const invoiceData = await invoiceRes.json();
@@ -42,11 +39,12 @@ const [groupedCompany, setGroupedCompany] = useState([]);
 
       const grouped = {};
       invoiceData.forEach((invoice) => {
-        const key = `${invoice.buyer_name}-${invoice.buyer_gst}`;
+        const key = `${invoice.buyer_name}-${invoice.buyer_gst}-${invoice.buyer_address}`;
         if (!grouped[key]) {
           grouped[key] = {
             buyer_name: invoice.buyer_name,
             buyer_gst: invoice.buyer_gst,
+            buyer_address: invoice.buyer_address,
             invoices: [invoice],
           };
         } else {
@@ -55,45 +53,33 @@ const [groupedCompany, setGroupedCompany] = useState([]);
       });
       setGroupedClients(Object.values(grouped));
 
-      // Other transactions
       const otherRes = await fetch("http://localhost:8000/api/banking/other/", { headers });
       if (!otherRes.ok) throw new Error("Failed to fetch 'other' transactions.");
       const otherData = await otherRes.json();
       setOtherTransactions(otherData);
 
-      const groupedOtherMap = otherData.reduce((acc, txn) => {
-        const key = txn.other_type;
+      const buyerRes = await fetch("http://localhost:8000/api/banking/buyer/", { headers });
+      if (!buyerRes.ok) throw new Error("Failed to fetch buyer transactions.");
+      const buyerData = await buyerRes.json();
+      setBuyerTransactions(buyerData);
+
+      const groupedBuyerMap = buyerData.reduce((acc, txn) => {
+        const key = txn.buyer_name;
         if (!acc[key]) {
           acc[key] = txn;
         }
         return acc;
       }, {});
-      setGroupedOther(Object.values(groupedOtherMap));
+      setGroupedBuyers(Object.values(groupedBuyerMap));
 
-      // Company transactions
-      const companyRes = await fetch("http://localhost:8000/api/banking/company/", { headers });
-      if (!companyRes.ok) throw new Error("Failed to fetch company transactions.");
-      const companyData = await companyRes.json();
-      setCompanyTransactions(companyData);
-
-      const groupedCompanyMap = companyData.reduce((acc, txn) => {
-        const key = txn.company_name;
-        if (!acc[key]) {
-          acc[key] = txn;
-        }
-        return acc;
-      }, {});
-      setGroupedCompany(Object.values(groupedCompanyMap));
-
-      // Combine all data
-      const allFormatted = [
+      const combined = [
         ...invoiceData.map((inv) => ({
           source: "Invoice",
           name: inv.buyer_name,
           amount: inv.total_amount,
           date: inv.invoice_date,
           note: inv.note || "-",
-          original: inv,  // <- Add this line
+          original: inv,
         })),
         ...otherData.map((txn) => ({
           source: "Other",
@@ -101,20 +87,26 @@ const [groupedCompany, setGroupedCompany] = useState([]);
           amount: txn.other_amount,
           date: txn.other_date,
           note: txn.other_notice || "-",
-          original: txn,  // <- Add this line
+          original: txn,
         })),
-        ...companyData.map((txn) => ({
-          source: "Company",
-          name: txn.company_name,
+        ...buyerData.map((txn) => ({
+          source: "Buyer",
+          name: txn.buyer_name,
           amount: txn.amount,
           date: txn.transaction_date,
           note: txn.notice || "-",
-          original: txn,  // <- Add this line
+          original: txn,
         })),
       ];
 
-      setAllCombined(allFormatted);
-
+      const uniqueMap = new Map();
+      combined.forEach((txn) => {
+        const key = `${txn.source}-${txn.name}`;
+        if (!uniqueMap.has(key)) {
+          uniqueMap.set(key, txn);
+        }
+      });
+      setAllCombined(Array.from(uniqueMap.values()));
     } catch (err) {
       console.error(err);
       setError(err.message);
@@ -128,20 +120,27 @@ const [groupedCompany, setGroupedCompany] = useState([]);
     client.buyer_gst.toLowerCase().includes(filterText.toLowerCase())
   );
 
-  const filteredOther = groupedOther.filter((txn) =>
-    txn.other_type?.toLowerCase().includes(filterText.toLowerCase()) ||
-    txn.other_amount?.toString().includes(filterText)
+  const filteredOther = otherTransactions.filter((txn, index, self) =>
+    index === self.findIndex(t => t.other_type === txn.other_type) &&
+    (
+      txn.other_type?.toLowerCase().includes(filterText.toLowerCase()) ||
+      txn.other_amount?.toString().includes(filterText)
+    )
   );
 
-  const filteredCompany = groupedCompany.filter((txn) =>
-    txn.company_name?.toLowerCase().includes(filterText.toLowerCase()) ||
-    txn.amount?.toString().includes(filterText)
+  const filteredBuyers = groupedBuyers.filter((txn, index, self) =>
+    index === self.findIndex(t => t.buyer_name === txn.buyer_name) &&
+    (
+      txn.buyer_name?.toLowerCase().includes(filterText.toLowerCase()) ||
+      txn.amount?.toString().includes(filterText)
+    )
   );
 
   return (
     <div style={{ padding: "10px 21px 10px 82px" }}>
       {error && <div className="alert alert-danger">{error}</div>}
       <h3>Bill Manager</h3>
+
       <div className="mb-3 d-flex align-items-center gap-2">
         <select
           className="form-select"
@@ -150,7 +149,7 @@ const [groupedCompany, setGroupedCompany] = useState([]);
           onChange={(e) => setCategory(e.target.value)}
         >
           <option value="invoice">Invoice</option>
-          <option value="company">Company</option>
+          <option value="buyer">Buyer</option>
           <option value="other">Other</option>
           <option value="all">All</option>
         </select>
@@ -159,10 +158,10 @@ const [groupedCompany, setGroupedCompany] = useState([]);
           type="text"
           className="form-control"
           placeholder={`Filter by ${category === "other"
-            ? "Type or Amount"
-            : category === "company"
-              ? "Company Name or Amount"
-              : "Name or GST"
+              ? "Type or Amount"
+              : category === "buyer"
+                ? "Buyer Name or Amount"
+                : "Name or GST"
             }`}
           value={filterText}
           onChange={(e) => setFilterText(e.target.value)}
@@ -187,68 +186,58 @@ const [groupedCompany, setGroupedCompany] = useState([]);
               {allCombined.length === 0 ? (
                 <p>No transactions found.</p>
               ) : (
-                <>
-                  <table className="table table-bordered table-hover text-center">
-                    <thead className="table-dark">
-                      <tr>
-                        <th>No.</th>
-                        <th>Type</th>
-                        <th>Name</th>
-                        <th>Date</th>
-                        <th>Note</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allCombined
-                        .filter((txn) =>
-                          txn.source.toLowerCase().includes(filterText.toLowerCase()) ||
-                          txn.name.toLowerCase().includes(filterText.toLowerCase()) ||
-                          txn.note.toLowerCase().includes(filterText.toLowerCase())
-                        )
-                        .sort((a, b) => {
-                          const dateA = new Date(a.date);
-                          const dateB = new Date(b.date);
-                          // Handle invalid dates by pushing them to the end
-                          if (isNaN(dateA)) return 1;
-                          if (isNaN(dateB)) return -1;
-                          return dateA - dateB; // ascending order
-                        })
-                        .map((txn, index) => (
-                          <tr
-                            key={index}
-                            style={{ cursor: "pointer" }}
-                            onClick={() => {
-                              const { source, original } = txn;
-                              if (source === "Invoice") {
-                                navigate("/invoice-details/:id", {
-                                  state: {
-                                    buyer_name: original.buyer_name,
-                                    buyer_gst: original.buyer_gst,
-                                  },
-                                });
-                              } else if (source === "Other") {
-                                navigate(`/banking/other-type/${original.other_type}`);
-                              } else if (source === "Company") {
-                                navigate(`/banking/company/${original.company_name}`, {
-                                  state: { company_name: original.company_name },
-                                });
-                              }
-                            }}
-                          >
-                            <td>{index + 1}</td>
-                            <td>{txn.source}</td>
-                            <td>{txn.name}</td>
-                            <td>
-                              {txn.date && !isNaN(new Date(txn.date))
-                                ? new Date(txn.date).toLocaleDateString("en-GB")
-                                : "-"}
-                            </td>
-                            <td>{txn.note}</td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </>
+                <table className="table table-bordered table-hover text-center">
+                  <thead className="table-dark">
+                    <tr>
+                      <th>No.</th>
+                      <th>Type</th>
+                      <th>Name</th>
+                      <th>Amount</th>
+                      <th>Date</th>
+                      <th>Note</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allCombined
+                      .filter((txn) =>
+                        txn.source.toLowerCase().includes(filterText.toLowerCase()) ||
+                        txn.name.toLowerCase().includes(filterText.toLowerCase()) ||
+                        txn.note.toLowerCase().includes(filterText.toLowerCase()) ||
+                        txn.amount.toString().includes(filterText)
+                      )
+                      .sort((a, b) => new Date(a.date) - new Date(b.date))
+                      .map((txn, index) => (
+                        <tr
+                          key={index}
+                          style={{ cursor: "pointer" }}
+                          onClick={() => {
+                            const { source, original } = txn;
+                            if (source === "Invoice") {
+                              navigate("/invoice-details/:id", {
+                                state: {
+                                  buyer_name: original.buyer_name,
+                                  buyer_gst: original.buyer_gst,
+                                },
+                              });
+                            } else if (source === "Other") {
+                              navigate(`/banking/other-type/${original.other_type}`);
+                            } else if (source === "Buyer") {
+                              navigate(`/banking/buyer/${original.buyer_name}`, {
+                                state: { buyer_name: original.buyer_name },
+                              });
+                            }
+                          }}
+                        >
+                          <td>{index + 1}</td>
+                          <td>{txn.source}</td>
+                          <td>{txn.name}</td>
+                          <td>{txn.amount}</td>
+                          <td>{txn.date ? new Date(txn.date).toLocaleDateString("en-GB") : "-"}</td>
+                          <td>{txn.note}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
               )}
             </>
           )}
@@ -264,6 +253,7 @@ const [groupedCompany, setGroupedCompany] = useState([]);
                       <th>No.</th>
                       <th>Buyer Name</th>
                       <th>GST Number</th>
+                      <th>Invoice Count</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -283,6 +273,7 @@ const [groupedCompany, setGroupedCompany] = useState([]);
                         <td>{index + 1}</td>
                         <td>{client.buyer_name}</td>
                         <td>{client.buyer_gst}</td>
+                        <td>{client.invoices.length}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -313,9 +304,7 @@ const [groupedCompany, setGroupedCompany] = useState([]);
                       <tr
                         key={index}
                         style={{ cursor: "pointer" }}
-                        onClick={() =>
-                          navigate(`/banking/other-type/${txn.other_type}`)
-                        }
+                        onClick={() => navigate(`/banking/other-type/${txn.other_type}`)}
                       >
                         <td>{index + 1}</td>
                         <td>{txn.transaction_type}</td>
@@ -331,38 +320,42 @@ const [groupedCompany, setGroupedCompany] = useState([]);
             </>
           )}
 
-          {category === "company" && (
+          {category === "buyer" && (
             <>
-              <h4>Company Banking Transactions</h4>
-              {filteredCompany.length === 0 ? (
+              <h4>Buyer Banking Transactions</h4>
+              {filteredBuyers.length === 0 ? (
                 <p>No transactions found.</p>
               ) : (
                 <table className="table table-bordered table-hover text-center">
                   <thead className="table-dark">
                     <tr>
                       <th>No.</th>
-                      <th>Company Name</th>
+                      <th>Buyer Name</th>
                       <th>Amount (₹)</th>
                       <th>Date</th>
                       <th>Note</th>
+                      <th>Payment Method</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredCompany.map((txn, index) => (
+                    {filteredBuyers.map((txn, index) => (
                       <tr
                         key={index}
                         style={{ cursor: "pointer" }}
                         onClick={() =>
-                          navigate(`/banking/company/${txn.company_name}`, {
-                            state: { company_name: txn.company_name }
+                          navigate(`/banking/buyer/${txn.buyer_name}`, {
+                            state: { buyer_name: txn.transaction_date },
                           })
                         }
+
+
                       >
                         <td>{index + 1}</td>
-                        <td>{txn.company_name}</td>
+                        <td>{txn.buyer_name}</td>
                         <td>{txn.amount}</td>
                         <td>{new Date(txn.transaction_date).toLocaleDateString("en-GB")}</td>
                         <td>{txn.notice || "-"}</td>
+                        <td>{txn.payment_method}</td>
                       </tr>
                     ))}
                   </tbody>

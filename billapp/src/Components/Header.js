@@ -46,8 +46,8 @@ const Header = () => {
         )}
       </div>
 
-      <div className="header-right" onClick={() => navigate("/profile")}>
-        <i className="bi bi-person-circle profile-icon clickable"></i>
+      <div className="header-right" >
+        <i className="bi bi-person-circle profile-icon clickable" onClick={() => navigate("/profile")}></i>
       </div>
     </header>
   );

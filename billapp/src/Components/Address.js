@@ -2,47 +2,64 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import './Address.css';
 
 const Address = () => {
   const navigate = useNavigate();
+  const printRef = useRef();
   const [invoices, setInvoices] = useState([]);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [logoLoaded, setLogoLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
-  const printRef = useRef();
 
-  const fetchInvoices = useCallback(async () => {
+  // Auth fetch wrapper
+  const fetchWithAuth = async (url, options = {}) => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      navigate('/login');
+      return null;
+    }
+
     try {
-      setLoading(true);
-      setError(""); // Clear previous errors
-      const token = localStorage.getItem("access_token");
-      if (!token) {
-        navigate("/login");
-        return;
-      }
-
-      const response = await fetch("http://localhost:8000/api/grouped-invoices/", {
+      const response = await fetch(url, {
+        ...options,
         headers: {
+          ...options.headers,
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
 
       if (!response.ok) {
-        // Try to get error details from response
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        if (response.status === 401) {
+          navigate('/login');
+          return null;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+      return await response.json();
+    } catch (error) {
+      console.error('Fetch error:', error);
+      toast.error(error.message || "Failed to fetch data");
+      return null;
+    }
+  };
 
-      const data = await response.json();
-      setInvoices(data);
-      setSuccess("Invoices loaded successfully");
+  const fetchInvoices = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const data = await fetchWithAuth("http://localhost:8000/api/grouped-invoices/");
+      if (data) {
+        setInvoices(data);
+        toast.success("Invoices loaded successfully");
+      }
     } catch (err) {
       console.error("Error fetching invoices:", err);
-      setError(err.message || "Failed to load invoices. Please try again.");
+      toast.error(err.message || "Failed to load invoices");
     } finally {
       setLoading(false);
     }
@@ -51,63 +68,6 @@ const Address = () => {
   useEffect(() => {
     fetchInvoices();
   }, [fetchInvoices]);
- 
-
-  const handleDownload = async (invoiceId) => {
-    try {
-      setLoading(true);
-      setError("");
-      const token = localStorage.getItem("access_token");
-      if (!token) {
-        navigate("/login");
-        return;
-      }
-
-      // Fetch invoice data
-      const invoiceResponse = await fetch(`http://localhost:8000/api/invoices/${invoiceId}/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!invoiceResponse.ok) {
-        throw new Error('Failed to fetch invoice details');
-      }
-      const pdfBasicDetail = await invoiceResponse.json();
-
-      // Fetch settings data
-      const settingsResponse = await fetch(`http://localhost:8000/api/settings/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!settingsResponse.ok) {
-        throw new Error('Failed to fetch settings');
-      }
-      const pdfMainDetails = await settingsResponse.json();
-
-      // Set the combined data into state
-      setSelectedInvoice({
-        ...pdfBasicDetail,
-        ...pdfMainDetails[0]
-      });
-
-      // Preload the logo image
-      const logoImg = new Image();
-      logoImg.crossOrigin = "Anonymous";
-      logoImg.src = `http://127.0.0.1:8000/media/favicon_cvGw7pn.png`;
-      logoImg.onload = () => setLogoLoaded(true);
-
-    } catch (err) {
-      console.error("Download error:", err);
-      setError(err.message || "Failed to prepare invoice for download");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const numberToWords = (num) => {
     const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
@@ -149,49 +109,83 @@ const Address = () => {
     return words.trim();
   };
 
+  const handleDownload = async (invoiceId) => {
+    try {
+      setLoading(true);
+      setError("");
+
+      // Fetch invoice data
+      const pdfBasicDetail = await fetchWithAuth(
+        `http://localhost:8000/api/invoices/${invoiceId}/`
+      );
+      if (!pdfBasicDetail) return;
+
+      // Fetch settings data
+      const pdfMainDetails = await fetchWithAuth(
+        `http://localhost:8000/api/settings/`
+      );
+      if (!pdfMainDetails) return;
+
+      // Set combined data
+      setSelectedInvoice({
+        ...pdfBasicDetail,
+        ...pdfMainDetails[0]
+      });
+
+      // Preload logo
+      const logoImg = new Image();
+      logoImg.crossOrigin = "Anonymous";
+      logoImg.src = `http://127.0.0.1:8000${pdfMainDetails[0]?.logo || '/media/favicon_cvGw7pn.png'}`;
+      logoImg.onload = () => setLogoLoaded(true);
+
+    } catch (err) {
+      console.error("Download error:", err);
+      toast.error(err.message || "Failed to prepare invoice");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (selectedInvoice && logoLoaded) {
-      const timer = setTimeout(() => {
-        generatePDF();
-      }, 300);
-      return () => clearTimeout(timer);
+      generatePDF();
     }
   }, [selectedInvoice, logoLoaded]);
 
   const generatePDF = async () => {
-    const input = printRef.current;
-    if (input) {
-      try {
-        const canvas = await html2canvas(input, {
-          useCORS: true,
-          allowTaint: true,
-          scale: 2,
-          logging: true,
-        });
+    const input = printRef?.current;
+    if (!input) {
+      toast.error("PDF content not found");
+      return;
+    }
 
-        const imgData = canvas.toDataURL("image/png");
-        const pdf = new jsPDF("p", "mm", "a4");
+    try {
+      const canvas = await html2canvas(input, {
+        useCORS: true,
+        scale: 2,
+        logging: true,
+      });
 
-        const margin = 10; // 10mm margin
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
 
-        // Calculate width and height with margin
-        const availableWidth = pageWidth - 2 * margin;
-        const imgHeight = (canvas.height * availableWidth) / canvas.width;
-        const imgX = margin;
-        const imgY = (pageHeight - imgHeight) / 2; // Vertically center
+      const margin = 10;
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const availableWidth = pageWidth - 2 * margin;
+      const imgHeight = (canvas.height * availableWidth) / canvas.width;
 
-        pdf.addImage(imgData, "PNG", imgX, imgY, availableWidth, imgHeight);
-        pdf.save(`Invoice_${selectedInvoice.invoice_number}.pdf`);
-        setSuccess("Invoice downloaded successfully!");
-      } catch (err) {
-        console.error("PDF generation error:", err);
-        setError("Failed to generate PDF");
-      } finally {
-        setSelectedInvoice(null);
-        setLogoLoaded(false);
-      }
+      pdf.addImage(imgData, "PNG", margin, (pageHeight - imgHeight) / 2, availableWidth, imgHeight);
+      
+      const fileName = `Invoice_${selectedInvoice.invoice_number}.pdf`;
+      pdf.save(fileName);
+      toast.success("Invoice downloaded successfully!");
+    } catch (err) {
+      console.error("PDF generation error:", err);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setSelectedInvoice(null);
+      setLogoLoaded(false);
     }
   };
 
@@ -212,76 +206,63 @@ const Address = () => {
     });
   };
 
-
-  const showDeleteToast = () => {
-    const toastEl = document.getElementById("deleteToast");
-    if (toastEl) {
-      const bsToast = new window.bootstrap.Toast(toastEl);
-      bsToast.show();
-    }
+  const handleEdit = (invoice) => {
+    navigate(`/edit-invoice/${invoice.id}`, {
+      state: {
+        isEdit: true,
+        fullInvoiceData: invoice,
+      },
+    });
   };
-
 
   const handleDelete = async (invoiceId) => {
-    if (window.confirm("Are you sure you want to delete this invoice?")) {
-      try {
-        setLoading(true);
-        setError("");
-        const token = localStorage.getItem("access_token");
-        if (!token) {
-          navigate("/login");
-          return;
-        }
+  if (window.confirm("Are you sure you want to delete this invoice?")) {
+    // Optimistically remove the row from UI
+    setInvoices((prev) =>
+      prev
+        .map((group) => ({
+          ...group,
+          invoices: group.invoices.filter((inv) => inv.id !== invoiceId),
+        }))
+        .filter((group) => group.invoices.length > 0)
+    );
 
-        const res = await fetch(`http://localhost:8000/api/delete/${invoiceId}/`, {
-          method: "DELETE",
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+    try {
+      const response = await fetchWithAuth(
+        `http://localhost:8000/api/delete/${invoiceId}/`,
+        { method: "DELETE" }
+      );
 
-        if (res.ok) {
-          setInvoices((prevInvoices) =>
-            prevInvoices.filter((invoice) => invoice.id !== invoiceId)
-          );
-
-        } else {
-          const errorData = await res.json();
-          throw new Error(errorData.message || 'Failed to delete invoice');
-        }
-      } catch (err) {
-        console.error("Error deleting invoice:", err);
-        setError(err.message || "An error occurred while deleting the invoice");
-      } finally {
-        setLoading(false);
+      if (response) {
+        toast.success("Invoice deleted successfully");
+      } else {
+        toast.error("Failed to delete invoice from server");
+        fetchInvoices(); // rollback and re-fetch if failed
       }
+    } catch (err) {
+      console.error("Error deleting invoice:", err);
+      toast.error(err.message || "Failed to delete invoice");
+      fetchInvoices(); // rollback and re-fetch if failed
     }
-  };
+  }
+};
 
-  const handleEdit = (invoiceId) => {
-    navigate(`/edit-invoice/${invoiceId}`);
+
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB');
   };
 
   return (
-    <div className="containers" style={{ height: "100vh" }}>
-      {/* Alert Messages
-      {error && (
-        <div className="alert alert-danger" role="alert">
-          {error}
-        </div>
-      )}
-      {success && (
-        <div className="alert alert-success" role="alert">
-          {success}
-        </div>
-      )} */}
+    <div className="year_container">
+      <ToastContainer position="top-right" autoClose={3000} />
 
-      {/* New Bill Button */}
-      <div className="d-grid gap-2 d-md-flex justify-content-md-end pt-2 pb-2 px-4">
+      {/* Header with New Bill Button */}
+      <div className="header-bar">
         <button
           type="button"
-          className="naw-biladd btn btn-success"
+          className="new-bill-btn"
           onClick={() => navigate("/tax-invoice")}
           disabled={loading}
         >
@@ -289,117 +270,100 @@ const Address = () => {
         </button>
       </div>
 
-      {/* Table Container */}
-      <div style={{ padding: "10px 21px 10px 82px" }}>
-        <div
-          style={{
-            borderRadius: "16px",
-            overflow: "hidden",
-            border: "2px solid #dee2e6",
-            boxShadow: "0 0 15px rgba(0,0,0,0.1)",
-            background: "#fff",
-          }}
-        >
-          <table className="table table-striped table-hover text-center mb-0">
-            <thead className="table-dark">
-              <tr>
-                <th>No.</th>
-                <th>Buyer</th>
-                <th>Address</th>
-                <th>Total</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan="5" className="text-center">
-                    <div className="spinner-border text-primary" role="status">
-                      <span className="visually-hidden">Loading...</span>
+      {/* Invoice Table */}
+      <table className="custom-table">
+        <thead>
+          <tr>
+            <th>No.</th>
+            <th>Buyer</th>
+            <th>Address</th>
+            <th>Invoice No.</th>
+            
+            <th>Total</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {loading && invoices.length === 0 ? (
+            <tr>
+              <td colSpan="7" className="text-center">Loading invoices...</td>
+            </tr>
+          ) : invoices.length === 0 ? (
+            <tr>
+              <td colSpan="7" className="text-center">No invoices found</td>
+            </tr>
+          ) : (
+            invoices.flatMap((group, groupIndex) => 
+              group.invoices.map((invoice, invoiceIndex) => (
+                <tr key={invoice.id}>
+                  <td>{groupIndex + 1}.{invoiceIndex + 1}</td>
+                  <td>{group.buyer_name}</td>
+                  <td
+                    className="truncate address-hover"
+                    title={`Click to copy: ${group.buyer_address}`}
+                    onClick={() => {
+                      navigator.clipboard.writeText(group.buyer_address);
+                      toast.success("Address copied to clipboard");
+                    }}
+                  >
+                    {group.buyer_address.length > 20
+                      ? group.buyer_address.slice(0, 20) + "..."
+                      : group.buyer_address}
+                  </td>
+                  <td>{invoice.invoice_number}</td>
+                 
+                  <td>
+                    {invoice.currency} {parseFloat(invoice.total_with_gst).toFixed(2)}
+                  </td>
+                  <td style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                    <div className="tooltip-container">
+                      <button
+                        type="button"
+                        className="action-btn view"
+                        onClick={() => navigate(`/invoice-detail/${invoice.id}`)}
+                        disabled={loading}
+                      >
+                        <i className="fa-regular fa-eye"></i>
+                      </button>
+                      <span className="tooltip-text">View</span>
+                    </div>
+                    <div className="tooltip-container">
+                      <button
+                        className="action-btn download"
+                        onClick={() => handleDownload(invoice.id)}
+                        disabled={loading}
+                      >
+                        <i className="fa-solid fa-download"></i>
+                      </button>
+                      <span className="tooltip-text">Download</span>
+                    </div>
+                    <div className="tooltip-container">
+                      <button
+                        className="action-btn edit"
+                        onClick={() => handleEdit(invoice)}
+                        disabled={loading}
+                      >
+                        <i className="fa-solid fa-pen-to-square"></i>
+                      </button>
+                      <span className="tooltip-text">Edit</span>
+                    </div>
+                    <div className="tooltip-container">
+                      <button
+                        className="action-btn delete"
+                        onClick={() => handleDelete(invoice.id)}
+                        disabled={loading}
+                      >
+                        <i className="fa-solid fa-trash"></i>
+                      </button>
+                      <span className="tooltip-text">Delete</span>
                     </div>
                   </td>
                 </tr>
-              ) : error ? (
-                <tr>
-                  <td colSpan="5" className="text-center text-danger">
-                    {error}
-                    <button 
-                      className="btn btn-link"
-                      onClick={fetchInvoices}
-                    >
-                      Retry
-                    </button>
-                  </td>
-                </tr>
-              ) : invoices.length === 0 ? (
-                <tr>
-                  <td colSpan="5" className="text-center">
-                    No invoices found
-                  </td>
-                </tr>
-              ) : (
-                invoices.flatMap((group) => (
-                  group.invoices.map((invoice, idx) => (
-                    <tr key={invoice.id}>
-                      <td>{idx === 0 ? group.serial_number : ''}</td>
-          <td>{group.buyer_name}</td>
-                      <td
-                        className="truncate address-hover"
-                        title={group.buyer_address}
-                        onClick={() => {
-                          navigator.clipboard.writeText(group.buyer_address);
-                          setSuccess("Address copied to clipboard!");
-                        }}
-                      >
-                        {group.buyer_address.length > 20
-              ? group.buyer_address.substring(0, 20) + "..."
-              : group.buyer_address}
-                      </td>
-                      <td>
-                        {invoice.currency} {parseFloat(invoice.total_with_gst).toFixed(2)}
-                      </td>
-                      <td>
-                        <button
-                          className="btn btn-outline-primary action-btn mx-1"
-                          onClick={() => navigate(`/invoice-detail/${invoice.id}`)}
-                          disabled={loading}
-                        >
-                          <i className="bi bi-eye"></i>
-                        </button>
-                        <button
-                          className="btn btn-outline-success action-btn mx-1"
-                          onClick={() => handleDownload(invoice.id)}
-                          disabled={loading}
-                        >
-                          <i className="bi bi-download"></i>
-                        </button>
-                        <button
-                          className="btn btn-outline-warning action-btn mx-1"
-                          onClick={() => handleEdit(invoice.id)}
-                          disabled={loading}
-                        >
-                          <i className="bi bi-pencil-square"></i>
-                        </button>
-                        <button
-                          className="btn btn-outline-danger action-btn mx-1"
-                          onClick={() => {
-                            handleDelete(invoice.id);
-                            showDeleteToast();
-                          }}
-                          disabled={loading}
-                        >
-                          <i className="bi bi-trash3"></i>
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
+              ))
+            )
+          )}
+        </tbody>
+      </table>
 
 
       {/* Hidden printable invoice for PDF */}

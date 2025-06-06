@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import "./setting.css";
 import { useNavigate } from "react-router-dom";
+import { ToastContainer, toast } from "react-toastify";
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function SettingsPage() {
   const [formData, setFormData] = useState({
@@ -17,13 +19,12 @@ export default function SettingsPage() {
     swift_code: "",
     company_code: "",
     HSN_codes: [],
-    logo: null,          // Will store File object for new uploads
-    logoUrl: "",         // Will store URL for existing/preview images
+    logo: null,
+    logoUrl: "",
   });
+
   const [newHsn, setNewHsn] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -59,66 +60,59 @@ export default function SettingsPage() {
     }));
   };
 
-const handleSave = async () => {
-  setLoading(true);
-  setError("");
-  setSuccess(false);
+  const handleSave = async () => {
+    setLoading(true);
 
-  const token = localStorage.getItem("access_token");
-  if (!token) {
-    setError("You need to login first");
-    navigate("/login");
-    return;
-  }
-
-  const formDataToSend = new FormData();
-  
-  // Append all fields
-  Object.keys(formData).forEach(key => {
-    if (key !== 'logoUrl' && key !== 'logo') {
-      formDataToSend.append(key, formData[key]);
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      toast.error("You need to login first");
+      navigate("/login");
+      return;
     }
-  });
 
-  // Handle HSN codes
-  formDataToSend.set('HSN_codes', JSON.stringify(formData.HSN_codes));
+    const formDataToSend = new FormData();
 
-  // Append logo only if it's a new file
-  if (formData.logo instanceof File) {
-    formDataToSend.append("logo", formData.logo);
-  }
-
-  try {
-    const response = await fetch("http://127.0.0.1:8000/api/settings/", {
-      method: "POST",  // Using POST to handle both create and update
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: formDataToSend,
+    Object.entries(formData).forEach(([key, value]) => {
+      if (key === "HSN_codes") {
+        formDataToSend.append(key, JSON.stringify(value));
+      } else if (key === "logo" && value instanceof File) {
+        formDataToSend.append("logo", value);
+      } else if (key !== "logo" && key !== "logoUrl") {
+        formDataToSend.append(key, value);
+      }
     });
 
-    if (response.ok) {
-      const result = await response.json();
-      setSuccess(true);
-      // Update logo URL if changed
-      if (result.logo) {
-        setFormData(prev => ({
-          ...prev,
-          logoUrl: `http://127.0.0.1:8000${result.logo}`,
-          logo: null
-        }));
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/settings/", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formDataToSend,
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        toast.success("Settings saved successfully!");
+
+        if (result.logo) {
+          setFormData((prev) => ({
+            ...prev,
+            logoUrl: `http://127.0.0.1:8000${result.logo}`,
+            logo: null,
+          }));
+        }
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.message || "Save failed");
       }
-    } else {
-      const errorData = await response.json();
-      setError(errorData.message || "Save failed");
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("An error occurred while saving");
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error("Error:", error);
-    setError("An error occurred while saving");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -142,7 +136,6 @@ const handleSave = async () => {
 
         let data = await response.json();
 
-        // If no settings exist, create default ones
         if (Array.isArray(data) && data.length === 0) {
           const createResponse = await fetch(
             "http://127.0.0.1:8000/api/settings/",
@@ -163,51 +156,46 @@ const handleSave = async () => {
           data = await createResponse.json();
         }
 
-        // Get the settings (handle both array and single object responses)
         const setting = Array.isArray(data) ? data[data.length - 1] : data;
 
         setFormData({
           company_name: setting.company_name || "Your Company",
           seller_address: setting.seller_address || "Your Address",
-          seller_pan: setting.seller_pan || "ABCDE1234F",
-          seller_gstin: setting.seller_gstin || "22AAAAA0000A1Z5",
-          seller_email: setting.seller_email || "your@email.com",
-          bank_account_holder: setting.bank_account_holder || "Your Company",
-          bank_name: setting.bank_name || "Bank Name",
-          account_number: setting.account_number || "123456789012",
-          ifsc_code: setting.ifsc_code || "BANK0001234",
-          branch: setting.branch || "Main Branch",
-          swift_code: setting.swift_code || "SWFT0001",
-          company_code: setting.company_code || "SWFT0001",
+          seller_pan: setting.seller_pan || "",
+          seller_gstin: setting.seller_gstin || "",
+          seller_email: setting.seller_email || "",
+          bank_account_holder: setting.bank_account_holder || "",
+          bank_name: setting.bank_name || "",
+          account_number: setting.account_number || "",
+          ifsc_code: setting.ifsc_code || "",
+          branch: setting.branch || "",
+          swift_code: setting.swift_code || "",
+          company_code: setting.company_code || "",
           HSN_codes: setting.HSN_codes || [],
-          logo: null, // Initialize as null - will only be set when a new file is uploaded
+          logo: null,
           logoUrl: setting.logo ? `http://127.0.0.1:8000${setting.logo}` : "",
         });
       } catch (error) {
         console.error("Failed to fetch settings", error);
-        setError(error.message || "Failed to load settings");
+        toast.error(error.message || "Failed to load settings");
       } finally {
         setLoading(false);
       }
     };
 
     fetchSettings();
-  }, [navigate, success]); // Added success to dependencies to refetch after save
+  }, [navigate]);
 
   return (
-    <div style={{ paddingLeft: "100px" }}>
+    <div style={{ paddingLeft: "60px" }}>
+      <ToastContainer />
       <h1 className="hedding">Your Company details</h1>
-      {error && <div className="alert alert-danger">{error}</div>}
-      {success && (
-        <div className="alert alert-success">Settings saved successfully!</div>
-      )}
+
       <div className="formbody">
         <div className="form-box">
           <div className="form-row">
             <div className="fastinput">
-              <label className="block text-sm font-medium text-gray-700">
-                Company name
-              </label>
+              <label>Company name</label>
               <input
                 type="text"
                 name="company_name"
@@ -217,9 +205,7 @@ const handleSave = async () => {
               />
             </div>
             <div className="fastinput">
-              <label className="block text-sm font-medium text-gray-700">
-                PAN Number
-              </label>
+              <label>PAN Number</label>
               <input
                 type="text"
                 name="seller_pan"
@@ -229,30 +215,24 @@ const handleSave = async () => {
               />
             </div>
           </div>
-          
+
           <div className="form-row">
             <div className="input-group">
-              <label htmlFor="seller_address" className="input-label">
-                Seller Address
-              </label>
+              <label>Seller Address</label>
               <textarea
-                id="seller_address"
                 name="seller_address"
                 value={formData.seller_address}
                 onChange={handleChange}
-                className="textarea-field"
                 rows={4}
                 placeholder="Enter seller address"
                 disabled={loading}
-              ></textarea>
+              />
             </div>
           </div>
 
           <div className="form-row">
             <div className="fastinput">
-              <label className="block text-sm font-medium text-gray-700">
-                GST Number
-              </label>
+              <label>GST Number</label>
               <input
                 type="text"
                 name="seller_gstin"
@@ -262,9 +242,7 @@ const handleSave = async () => {
               />
             </div>
             <div className="fastinput">
-              <label className="block text-sm font-medium text-gray-700">
-                Email
-              </label>
+              <label>Email</label>
               <input
                 type="email"
                 name="seller_email"
@@ -274,12 +252,10 @@ const handleSave = async () => {
               />
             </div>
           </div>
-          
+
           <div className="form-row">
             <div className="fastinput">
-              <label className="block text-sm font-medium text-gray-700">
-                Bank Name
-              </label>
+              <label>Bank Name</label>
               <input
                 type="text"
                 name="bank_name"
@@ -289,9 +265,7 @@ const handleSave = async () => {
               />
             </div>
             <div className="fastinput">
-              <label className="block text-sm font-medium text-gray-700">
-                Account Number
-              </label>
+              <label>Account Number</label>
               <input
                 type="text"
                 name="account_number"
@@ -301,12 +275,10 @@ const handleSave = async () => {
               />
             </div>
           </div>
-          
+
           <div className="form-row">
             <div className="fastinput">
-              <label className="block text-sm font-medium text-gray-700">
-                IFSC Code
-              </label>
+              <label>IFSC Code</label>
               <input
                 type="text"
                 name="ifsc_code"
@@ -316,9 +288,7 @@ const handleSave = async () => {
               />
             </div>
             <div className="fastinput">
-              <label className="block text-sm font-medium text-gray-700">
-                A/c Holder's Name:
-              </label>
+              <label>A/c Holder's Name</label>
               <input
                 type="text"
                 name="bank_account_holder"
@@ -328,12 +298,10 @@ const handleSave = async () => {
               />
             </div>
           </div>
-          
+
           <div className="form-row">
             <div className="fastinput">
-              <label className="block text-sm font-medium text-gray-700">
-                Branch
-              </label>
+              <label>Branch</label>
               <input
                 type="text"
                 name="branch"
@@ -343,9 +311,7 @@ const handleSave = async () => {
               />
             </div>
             <div className="fastinput">
-              <label className="block text-sm font-medium text-gray-700">
-                SWIFT Code:
-              </label>
+              <label>SWIFT Code</label>
               <input
                 type="text"
                 name="swift_code"
@@ -358,9 +324,7 @@ const handleSave = async () => {
 
           <div className="form-row">
             <div className="fastinput">
-              <label className="block text-sm font-medium text-gray-700">
-                COMPANY Code:
-              </label>
+              <label>COMPANY Code</label>
               <input
                 type="text"
                 name="company_code"
@@ -369,64 +333,56 @@ const handleSave = async () => {
                 disabled={loading}
               />
             </div>
-            <div className="fastinput">
-              <div className="formbody">
-                <div className="form-row">
-                  <label>HSN Codes</label>
-                  <div className="hsn-group">
-                    <input
-                      type="text"
-                      value={newHsn}
-                      onChange={(e) => setNewHsn(e.target.value)}
-                      disabled={loading}
-                    />
-                    <button className="mb-2" onClick={addHsnCode} disabled={loading}>
-                      Add HSN Code
-                    </button>
-                    {formData.HSN_codes.map((code, index) => (
-                      <div key={index} className="hsn-item d-flex align-items-center justify-content-between border rounded p-2 mb-2">
-                        <span>{code}</span>
-                        <button className="ms-2" onClick={() => removeHsnCode(index)}>Remove</button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+
+            <div className="hsn-section">
+              <label>HSN Codes</label>
+              <div className="hsn-input-group">
+                <input
+                  type="text"
+                  value={newHsn}
+                  onChange={(e) => setNewHsn(e.target.value)}
+                  disabled={loading}
+                />
+                <button className="hsn-add-btn" onClick={addHsnCode} disabled={loading}>Add</button>
               </div>
             </div>
           </div>
 
           <div className="form-row">
-            <div className="upload-container">
-              <div className="upload-input">
-                <label className="upload-label">Upload Logo</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  className="upload-file"
-                  disabled={loading}
-                />
-              </div>
+            <div className="fastinput">
+              <label>Upload Logo</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                disabled={loading}
+              />
               {formData.logoUrl && (
-                <div className="upload-preview">
-                  <p className="preview-text">Logo Preview:</p>
-                  <img
-                    src={formData.logoUrl}
-                    alt="Company Logo"
-                    className="preview-image"
-                  />
-                </div>
+                <img src={formData.logoUrl} alt="Preview" className="preview-image" />
               )}
             </div>
+
+            <div className="fastinput" style={{marginTop: "30px"}}>
+              <div className="hsn-code-list">
+                {formData.HSN_codes.map((code, index) => (
+                  <div key={index} className="hsn-code-item">
+                    <span>{code}</span>
+                    <button className="hsn-remove-btn" onClick={() => removeHsnCode(index)}>Remove</button>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-          
-          <button
-            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 updet"
-            onClick={handleSave}
-            disabled={loading}
-          >
-            {loading ? "Saving..." : "Update"}
-          </button>
+
+          <div className="buttonuplod">
+            <button
+              className="button-sumbit-banking btn-all"
+              onClick={handleSave}
+              disabled={loading}
+            >
+              {loading ? "Saving..." : "Update"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

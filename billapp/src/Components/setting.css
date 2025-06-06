@@ -99,21 +99,69 @@ textarea {
   box-sizing: border-box;
 }
 
-.updet button {
-  margin-top: 20px;
-  padding: 12px;
-  font-size: 16px;
-  background-color: #007aff;
+.hsn-section {
+  flex: 1;
+  min-width: 300px;
+  display: flex;
+  flex-direction: column;
+}
+
+.hsn-input-group {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.hsn-add-btn {
+  background-color: #3498db;
+  color: white;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  align-items: center;
+}
+.hsn-add-btn:hover {
+  background-color: #195a85;
+}
+
+.hsn-code-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.hsn-code-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #f7f9fa;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #dfe4ea;
+}
+
+.hsn-code-text {
+  font-size: 14px;
+  color: #333;
+}
+
+.hsn-remove-btn {
+  background-color: #e74c3c;
   color: white;
   border: none;
+  padding: 6px 12px;
   border-radius: 6px;
+  font-size: 14px;
   cursor: pointer;
+  transition: background-color 0.3s;
 }
 
-button:hover {
-  background-color: #005ecb;
+.hsn-remove-btn:hover {
+  background-color: #631f18;
 }
-
 /* Upload Section */
 .upload-container {
   display: flex;
@@ -154,12 +202,13 @@ button:hover {
 }
 
 .preview-image {
-  width: 100px;
-  height: 100px;
-  object-fit: contain;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-  background-color: #f9fafb;
+    width: 100px;
+    height: 100px;
+    object-fit: contain;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    background-color: #f9fafb;
+    margin: 10px 191px 18px 189px;
 }
 
 /* Textarea Section */
@@ -186,3 +235,37 @@ button:hover {
   border-color: #2563eb;
   box-shadow: 0 0 0 1px #2563eb;
 }
+.buttonuplod {
+    display: flex
+;
+    justify-content: center;
+    margin-top: 39px;
+}
+.btn-all {
+  color: #ffffff;
+  width: 211px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  background-color: #6f7172fd;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  box-shadow: 0 2px 6px #6f7172fd;
+  border: none;
+
+}
+
+.btn-all:hover {
+  background-color: #6b6d74;
+  /* nice blue hover */
+  transform: scale(1.05);
+}
+
+.button-sumbit-banking {
+  background-color: #195277;
+  border: none;
+}
+
+.button-sumbit-banking:hover {
+  background-color: #2a75a7;
+}
+
