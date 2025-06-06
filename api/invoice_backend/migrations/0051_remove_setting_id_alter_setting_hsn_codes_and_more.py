@@ -74,7 +74,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='setting',
             name='seller_pan',
-            field=models.CharField(default='ABCDE1234F', max_length=20),
+            field=models.CharField(default='', max_length=20),
         ),
         migrations.AlterField(
             model_name='setting',

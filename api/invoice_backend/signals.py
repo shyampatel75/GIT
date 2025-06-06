@@ -7,17 +7,17 @@ from .models import Setting
 def create_default_settings(sender, **kwargs):
     if Setting.objects.count() == 0:
         Setting.objects.create(
-            company_name="Your Company",
+            company_name="",
             seller_address="Your Address",
-            seller_email="your@email.com",
-            seller_pan="ABCDE1234F",
-            seller_gstin="22AAAAA0000A1Z5",
-            bank_account_holder="Your Company",
-            bank_name="Bank Name",
-            account_number="123456789012",
-            ifsc_code="BANK0001234",
-            branch="Main Branch",
-            swift_code="SWFT0001",
+            seller_email="",
+            seller_pan="",
+            seller_gstin="",
+            bank_account_holder="",
+            bank_name="",
+            account_number="",
+            ifsc_code="",
+            branch="",
+            swift_code="",
             last_invoice_number=0
         )
         print("✅ Default settings created!")

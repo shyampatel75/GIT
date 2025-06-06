@@ -90,6 +90,9 @@ class Invoice(models.Model):
     # Remarks
     remark = models.TextField(blank=True, null=True,default='')
 
+    exchange_rate = models.FloatField(blank=True, null=True, default=1.0)
+    inr_equivalent = models.FloatField(blank=True, null=True)
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -127,6 +130,15 @@ class Invoice(models.Model):
         # Calculate totals
         self.calculate_totals()
         
+          # Calculate INR equivalent if currency is not INR
+        if self.currency != 'INR':
+            if hasattr(self, 'exchange_rate') and self.exchange_rate:
+                # Use the provided exchange rate if available
+                self.inr_equivalent = self.total_with_gst * self.exchange_rate
+            else:
+                # Fallback to default conversion if no rate provided
+                self.inr_equivalent = self.total_with_gst * 1  # Adjust this if you have a default rate
+        
         super().save(*args, **kwargs)
 
     def calculate_totals(self):
@@ -149,18 +161,18 @@ class Setting(models.Model):
     # Seller Info
     company_name = models.CharField(max_length=255, default='Your Company')
     seller_address = models.TextField(default='Your Address')
-    seller_email = models.EmailField(default='your@email.com')
-    seller_pan = models.CharField(max_length=20, default='ABCDE1234F')
-    seller_gstin = models.CharField(max_length=20, default='22AAAAA0000A1Z5')
+    seller_email = models.EmailField(blank=True, null=True)
+    seller_pan = models.CharField(max_length=20, blank=True, null=True)
+    seller_gstin = models.CharField(max_length=20, blank=True, null=True)
 
     # Company Bank Details
-    bank_account_holder = models.CharField(max_length=255, default='Your Name')
-    bank_name = models.CharField(max_length=255, default='Bank Name')
-    account_number = models.CharField(max_length=50, default='1234567890')
-    ifsc_code = models.CharField(max_length=20, default='ABCD0123456')
-    branch = models.CharField(max_length=255, default='Main Branch')
-    swift_code = models.CharField(max_length=20, default='SWIFT0001')
-    company_code = models.CharField(max_length=20, default='COMP0001')
+    bank_account_holder = models.CharField(max_length=255, blank=True, null=True)
+    bank_name = models.CharField(max_length=255, blank=True, null=True)
+    account_number = models.CharField(max_length=50,blank=True, null=True)
+    ifsc_code = models.CharField(max_length=20, blank=True, null=True)
+    branch = models.CharField(max_length=255, blank=True, null=True)
+    swift_code = models.CharField(max_length=20,blank=True, null=True)
+    company_code = models.CharField(max_length=20,blank=True, null=True )
     
     HSN_codes = models.JSONField(default=list)
     logo = models.ImageField(upload_to='company_logos/', null=True, blank=True)
@@ -333,3 +345,13 @@ class BankAccount(models.Model):
 
     def __str__(self):
         return f"{self.bank_name} - {self.account_number}"
+    
+
+class CashEntry(models.Model):
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    date = models.DateField()
+    description = models.TextField(blank=True, null=True)
+    is_deleted = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Cash: {self.amount} on {self.date}"

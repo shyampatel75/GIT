@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import Invoice
 from .models import Setting,Deposit
-from .models import CompanyBill, Buyer, Salary, Other,BankingDeposit,Employee,BankAccount
+from .models import CompanyBill, Buyer, Salary, Other,BankingDeposit,Employee,BankAccount,CashEntry
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth.models import User
@@ -89,7 +89,10 @@ class InvoiceSerializer(serializers.ModelSerializer):
 class SettingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Setting
-        fields = '__all__' 
+        fields = '__all__'  # Corrected from '_all_' to '__all__'
+        extra_kwargs = {
+            'seller_pan': {'required': False, 'allow_blank': True},
+        }
 
 class DepositSerializer(serializers.ModelSerializer):
     class Meta:
@@ -165,8 +168,12 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return None
 
 
-
 class BankAccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = BankAccount
         fields = '__all__'
+
+class CashEntrySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CashEntry
+        fields = ['id', 'amount', 'description', 'date']

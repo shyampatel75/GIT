@@ -48,8 +48,13 @@ urlpatterns = [
     path('bank-accounts/<int:pk>/restore/', views.restore_bank_account, name='restore-account'),
     path('bank-accounts/deleted/', views.soft_deleted_bank_accounts, name='soft-deleted-bank-accounts'),
     path('bank-accounts/deleted/<int:pk>/', views.soft_deleted_bank_account_detail, name='soft-deleted-bank-account-detail'),
+    path('bank-accounts/deleted/<int:pk>/permanent-delete/', views.permanently_delete_bank_account, name='permanently-delete-account'),
+
+    # Cash management
+    path('cash-entries/', views.cash_entry_collection, name='cashentry-collection'),
+    path('cash-entries/<int:pk>/', views.cash_entry_detail, name='cashentry-detail'),
 
     # Company balance utility
     path('company-balance/<str:buyer_gst>/', views.company_balance, name='company-balance'),
-    path('bank-accounts/deleted/<int:pk>/permanent-delete/', views.permanently_delete_bank_account, name='permanently-delete-account'),
+    
 ]

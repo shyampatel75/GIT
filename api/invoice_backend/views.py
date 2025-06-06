@@ -4,8 +4,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics, permissions
-from .models import Invoice, Setting, Deposit,CompanyBill, Buyer, Salary, Other,BankingDeposit,Employee,Bank,BankAccount
-from .serializers import InvoiceSerializer,SettingSerializer, DepositSerializer,CompanyBillSerializer, BuyerSerializer, SalarySerializer, OtherSerializer,BankingDepositSerializer,EmployeeSerializer,UserProfile,BankAccountSerializer
+from .models import Invoice, Setting, Deposit,CompanyBill, Buyer, Salary, Other,BankingDeposit,Employee,Bank,BankAccount,CashEntry
+from .serializers import InvoiceSerializer,SettingSerializer, DepositSerializer,CompanyBillSerializer, BuyerSerializer, SalarySerializer, OtherSerializer,BankingDepositSerializer,EmployeeSerializer,UserProfile,BankAccountSerializer,CashEntrySerializer
 from django.contrib.auth.models import User
 from datetime import datetime
 from django.http import JsonResponse,FileResponse,Http404,HttpResponseBadRequest
@@ -793,6 +793,15 @@ def soft_deleted_bank_accounts(request):
     serializer = BankAccountSerializer(accounts, many=True)
     return Response(serializer.data)
 
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def permanently_delete_bank_account(request, pk):
+    try:
+        account = BankAccount.objects.get(pk=pk, is_deleted=True)
+        account.delete()  # This performs a hard delete
+        return Response({"message": "Bank account permanently deleted."}, status=status.HTTP_204_NO_CONTENT)
+    except BankAccount.DoesNotExist:
+        return Response({"error": "Soft-deleted bank account not found."}, status=status.HTTP_404_NOT_FOUND)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -817,7 +826,6 @@ def grouped_invoices(request):
         '-invoice_date'  # Optional: newest first within groups
     )
     
-    # Group invoices by buyer details
     groups = defaultdict(list)
     for invoice in invoices:
         key = (invoice.buyer_name, invoice.buyer_address, invoice.buyer_gst)
@@ -835,12 +843,46 @@ def grouped_invoices(request):
         })
     
     return Response(result)
-@api_view(['DELETE'])
+
+
+@api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
-def permanently_delete_bank_account(request, pk):
+def cash_entry_collection(request):
+    if request.method == 'GET':
+        entries = CashEntry.objects.all().order_by('-id')
+        serializer = CashEntrySerializer(entries, many=True)
+        return Response(serializer.data)
+
+    # POST
+    serializer = CashEntrySerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def cash_entry_detail(request, pk):
     try:
-        account = BankAccount.objects.get(pk=pk, is_deleted=True)
-        account.delete()  # This performs a hard delete
-        return Response({"message": "Bank account permanently deleted."}, status=status.HTTP_204_NO_CONTENT)
-    except BankAccount.DoesNotExist:
-        return Response({"error": "Soft-deleted bank account not found."}, status=status.HTTP_404_NOT_FOUND)
+        entry = CashEntry.objects.get(pk=pk)
+    except CashEntry.DoesNotExist:
+        return Response(
+            {"detail": "Cash entry not found."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    if request.method == 'GET':
+        serializer = CashEntrySerializer(entry)
+        return Response(serializer.data)
+
+    if request.method == 'PUT':
+        serializer = CashEntrySerializer(entry, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # DELETE
+    entry.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
