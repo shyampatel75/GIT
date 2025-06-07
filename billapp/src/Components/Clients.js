@@ -2,42 +2,64 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import './Address.css';
 
-const Clients = () => {
+const Address = () => {
   const navigate = useNavigate();
+  const printRef = useRef();
+
+  // State declarations at the top
   const [invoices, setInvoices] = useState([]);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [logoLoaded, setLogoLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
-  const printRef = useRef();
+  const [initialLoad, setInitialLoad] = useState(true); // Moved to top with other states
 
+
+  // ✅ Universal fetch wrapper with safe JSON handling
   const fetchWithAuth = async (url, options = {}) => {
     const token = localStorage.getItem("access_token");
-    const headers = {
-      ...options.headers,
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    };
-
-    try {
-      const response = await fetch(url, { ...options, headers });
-      if (!response.ok) {
-        if (response.status === 401) {
-          navigate('/login');
-          return null;
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Fetch error:', error);
-      setError(error.message || "Failed to fetch data");
+    if (!token) {
+      navigate("/login");
       return null;
     }
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          ...options.headers,
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          navigate("/login");
+          return null;
+        }
+
+        // Try reading error message safely
+        const errorText = await response.text();
+        const errorData = errorText ? JSON.parse(errorText) : {};
+        throw new Error(errorData.message || `HTTP error! Status: ${response.status}`);
+      }
+
+      // ✅ Handle DELETE responses with no body
+      const text = await response.text();
+      return text ? JSON.parse(text) : {}; // safe fallback
+    } catch (error) {
+      console.error("Fetch error:", error.message);
+      // ❌ Don't show toast here to avoid duplicates
+      throw error; // allow `handleDelete` to catch and toast 
+    }
   };
+
+
 
   const fetchInvoices = useCallback(async () => {
     try {
@@ -46,15 +68,18 @@ const Clients = () => {
       const data = await fetchWithAuth("http://localhost:8000/api/grouped-invoices/");
       if (data) {
         setInvoices(data);
-        setSuccess("Invoices loaded successfully");
+        if (!initialLoad) {
+          toast.success("Invoices loaded successfully");
+        }
       }
     } catch (err) {
       console.error("Error fetching invoices:", err);
-      setError(err.message || "Error fetching invoices");
+      toast.error(err.message || "Failed to load invoices");
     } finally {
       setLoading(false);
+      setInitialLoad(false);
     }
-  }, [navigate]);
+  }, [navigate, initialLoad]); // initialLoad is now properly in scope
 
   useEffect(() => {
     fetchInvoices();
@@ -105,35 +130,29 @@ const Clients = () => {
       setLoading(true);
       setError("");
 
-      // Fetch invoice data with auth
       const pdfBasicDetail = await fetchWithAuth(
         `http://localhost:8000/api/invoices/${invoiceId}/`
       );
-
       if (!pdfBasicDetail) return;
 
-      // Fetch settings data with auth
       const pdfMainDetails = await fetchWithAuth(
         `http://localhost:8000/api/settings/`
       );
-
       if (!pdfMainDetails) return;
 
-      // Set the combined data into state
       setSelectedInvoice({
         ...pdfBasicDetail,
         ...pdfMainDetails[0]
       });
 
-      // Preload the logo image
       const logoImg = new Image();
       logoImg.crossOrigin = "Anonymous";
-      logoImg.src = 'http://127.0.0.1:8000/media/favicon_cvGw7pn.png';
+      logoImg.src = `http://127.0.0.1:8000${pdfMainDetails[0]?.logo || '/media/favicon_cvGw7pn.png'}`;
       logoImg.onload = () => setLogoLoaded(true);
 
     } catch (err) {
       console.error("Download error:", err);
-      setError(err.message || "Download error");
+      toast.error(err.message || "Failed to prepare invoice");
     } finally {
       setLoading(false);
     }
@@ -141,68 +160,67 @@ const Clients = () => {
 
   useEffect(() => {
     if (selectedInvoice && logoLoaded) {
-      const timer = setTimeout(() => {
-        generatePDF();
-      }, 300);
-      return () => clearTimeout(timer);
+      generatePDF();
     }
   }, [selectedInvoice, logoLoaded]);
 
   const generatePDF = async () => {
-    const input = printRef.current;
-    if (input) {
-      try {
-        const canvas = await html2canvas(input, {
-          useCORS: true,
-          allowTaint: true,
-          scale: 2,
-          logging: true,
-        });
+    const input = printRef?.current;
+    if (!input) {
+      toast.error("PDF content not found");
+      return;
+    }
 
-        const imgData = canvas.toDataURL("image/png");
-        const pdf = new jsPDF("p", "mm", "A4");
+    try {
+      const canvas = await html2canvas(input, {
+        useCORS: true,
+        scale: 2,
+        logging: true,
+      });
 
-        const margin = 10;
-        const pdfWidth = pdf.internal.pageSize.getWidth() - margin * 2;
-        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
 
-        pdf.addImage(imgData, "PNG", margin, margin, pdfWidth, pdfHeight);
-        pdf.save(`Invoice_${selectedInvoice.invoice_number}.pdf`);
-      } catch (err) {
-        console.error("PDF generation error:", err);
-        setError(err.message || "PDF generation error");
-      } finally {
-        setSelectedInvoice(null);
-        setLogoLoaded(false);
-      }
+      const margin = 10;
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const availableWidth = pageWidth - 2 * margin;
+      const imgHeight = (canvas.height * availableWidth) / canvas.width;
+
+      pdf.addImage(imgData, "PNG", margin, (pageHeight - imgHeight) / 2, availableWidth, imgHeight);
+
+      const fileName = `Invoice_${selectedInvoice.invoice_number}.pdf`;
+      pdf.save(fileName);
+      toast.success("Invoice downloaded successfully!");
+    } catch (err) {
+      console.error("PDF generation error:", err);
+      toast.error("Failed to generate PDF");
+    } finally {
+      setSelectedInvoice(null);
+      setLogoLoaded(false);
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}-${month}-${year}`;
-  };
+const handleNewBill = (invoice) => {
+  navigate('/tax-invoice', {
+    state: {
+      buyerData: {
+        buyer_name: invoice?.buyer_name || '',
+        buyer_address: invoice?.buyer_address || '',
+        buyer_gst: invoice?.buyer_gst || '',
+      },
+      consigneeData: {
+        consignee_name: invoice?.consignee_name || '',
+        consignee_address: invoice?.consignee_address || '',
+        consignee_gst: invoice?.consignee_gst || '',
+      },
+      country: invoice?.country || 'India',  // Pass the country
+      currency: invoice?.currency || 'INR',  // Pass the currency
+      state: invoice?.state || 'Gujarat'     // Pass the state if India
+    }
+  });
+};
 
-  const handleNewBill = (invoice) => {
-    navigate('/tax-invoice', {
-      state: {
-        buyerData: {
-          buyer_name: invoice?.buyer_name || '',
-          buyer_address: invoice?.buyer_address || '',
-          buyer_gst: invoice?.buyer_gst || '',
-        },
-        consigneeData: {
-          consignee_name: invoice?.consignee_name || '',
-          consignee_address: invoice?.consignee_address || '',
-          consignee_gst: invoice?.consignee_gst || '',
-        }
-      }
-    });
-  };
 
   const handleEdit = (invoice) => {
     navigate(`/edit-invoice/${invoice.id}`, {
@@ -213,191 +231,160 @@ const Clients = () => {
     });
   };
 
+  // ✅ Deletion handler with only 1 toast message
   const handleDelete = async (invoiceId) => {
-    if (window.confirm("Are you sure you want to delete this invoice?")) {
-      try {
-        setLoading(true);
-        setError("");
+    if (!window.confirm("Are you sure you want to delete this invoice?")) return;
 
-        const token = localStorage.getItem("access_token");
-        const response = await fetch(
-          `http://localhost:8000/api/delete/${invoiceId}/`,
-          {
-            method: "DELETE",
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
+    try {
+      // Optimistically update UI
+      setInvoices((prev) =>
+        prev
+          .map((group) => ({
+            ...group,
+            invoices: group.invoices.filter((inv) => inv.id !== invoiceId),
+          }))
+          .filter((group) => group.invoices.length > 0)
+      );
 
-        if (response.ok) {
-          setInvoices(prevInvoices =>
-            prevInvoices.filter(invoice => invoice.id !== invoiceId)
-          );
-          alert("Invoice deleted successfully!");
-        } else {
-          if (response.status === 401) {
-            navigate('/login');
-            return;
-          }
-          throw new Error("Failed to delete invoice");
-        }
-      } catch (err) {
-        console.error("Error deleting invoice:", err);
-        setError(err.message || "Error deleting invoice");
-        alert("An error occurred while deleting the invoice.");
-      } finally {
-        setLoading(false);
-      }
+      await fetchWithAuth(`http://localhost:8000/api/delete/${invoiceId}/`, {
+        method: "DELETE",
+      });
+
+      toast.success("Invoice deleted successfully");
+    } catch (err) {
+      console.error("Error deleting invoice:", err.message);
+      toast.error("Failed to delete invoice. Please try again.");
+      fetchInvoices(); // Restore data
     }
   };
 
-  // Check if user is authenticated on component mount
-  useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    if (!token) {
-      navigate('/login');
-    }
-  }, [navigate]);
+
+
+
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB');
+  };
 
   return (
-    <div className="containers" style={{ height: "100vh" }}>
-      {/* {error && (
-        <div className="alert alert-danger">
-          {error}
-        </div>
-      )}
-      {success && (
-        <div className="alert alert-success">
-          {success}
-        </div>
-      )} */}
-      {loading && (
-        <div className="text-center mt-3">
-          <div className="spinner-border" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
-        </div>
-      )}
+    <div className="year_container">
+      <ToastContainer position="top-right" autoClose={3000} />
 
-      <div className="d-grid gap-2 d-md-flex justify-content-md-end pt-2 pb-2 px-4">
+      <div className="header-bar">
         <button
           type="button"
-          className="naw-biladd"
+          className="new-bill-btn"
           onClick={() => navigate("/tax-invoice")}
           disabled={loading}
         >
-          <i className="bi bi-plus-lg"></i> New Bills
+          <i className="bi bi-plus-lg"></i> {loading ? "Loading..." : "New Bills"}
         </button>
       </div>
 
-      <div style={{ padding: "10px 21px 10px 82px" }}>
-        <div style={{ borderRadius: "32px", overflow: "hidden", border: "15px solid" }}>
-          <table className="table table-striped table-hover text-center">
-            <thead className="table-dark">
-              <tr>
-                <th>No.</th>
-                <th>Buyer Name</th>
-                <th>Address</th>
-                <th>Bill Number</th>
-                <th>Total Amount</th>
-                <th>items</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan="6" className="text-center">
-                    <div className="spinner-border" role="status">
-                      <span className="visually-hidden">Loading...</span>
-                    </div>
+      <table className="custom-table">
+        <thead>
+          <tr>
+            <th>No.</th>
+            <th>Buyer</th>
+            <th>Address</th>
+            <th>Invoice No.</th>
+            <th>Total</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {loading && invoices.length === 0 ? (
+            <tr>
+              <td colSpan="7" className="text-center">Loading invoices...</td>
+            </tr>
+          ) : invoices.length === 0 ? (
+            <tr>
+              <td colSpan="7" className="text-center">No invoices found</td>
+            </tr>
+          ) : (
+            invoices.flatMap((group, groupIndex) =>
+              group.invoices.map((invoice, invoiceIndex) => (
+                <tr key={invoice.id}>
+                  <td>{groupIndex + 1}.{invoiceIndex + 1}</td>
+                  <td>{group.buyer_name}</td>
+                  <td
+                    className="truncate address-hover"
+                    title={`Click to copy: ${group.buyer_address}`}
+                    onClick={() => {
+                      navigator.clipboard.writeText(group.buyer_address);
+                      toast.success("Address copied to clipboard");
+                    }}
+                  >
+                    {group.buyer_address.length > 20
+                      ? group.buyer_address.slice(0, 20) + "..."
+                      : group.buyer_address}
                   </td>
-                </tr>
-              ) : error ? (
-                <tr>
-                  <td colSpan="6" className="text-center text-danger">
-                    {error}
-                    <button className="btn btn-link" onClick={fetchInvoices}>
-                      Retry
-                    </button>
+                  <td>{invoice.invoice_number}</td>
+                  <td>
+                    {invoice.currency} {parseFloat(invoice.total_with_gst).toFixed(2)}
                   </td>
-                </tr>
-              ) : invoices.length === 0 ? (
-                <tr>
-                  <td colSpan="6" className="text-center">
-                    No invoices found
-                  </td>
-                </tr>
-              ) : (
-                invoices.flatMap((group) => (
-                  group.invoices.map((invoice, idx) => (
-                    <tr key={invoice.id}>
-                      <td>{idx === 0 ? group.serial_number : ''}</td>
-                      <td>{group.buyer_name}</td>
-                      <td
-                        className="truncate address-hover"
-                        title={group.buyer_address}
-                        onClick={() => {
-                          navigator.clipboard.writeText(group.buyer_address);
-                          setSuccess("Address copied to clipboard!");
-                        }}
+                  <td style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                    <div className="tooltip-container">
+                      <button
+                        type="button"
+                        className="action-btn view"
+                        onClick={() => navigate(`/invoice-detail/${invoice.id}`)}
+                        disabled={loading}
                       >
-                        {group.buyer_address.length > 20
-                          ? group.buyer_address.substring(0, 20) + "..."
-                          : group.buyer_address}
-                      </td>
-                      <td>{invoice.invoice_number}</td>
-                      <td>
-                        {invoice.currency} {parseFloat(invoice.total_with_gst).toFixed(2)}
-                      </td>
-                      <td className="d-flex flex-wrap gap-2 justify-content-center">
-                        <button
-                          className="btn btn-primary"
-                          onClick={() => navigate(`/invoice-detail/${invoice.id}`)}
-                          disabled={loading}
-                        >
-                          View
-                        </button>
-                        <button
-                          className="btn btn-success"
-                          onClick={() => handleDownload(invoice.id)}
-                          disabled={loading}
-                        >
-                          Download
-                        </button>
-                        <button
-                          className="btn btn-secondary"
-                          onClick={() => handleNewBill(invoice)}
-                          disabled={loading}
-                        >
-                          Newbill
-                        </button>
-                        <button
-                          className="btn btn-warning"
-                          onClick={() => handleEdit(invoice)}
-                          disabled={loading}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="btn btn-danger"
-                          onClick={() => handleDelete(invoice.id)}
-                          disabled={loading}
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                        <i className="fa-regular fa-eye"></i>
+                      </button>
+                      <span className="tooltip-text">View</span>
+                    </div>
+                    <div className="tooltip-container">
+                      <button
+                        className="action-btn download"
+                        onClick={() => handleDownload(invoice.id)}
+                        disabled={loading}
+                      >
+                        <i className="fa-solid fa-download"></i>
+                      </button>
+                      <span className="tooltip-text">Download</span>
+                    </div>
+                    <div className="tooltip-container">
+                      <button
+                        className="action-btn edit"
+                        onClick={() => handleEdit(invoice)}
+                        disabled={loading}
+                      >
+                        <i className="fa-solid fa-pen-to-square"></i>
+                      </button>
+                      <span className="tooltip-text">Edit</span>
+                    </div>
+                    <div className="tooltip-container">
+                      <button
+                        className="action-btn delete"
+                        onClick={() => handleDelete(invoice.id)}
+                        disabled={loading}
+                      >
+                        <i className="fa-solid fa-trash"></i>
+                      </button>
+                      <span className="tooltip-text">Delete</span>
+                    </div>
+                     <div className="tooltip-container">
+                      <button
+                        className="action-btn new"
+                        onClick={() => handleNewBill(invoice)}
+                        disabled={loading}
+                      >
+                        <i className="fa-solid fa-plus"></i>
+                      </button>
+                      <span className="tooltip-text">Newbill</span>
+                    </div>
+                    
+                  </td>
+                </tr>
+              ))
+            )
+          )}
+        </tbody>
+      </table>
 
-      {/* Hidden printable invoice for PDF */}
       {selectedInvoice && (
         <div ref={printRef} style={{ position: "absolute", left: "-9999px" }}>
           <div style={{ paddingLeft: "10px" }}>
@@ -406,7 +393,6 @@ const Clients = () => {
               <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white" }}>
                 <div className="row date-tables">
                   <div className="col-6">
-                    {/* Seller Info */}
                     <table className="table table-bordered black-bordered">
                       <tbody style={{ border: "2px solid" }}>
                         <tr>
@@ -434,7 +420,6 @@ const Clients = () => {
                       </tbody>
                     </table>
 
-                    {/* Buyer Info */}
                     <table className="table table-bordered black-bordered">
                       <tbody style={{ border: "2px solid" }}>
                         <tr>
@@ -461,7 +446,6 @@ const Clients = () => {
                       </tbody>
                     </table>
 
-                    {/* Consignee Info */}
                     <table className="table table-bordered black-bordered">
                       <tbody style={{ border: "2px solid" }}>
                         <tr>
@@ -500,7 +484,7 @@ const Clients = () => {
                         </tr>
                         <tr>
                           <td>Date</td>
-                          <td>{formatDate(selectedInvoice.invoice_date)}</td>
+                          <td>{new Date(selectedInvoice.invoice_date).toLocaleDateString("en-GB")}</td>
                         </tr>
                         <tr>
                           <td>Delivery Note</td>
@@ -512,7 +496,7 @@ const Clients = () => {
                         </tr>
                         <tr>
                           <td>Delivery Note Date</td>
-                          <td>{formatDate(selectedInvoice.delivery_note_date)}</td>
+                          <td>{new Date(selectedInvoice.delivery_note_date).toLocaleDateString("en-GB")}</td>
                         </tr>
                         <tr>
                           <td>Destination</td>
@@ -554,9 +538,6 @@ const Clients = () => {
                         </div>
                       </div>
                     </div>
-
-                    <input type="hidden" id="currencyTitle" value="INR" />
-                    <input type="hidden" id="currencySymbol" value="₹" />
                   </div>
                 </div>
 
@@ -637,7 +618,7 @@ const Clients = () => {
                           <strong>Amount Chargeable (in words):</strong>
                         </p>
                         <h4 className="total-in-words">
-                          <span className="currency-text">INR</span>
+                          <span className="currency-text">INR </span>
                           {numberToWords(Math.floor(selectedInvoice.total_with_gst))}
                         </h4>
                         <div className="top-right-corner">
@@ -706,7 +687,7 @@ const Clients = () => {
                         <strong>Tax Amount (in words):</strong>
                         <span className="total-tax-in-words">
                           <span className="currency-text">INR </span>
-                           {numberToWords(Math.floor(selectedInvoice.total_with_gst))}
+                          {numberToWords(Math.floor(selectedInvoice.total_with_gst))}
                         </span>
                       </div>
                     </div>
@@ -762,4 +743,4 @@ const Clients = () => {
   );
 };
 
-export default Clients;
+export default Address;

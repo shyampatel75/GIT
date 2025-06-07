@@ -9,17 +9,21 @@ import './Address.css';
 const Address = () => {
   const navigate = useNavigate();
   const printRef = useRef();
+
+  // State declarations at the top
   const [invoices, setInvoices] = useState([]);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [logoLoaded, setLogoLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [initialLoad, setInitialLoad] = useState(true); // Moved to top with other states
 
-  // Auth fetch wrapper
+
+  // ✅ Universal fetch wrapper with safe JSON handling
   const fetchWithAuth = async (url, options = {}) => {
     const token = localStorage.getItem("access_token");
     if (!token) {
-      navigate('/login');
+      navigate("/login");
       return null;
     }
 
@@ -28,25 +32,34 @@ const Address = () => {
         ...options,
         headers: {
           ...options.headers,
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
       });
 
       if (!response.ok) {
         if (response.status === 401) {
-          navigate('/login');
+          navigate("/login");
           return null;
         }
-        throw new Error(`HTTP error! status: ${response.status}`);
+
+        // Try reading error message safely
+        const errorText = await response.text();
+        const errorData = errorText ? JSON.parse(errorText) : {};
+        throw new Error(errorData.message || `HTTP error! Status: ${response.status}`);
       }
-      return await response.json();
+
+      // ✅ Handle DELETE responses with no body
+      const text = await response.text();
+      return text ? JSON.parse(text) : {}; // safe fallback
     } catch (error) {
-      console.error('Fetch error:', error);
-      toast.error(error.message || "Failed to fetch data");
-      return null;
+      console.error("Fetch error:", error.message);
+      // ❌ Don't show toast here to avoid duplicates
+      throw error; // allow `handleDelete` to catch and toast 
     }
   };
+
+
 
   const fetchInvoices = useCallback(async () => {
     try {
@@ -55,15 +68,18 @@ const Address = () => {
       const data = await fetchWithAuth("http://localhost:8000/api/grouped-invoices/");
       if (data) {
         setInvoices(data);
-        toast.success("Invoices loaded successfully");
+        if (!initialLoad) {
+          toast.success("Invoices loaded successfully");
+        }
       }
     } catch (err) {
       console.error("Error fetching invoices:", err);
       toast.error(err.message || "Failed to load invoices");
     } finally {
       setLoading(false);
+      setInitialLoad(false);
     }
-  }, [navigate]);
+  }, [navigate, initialLoad]); // initialLoad is now properly in scope
 
   useEffect(() => {
     fetchInvoices();
@@ -114,25 +130,21 @@ const Address = () => {
       setLoading(true);
       setError("");
 
-      // Fetch invoice data
       const pdfBasicDetail = await fetchWithAuth(
         `http://localhost:8000/api/invoices/${invoiceId}/`
       );
       if (!pdfBasicDetail) return;
 
-      // Fetch settings data
       const pdfMainDetails = await fetchWithAuth(
         `http://localhost:8000/api/settings/`
       );
       if (!pdfMainDetails) return;
 
-      // Set combined data
       setSelectedInvoice({
         ...pdfBasicDetail,
         ...pdfMainDetails[0]
       });
 
-      // Preload logo
       const logoImg = new Image();
       logoImg.crossOrigin = "Anonymous";
       logoImg.src = `http://127.0.0.1:8000${pdfMainDetails[0]?.logo || '/media/favicon_cvGw7pn.png'}`;
@@ -176,7 +188,7 @@ const Address = () => {
       const imgHeight = (canvas.height * availableWidth) / canvas.width;
 
       pdf.addImage(imgData, "PNG", margin, (pageHeight - imgHeight) / 2, availableWidth, imgHeight);
-      
+
       const fileName = `Invoice_${selectedInvoice.invoice_number}.pdf`;
       pdf.save(fileName);
       toast.success("Invoice downloaded successfully!");
@@ -215,37 +227,34 @@ const Address = () => {
     });
   };
 
+  // ✅ Deletion handler with only 1 toast message
   const handleDelete = async (invoiceId) => {
-  if (window.confirm("Are you sure you want to delete this invoice?")) {
-    // Optimistically remove the row from UI
-    setInvoices((prev) =>
-      prev
-        .map((group) => ({
-          ...group,
-          invoices: group.invoices.filter((inv) => inv.id !== invoiceId),
-        }))
-        .filter((group) => group.invoices.length > 0)
-    );
+    if (!window.confirm("Are you sure you want to delete this invoice?")) return;
 
     try {
-      const response = await fetchWithAuth(
-        `http://localhost:8000/api/delete/${invoiceId}/`,
-        { method: "DELETE" }
+      // Optimistically update UI
+      setInvoices((prev) =>
+        prev
+          .map((group) => ({
+            ...group,
+            invoices: group.invoices.filter((inv) => inv.id !== invoiceId),
+          }))
+          .filter((group) => group.invoices.length > 0)
       );
 
-      if (response) {
-        toast.success("Invoice deleted successfully");
-      } else {
-        toast.error("Failed to delete invoice from server");
-        fetchInvoices(); // rollback and re-fetch if failed
-      }
+      await fetchWithAuth(`http://localhost:8000/api/delete/${invoiceId}/`, {
+        method: "DELETE",
+      });
+
+      toast.success("Invoice deleted successfully");
     } catch (err) {
-      console.error("Error deleting invoice:", err);
-      toast.error(err.message || "Failed to delete invoice");
-      fetchInvoices(); // rollback and re-fetch if failed
+      console.error("Error deleting invoice:", err.message);
+      toast.error("Failed to delete invoice. Please try again.");
+      fetchInvoices(); // Restore data
     }
-  }
-};
+  };
+
+
 
 
   const formatDate = (dateString) => {
@@ -258,7 +267,6 @@ const Address = () => {
     <div className="year_container">
       <ToastContainer position="top-right" autoClose={3000} />
 
-      {/* Header with New Bill Button */}
       <div className="header-bar">
         <button
           type="button"
@@ -270,7 +278,6 @@ const Address = () => {
         </button>
       </div>
 
-      {/* Invoice Table */}
       <table className="custom-table">
         <thead>
           <tr>
@@ -278,7 +285,6 @@ const Address = () => {
             <th>Buyer</th>
             <th>Address</th>
             <th>Invoice No.</th>
-            
             <th>Total</th>
             <th>Actions</th>
           </tr>
@@ -293,7 +299,7 @@ const Address = () => {
               <td colSpan="7" className="text-center">No invoices found</td>
             </tr>
           ) : (
-            invoices.flatMap((group, groupIndex) => 
+            invoices.flatMap((group, groupIndex) =>
               group.invoices.map((invoice, invoiceIndex) => (
                 <tr key={invoice.id}>
                   <td>{groupIndex + 1}.{invoiceIndex + 1}</td>
@@ -311,7 +317,6 @@ const Address = () => {
                       : group.buyer_address}
                   </td>
                   <td>{invoice.invoice_number}</td>
-                 
                   <td>
                     {invoice.currency} {parseFloat(invoice.total_with_gst).toFixed(2)}
                   </td>
@@ -365,8 +370,6 @@ const Address = () => {
         </tbody>
       </table>
 
-
-      {/* Hidden printable invoice for PDF */}
       {selectedInvoice && (
         <div ref={printRef} style={{ position: "absolute", left: "-9999px" }}>
           <div style={{ paddingLeft: "10px" }}>
@@ -375,7 +378,6 @@ const Address = () => {
               <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white" }}>
                 <div className="row date-tables">
                   <div className="col-6">
-                    {/* Seller Info */}
                     <table className="table table-bordered black-bordered">
                       <tbody style={{ border: "2px solid" }}>
                         <tr>
@@ -403,7 +405,6 @@ const Address = () => {
                       </tbody>
                     </table>
 
-                    {/* Buyer Info */}
                     <table className="table table-bordered black-bordered">
                       <tbody style={{ border: "2px solid" }}>
                         <tr>
@@ -430,7 +431,6 @@ const Address = () => {
                       </tbody>
                     </table>
 
-                    {/* Consignee Info */}
                     <table className="table table-bordered black-bordered">
                       <tbody style={{ border: "2px solid" }}>
                         <tr>
@@ -481,7 +481,6 @@ const Address = () => {
                         </tr>
                         <tr>
                           <td>Delivery Note Date</td>
-
                           <td>{new Date(selectedInvoice.delivery_note_date).toLocaleDateString("en-GB")}</td>
                         </tr>
                         <tr>
@@ -524,9 +523,6 @@ const Address = () => {
                         </div>
                       </div>
                     </div>
-
-                    <input type="hidden" id="currencyTitle" value="INR" />
-                    <input type="hidden" id="currencySymbol" value="₹" />
                   </div>
                 </div>
 
