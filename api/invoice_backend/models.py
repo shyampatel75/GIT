@@ -72,10 +72,11 @@ class Invoice(models.Model):
     # Country and Currency Info
     country = models.CharField(max_length=255, default='India')
     currency = models.CharField(max_length=10, default='INR')
+    state = models.CharField(max_length=50, default="Gujarat")
 
     # Product details
     Particulars = models.CharField(max_length=255, blank=True, null=True,default='Consultancy')
-    hsn_sac_code = models.CharField(max_length=10, blank=True, null=True,default='0000')
+    hsn_sac_code = models.CharField(max_length=10)
     total_hours = models.FloatField(blank=True, null=True, default=0.0)
     rate = models.FloatField(blank=True, null=True, default=0.0)
     base_amount = models.FloatField()

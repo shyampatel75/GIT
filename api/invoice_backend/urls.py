@@ -53,6 +53,8 @@ urlpatterns = [
     # Cash management
     path('cash-entries/', views.cash_entry_collection, name='cashentry-collection'),
     path('cash-entries/<int:pk>/', views.cash_entry_detail, name='cashentry-detail'),
+    path('cash-entries/<int:pk>/restore/', views.restore_cash_entry, name='restore-cash-entry'),
+    path('cash-entries/deleted/', views.soft_deleted_cash_entries, name='soft-deleted-cash-entries'),
 
     # Company balance utility
     path('company-balance/<str:buyer_gst>/', views.company_balance, name='company-balance'),

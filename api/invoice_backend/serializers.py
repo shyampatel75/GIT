@@ -61,14 +61,11 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 class InvoiceSerializer(serializers.ModelSerializer):
-    
     class Meta:
         model = Invoice
         fields = '__all__'
         extra_kwargs = {
-            'buyer_name': {'required': True},
-            'buyer_address': {'required': True},
-            'invoice_date': {'required': True},
+            'hsn_sac_code': {'required': True},
         }
 
     def validate(self, data):
@@ -84,15 +81,31 @@ class InvoiceSerializer(serializers.ModelSerializer):
                 "Either provide rate and hours, or directly enter the base amount"
             )
         
+        if data.get('country') == 'India' and not data.get('state'):
+            raise serializers.ValidationError(
+                {"state": "State is required for Indian invoices"}
+            )
+        if not data.get('hsn_sac_code'):
+            raise serializers.ValidationError(
+                {"hsn_sac_code": "HSN/SAC code is required"}
+            )    
+        
         return data
 
 class SettingSerializer(serializers.ModelSerializer):
+    HSN_codes = serializers.JSONField(required=False)
+    
     class Meta:
         model = Setting
-        fields = '__all__'  # Corrected from '_all_' to '__all__'
+        fields = '__all__'
         extra_kwargs = {
-            'seller_pan': {'required': False, 'allow_blank': True},
+            'HSN_codes': {'required': False},
         }
+
+    def validate_HSN_codes(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("HSN_codes must be a list")
+        return value
 
 class DepositSerializer(serializers.ModelSerializer):
     class Meta:
@@ -176,4 +189,4 @@ class BankAccountSerializer(serializers.ModelSerializer):
 class CashEntrySerializer(serializers.ModelSerializer):
     class Meta:
         model = CashEntry
-        fields = ['id', 'amount', 'description', 'date']
+        fields = ['id', 'amount', 'description', 'date', 'is_deleted']

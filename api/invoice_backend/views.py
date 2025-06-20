@@ -849,7 +849,7 @@ def grouped_invoices(request):
 @permission_classes([IsAuthenticated])
 def cash_entry_collection(request):
     if request.method == 'GET':
-        entries = CashEntry.objects.all().order_by('-id')
+        entries = CashEntry.objects.filter(is_deleted=False).order_by('-id')  # only active ones
         serializer = CashEntrySerializer(entries, many=True)
         return Response(serializer.data)
 
@@ -883,6 +883,27 @@ def cash_entry_detail(request, pk):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    # DELETE
-    entry.delete()
-    return Response(status=status.HTTP_204_NO_CONTENT)
+    # DELETE - soft delete
+    entry.is_deleted = True
+    entry.save()
+    return Response({"message": "Cash entry soft-deleted."}, status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def restore_cash_entry(request, pk):
+    try:
+        entry = CashEntry.objects.get(pk=pk, is_deleted=True)
+        entry.is_deleted = False
+        entry.save()
+        return Response({"message": "Cash entry restored."}, status=status.HTTP_200_OK)
+    except CashEntry.DoesNotExist:
+        return Response({"error": "Cash entry not found or not deleted."}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def soft_deleted_cash_entries(request):
+    entries = CashEntry.objects.filter(is_deleted=True)
+    serializer = CashEntrySerializer(entries, many=True)
+    return Response(serializer.data)
