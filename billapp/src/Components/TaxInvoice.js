@@ -24,6 +24,7 @@ const Taxinvoice = () => {
     consignee_name: location.state?.consigneeData?.consignee_name || "",
     consignee_address: location.state?.consigneeData?.consignee_address || "",
     consignee_gst: location.state?.consigneeData?.consignee_gst || "",
+    hsn_sac_code: "",
     invoice_number: "",
     invoice_date: "",
     delivery_note: "",
@@ -57,10 +58,14 @@ const Taxinvoice = () => {
     flag: "https://flagcdn.com/in.svg",
   });
   const [states, setStates] = useState([]);
-  const [selectedState, setSelectedState] = useState("");
+  const [selectedState, setSelectedState] = useState(
+    location.state?.state || (selectedCountry.name === "India" ? "Gujarat" : "")
+  );
   const [isOpen, setIsOpen] = useState(false);
   const [invoiceYear, setInvoiceYear] = useState(getCurrentInvoiceYear());
-  const [settingsData, setSettingsData] = useState({});
+  const [settingsData, setSettingsData] = useState({
+    HSN_codes: [] // Initialize empty array
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -120,29 +125,29 @@ const Taxinvoice = () => {
     }
   }, []);
 
- const calculateInrEquivalent = (amount) => {
-  const adjustment = 1; // subtract ₹1 per unit if needed
-  
-  if (!amount || isNaN(amount)) return 0;
+  const calculateInrEquivalent = (amount) => {
+    const adjustment = 1; // subtract ₹1 per unit if needed
 
-  const numAmount = parseFloat(amount);
-  if (isNaN(numAmount)) return 0;
+    if (!amount || isNaN(amount)) return 0;
 
-  const converted = numAmount * exchangeRate;
-  const adjusted = converted - adjustment; // Adjust if needed
-  
-  return adjusted;
-};
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount)) return 0;
+
+    const converted = numAmount * exchangeRate;
+    const adjusted = converted - adjustment; // Adjust if needed
+
+    return adjusted;
+  };
 
 
-  useEffect(() => {
-    if (settingsData?.HSN_codes?.length > 0 && !formData.hsn_code) {
-      setFormData(prev => ({
-        ...prev,
-        hsn_code: settingsData.HSN_codes[0],
-      }));
-    }
-  }, [settingsData]);
+useEffect(() => {
+  if (settingsData.HSN_codes?.length > 0) {
+    setFormData(prev => ({
+      ...prev,
+      hsn_sac_code: settingsData.HSN_codes[0], // Set default to first HSN code
+    }));
+  }
+}, [settingsData.HSN_codes]);
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -168,6 +173,14 @@ const Taxinvoice = () => {
       const data = await response.json();
       if (data) {
         setSettingsData(data);
+        
+        // Set default HSN code if available
+        if (data.HSN_codes && data.HSN_codes.length > 0) {
+          setFormData(prev => ({
+            ...prev,
+            hsn_sac_code: data.HSN_codes[0]
+          }));
+        }
       }
     } catch (err) {
       console.error("Error fetching settings:", err);
@@ -209,34 +222,38 @@ const Taxinvoice = () => {
   }, []);
 
   useEffect(() => {
-    const fetchIndianStates = async () => {
-      try {
-        const response = await fetch("https://countriesnow.space/api/v0.1/countries/states", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            country: "India",
-          }),
-        });
-
-        const data = await response.json();
-
-        if (data.error) {
-          throw new Error("Failed to fetch states");
+  const fetchSettings = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("access_token");
+      const response = await fetch("http://127.0.0.1:8000/api/settings/", {
+        headers: {
+          'Authorization': `Bearer ${token}`,
         }
+      });
 
-        setStates(data.data.states);
-      } catch (error) {
-        console.error("Error fetching Indian states:", error);
-      } finally {
-        setLoading(false);
+      if (!response.ok) throw new Error('Failed to fetch settings');
+      
+      const data = await response.json();
+      setSettingsData(data);
+      
+      // Set default HSN code if available
+      if (data.HSN_codes && data.HSN_codes.length > 0) {
+        setFormData(prev => ({
+          ...prev,
+          hsn_sac_code: data.HSN_codes[0] // Set first HSN code as default
+        }));
       }
-    };
+      
+    } catch (err) {
+      console.error("Error fetching settings:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchIndianStates();
-  }, []);
+  fetchSettings();
+}, []);
 
   useEffect(() => {
     if (selectedCountry.name === "India" && states.length > 0) {
@@ -284,7 +301,11 @@ const Taxinvoice = () => {
       }));
     }
   }, []);
-
+  useEffect(() => {
+    if (location.state?.state) {
+      setSelectedState(location.state.state);
+    }
+  }, [location.state]);
   // Effects
   useEffect(() => {
     fetchNextInvoiceNumber();
@@ -338,10 +359,12 @@ const Taxinvoice = () => {
   // Handlers
   const handleSelectChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-    }));
+    if (name === "hsn_sac_code") {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   const handleChange = (e) => {
@@ -562,6 +585,16 @@ const Taxinvoice = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // If HSN code is empty, auto-select the first option and proceed
+    if (!formData.hsn_sac_code && settingsData.HSN_codes && settingsData.HSN_codes.length > 0) {
+      setFormData(prev => ({
+        ...prev,
+        hsn_sac_code: settingsData.HSN_codes[0]
+      }));
+      // Wait for state to update, then proceed
+      setTimeout(() => handleSubmit(e), 0);
+      return;
+    }
 
     try {
       setLoading(true);
@@ -609,7 +642,7 @@ const Taxinvoice = () => {
         const payload = {
           buyer_name: formData.buyer_name,
           buyer_address: formData.buyer_address,
-          buyer_gst: formData.buyer_gst || "NOTAPPLICABLE",
+          buyer_gst: formData.buyer_gst || "-",
           consignee_name: formData.consignee_name,
           consignee_address: formData.consignee_address,
           consignee_gst: formData.consignee_gst,
@@ -621,8 +654,10 @@ const Taxinvoice = () => {
           destination: formData.destination,
           country: selectedCountry.name,
           currency: selectedCountry.currencyCode,
+          state: selectedState,
+          // state:selectedState.state,
           Particulars: formData.Particulars,
-          hsn_code: formData.hsn_code,
+          hsn_sac_code: formData.hsn_sac_code || settingsData.HSN_codes?.[0] || null,
           total_hours: prepareNumericField(formData.total_hours),
           rate: prepareNumericField(formData.rate),
           base_amount,
@@ -703,6 +738,7 @@ const Taxinvoice = () => {
     try {
       await new Promise(resolve => setTimeout(resolve, 100));
 
+      // Use html2canvas to render the input
       const canvas = await html2canvas(input, {
         useCORS: true,
         allowTaint: true,
@@ -713,23 +749,28 @@ const Taxinvoice = () => {
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF("p", "mm", "a4");
 
-      const margin = 10;
+      const margin = 10; // 10mm margin
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const maxWidth = pageWidth - 2 * margin;
       const maxHeight = pageHeight - 2 * margin;
 
+      // Calculate the scale so the image fits within the page
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;
-      const imgAspectRatio = imgWidth / imgHeight;
+      const pxPerMm = imgWidth / input.offsetWidth; // pixels per mm
 
-      let renderWidth = maxWidth;
-      let renderHeight = maxWidth / imgAspectRatio;
+      // Convert canvas size from px to mm
+      const imgWidthMm = imgWidth / pxPerMm;
+      const imgHeightMm = imgHeight / pxPerMm;
 
-      if (renderHeight > maxHeight) {
-        renderHeight = maxHeight;
-        renderWidth = maxHeight * imgAspectRatio;
-      }
+      // Calculate scale factor to fit within maxWidth and maxHeight
+      const widthScale = maxWidth / imgWidthMm;
+      const heightScale = maxHeight / imgHeightMm;
+      const scale = Math.min(widthScale, heightScale);
+
+      const renderWidth = imgWidthMm * scale;
+      const renderHeight = imgHeightMm * scale;
 
       const x = (pageWidth - renderWidth) / 2;
       const y = (pageHeight - renderHeight) / 2;
@@ -775,6 +816,50 @@ const Taxinvoice = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // Only set states if country is India
+    if (selectedCountry.name === "India") {
+      setStates([
+        { name: "Andhra Pradesh" },
+        { name: "Arunachal Pradesh" },
+        { name: "Assam" },
+        { name: "Bihar" },
+        { name: "Chhattisgarh" },
+        { name: "Goa" },
+        { name: "Gujarat" },
+        { name: "Haryana" },
+        { name: "Himachal Pradesh" },
+        { name: "Jharkhand" },
+        { name: "Karnataka" },
+        { name: "Kerala" },
+        { name: "Madhya Pradesh" },
+        { name: "Maharashtra" },
+        { name: "Manipur" },
+        { name: "Meghalaya" },
+        { name: "Mizoram" },
+        { name: "Nagaland" },
+        { name: "Odisha" },
+        { name: "Punjab" },
+        { name: "Rajasthan" },
+        { name: "Sikkim" },
+        { name: "Tamil Nadu" },
+        { name: "Telangana" },
+        { name: "Tripura" },
+        { name: "Uttar Pradesh" },
+        { name: "Uttarakhand" },
+        { name: "West Bengal" },
+        { name: "Andaman and Nicobar Islands" },
+        { name: "Chandigarh" },
+        { name: "Dadra and Nagar Haveli and Daman and Diu" },
+        { name: "Delhi" },
+        { name: "Jammu and Kashmir" },
+        { name: "Ladakh" },
+        { name: "Lakshadweep" },
+        { name: "Puducherry" }
+      ]);
+    }
+  }, [selectedCountry]);
 
   if (!settingsData) return <p className="text-center mt-4">Loading settings...</p>;
 
@@ -1187,16 +1272,19 @@ const Taxinvoice = () => {
                     </td>
                     <td style={{ width: "130px", paddingTop: "16px" }}>
                       <select
-                        name="hsn_code"
+                        name="hsn_sac_code"
                         id="hns_select"
                         onChange={handleSelectChange}
-                        value={formData.hsn_code}
-                        style={{ height: "46px" }}
-                        readOnly={isSubmitted}
+                        value={formData.hsn_sac_code || (settingsData.HSN_codes && settingsData.HSN_codes[0]) || ""}
+                        style={{ height: "46px", width: "100%" }}
+                        disabled={isSubmitted}
+                        required
+                        className="form-control"
                       >
-                        <option value="">Select</option>
-                        {settingsData?.HSN_codes?.map((code, index) => (
-                          <option key={index} value={code}>{code}</option>
+                        {settingsData.HSN_codes?.map((code, index) => (
+                          <option key={index} value={code}>
+                            {code}
+                          </option>
                         ))}
                       </select>
                     </td>
@@ -1323,14 +1411,15 @@ const Taxinvoice = () => {
                         <div style={{ whiteSpace: 'nowrap' }}>
                           {showConversion && (
                             <>
-                              ₹ {numberToWords(Math.floor(calculateInrEquivalent(formData.total_with_gst)))} Only —
-                              ₹ {calculateInrEquivalent(formData.total_with_gst)}
+                              ₹ {numberToWords(Math.floor(calculateInrEquivalent(formData.total_with_gst)))} Only — ₹{" "}
+                              {calculateInrEquivalent(formData.total_with_gst).toFixed(2)}
                             </>
                           )}
                         </div>
 
+
                         {/* Right side: Total */}
-                        <div style={{ whiteSpace: 'nowrap', textAlign: 'center',width: "200px" }}>
+                        <div style={{ whiteSpace: 'nowrap', textAlign: 'center', width: "200px" }}>
                           <strong>Total:</strong> &nbsp;
                           <strong id="total-with-gst">
                             <span className="currency-sym">{selectedCountry.currency} </span>
@@ -1390,7 +1479,7 @@ const Taxinvoice = () => {
                   </thead>
                   <tbody>
                     <tr>
-                      <td>{formData.hsn_code}</td>
+                      <td>{formData.hsn_sac_code}</td>
                       <td>
                         {formData.base_amount}
                         {showConversion && (
@@ -1487,7 +1576,7 @@ const Taxinvoice = () => {
                   </thead>
                   <tbody>
                     <tr>
-                      <td>{formData.hsn_code}</td>
+                      <td>{formData.hsn_sac_code}</td>
                       <td>
                         {formData.base_amount}
                         {showConversion && (
@@ -1621,7 +1710,7 @@ const Taxinvoice = () => {
           {loading ? 'Processing...' : isSubmitted ? 'Download PDF' : 'Generate & Download PDF'}
         </button>
       </div>
-{/* --------------------------------------------pdf------------------------------------------------------ */}
+      {/* --------------------------------------------pdf------------------------------------------------------ */}
 
       <div
         ref={pdfRef}
@@ -1881,8 +1970,7 @@ const Taxinvoice = () => {
                         {formData.Particulars}
                       </td>
                       <td style={{ width: "130px", paddingTop: "16px" }}>
-                        {formData.hsn_code}
-
+                        {formData.hsn_sac_code} {/* Fallback to "0000" if empty */}
                       </td>
                       <td style={{ width: "10%" }}>
 
@@ -1950,31 +2038,31 @@ const Taxinvoice = () => {
 
                     {/* Total row */}
                     <tr>
-                    <td colSpan="6">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <td colSpan="6">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
 
-                        {/* Left side: INR conversion (words + number) */}
-                        <div style={{ whiteSpace: 'nowrap' }}>
-                          {showConversion && (
-                            <>
-                              ₹ {numberToWords(Math.floor(calculateInrEquivalent(formData.total_with_gst)))} Only —
-                              ₹ {calculateInrEquivalent(formData.total_with_gst)}
-                            </>
-                          )}
+                          {/* Left side: INR conversion (words + number) */}
+                          <div style={{ whiteSpace: 'nowrap' }}>
+                            {showConversion && (
+                              <>
+                                ₹ {numberToWords(Math.floor(calculateInrEquivalent(formData.total_with_gst)))} Only — ₹{" "}
+                                {calculateInrEquivalent(formData.total_with_gst).toFixed(2)}
+                              </>
+                            )}
+                          </div>
+
+                          {/* Right side: Total */}
+                          <div style={{ whiteSpace: 'nowrap', textAlign: 'center', width: "200px" }}>
+                            <strong>Total:</strong> &nbsp;
+                            <strong id="total-with-gst">
+                              <span className="currency-sym">{selectedCountry.currency} </span>
+                              {formData.total_with_gst}
+                            </strong>
+                          </div>
+
                         </div>
-
-                        {/* Right side: Total */}
-                        <div style={{ whiteSpace: 'nowrap', textAlign: 'center',width: "200px" }}>
-                          <strong>Total:</strong> &nbsp;
-                          <strong id="total-with-gst">
-                            <span className="currency-sym">{selectedCountry.currency} </span>
-                            {formData.total_with_gst}
-                          </strong>
-                        </div>
-
-                      </div>
-                    </td>
-                  </tr>
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -2000,107 +2088,184 @@ const Taxinvoice = () => {
               </div>
             </div>
 
-            {selectedCountry.name === "India" && (
-              <div className="row">
-                <div className="col-xs-12 inside-india">
-                  <table className="table table-bordered invoice-table">
-                    <thead>
-                      {selectedState !== "Gujarat" ? (
-                        <>
-                          <tr>
-                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
-                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
-                            <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Integrated Tax</th>
-                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
-                          </tr>
-                          <tr>
-                            <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                            <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                          </tr>
-                        </>
-                      ) : (
-                        <>
-                          <tr>
-                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
-                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
-                            <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Central Tax</th>
-                            <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">State Tax</th>
-                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
-                          </tr>
-                          <tr>
-                            <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                            <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                            <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                            <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                          </tr>
-                        </>
-                      )}
-                    </thead>
-
-                    <tbody>
-                      <tr>
-                        <td>{formData.hsn_code}</td>
-                        <td>{formData.base_amount}</td>
-                        {selectedState === "Gujarat" ? (
-                          <>
-                            <td>9%</td>
-                            <td>{formData.cgst}</td>
-                            <td>9%</td>
-                            <td>{formData.sgst}</td>
-                            <td>{formData.taxtotal}</td>
-                          </>
-                        ) : (
-                          <>
-                            <td>18%</td>
-                            <td>{formData.igst}</td>
-                            <td>{formData.taxtotal}</td>
-                          </>
+            {selectedCountry.name === "India" && selectedState === "Gujarat" && (
+            <div className="row">
+              <div className="col-xs-12 inside-india">
+                <table className="table table-bordered invoice-table">
+                  <thead>
+                    <tr>
+                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Central Tax</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">State Tax</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
+                    </tr>
+                    <tr>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>{formData.hsn_sac_code}</td>
+                      <td>
+                        {formData.base_amount}
+                        {showConversion && (
+                          <div className="inr-conversion">
+                            ≈ ₹{calculateInrEquivalent(formData.base_amount)}
+                          </div>
                         )}
-                      </tr>
-                      <tr className="total-row">
-                        <td>Total</td>
-                        <td>{formData.base_amount}</td>
-                        {selectedState === "Gujarat" ? (
-                          <>
-                            <td></td>
-                            <td>{formData.cgst}</td>
-                            <td></td>
-                            <td>{formData.sgst}</td>
-                            <td>{formData.taxtotal}</td>
-                          </>
-                        ) : (
-                          <>
-                            <td></td>
-                            <td>{formData.igst}</td>
-                            <td>{formData.taxtotal}</td>
-                          </>
+                      </td>
+                      <td>9%</td>
+                      <td>
+                        {formData.cgst}
+                        {showConversion && (
+                          <div className="inr-conversion">
+                            ≈ ₹{calculateInrEquivalent(formData.cgst)}
+                          </div>
                         )}
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <div style={{ padding: "0 0 0 10px" }}>
-                  <div className="col-xs-12 inside-india">
-                    <div>
-                      <strong>Tax Amount (in words): </strong>
-                      <span className="total-tax-in-words">
-                        <span className="currency-text">{selectedCountry.currencyCode}</span>{" "}
-                        {numberToWords(Math.floor(formData.total_with_gst))} Only
-                      </span>
-                    </div>
-                  </div>
-                  <div className="col-xs-12">
-                    <div>
-                      <h4>
-                        <strong>Remarks:</strong>
-                      </h4>
-                      <h5 className="html-remark">{formData.remark}</h5>
-                    </div>
-                  </div>
-                </div>
+                      </td>
+                      <td>9%</td>
+                      <td>
+                        {formData.sgst}
+                        {showConversion && (
+                          <div className="inr-conversion">
+                            ≈ ₹{calculateInrEquivalent(formData.sgst)}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        {formData.taxtotal}
+                        {showConversion && (
+                          <div className="inr-conversion">
+                            ≈ ₹{calculateInrEquivalent(formData.taxtotal)}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                    <tr className="total-row">
+                      <td>Total</td>
+                      <td>
+                        {formData.base_amount}
+                        {showConversion && (
+                          <div className="inr-conversion">
+                            ≈ ₹{calculateInrEquivalent(formData.base_amount)}
+                          </div>
+                        )}
+                      </td>
+                      <td></td>
+                      <td>
+                        {formData.cgst}
+                        {showConversion && (
+                          <div className="inr-conversion">
+                            ≈ ₹{calculateInrEquivalent(formData.cgst)}
+                          </div>
+                        )}
+                      </td>
+                      <td></td>
+                      <td>
+                        {formData.sgst}
+                        {showConversion && (
+                          <div className="inr-conversion">
+                            ≈ ₹{calculateInrEquivalent(formData.sgst)}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        {formData.taxtotal}
+                        {showConversion && (
+                          <div className="inr-conversion">
+                            ≈ ₹{calculateInrEquivalent(formData.taxtotal)}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-            )}
+            </div>
+          )}
+
+          {selectedCountry.name === "India" && selectedState !== "Gujarat" && (
+            <div className="row">
+              <div className="col-xs-12 outside-gujarat">
+                <table className="table table-bordered invoice-table">
+                  <thead>
+                    <tr>
+                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Integrated Tax</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
+                    </tr>
+                    <tr>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>{formData.hsn_sac_code}</td>
+                      <td>
+                        {formData.base_amount}
+                        {showConversion && (
+                          <div className="inr-conversion">
+                            ≈ ₹{calculateInrEquivalent(formData.base_amount)}
+                          </div>
+                        )}
+                      </td>
+                      <td>18%</td>
+                      <td>
+                        {formData.igst}
+                        {showConversion && (
+                          <div className="inr-conversion">
+                            ≈ ₹{calculateInrEquivalent(formData.igst)}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        {formData.taxtotal}
+                        {showConversion && (
+                          <div className="inr-conversion">
+                            ≈ ₹{calculateInrEquivalent(formData.taxtotal)}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                    <tr className="total-row">
+                      <td><strong>Total</strong></td>
+                      <td>
+                        <strong>{formData.base_amount}</strong>
+                        {showConversion && (
+                          <div className="inr-conversion">
+                            ≈ ₹{calculateInrEquivalent(formData.base_amount)}
+                          </div>
+                        )}
+                      </td>
+                      <td></td>
+                      <td>
+                        <strong>{formData.igst}</strong>
+                        {showConversion && (
+                          <div className="inr-conversion">
+                            ≈ ₹{calculateInrEquivalent(formData.igst)}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <strong>{formData.taxtotal}</strong>
+                        {showConversion && (
+                          <div className="inr-conversion">
+                            ≈ ₹{calculateInrEquivalent(formData.taxtotal)}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
 
             <div className="row mb-3">

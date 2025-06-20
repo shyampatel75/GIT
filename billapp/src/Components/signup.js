@@ -45,7 +45,7 @@ const Signup = () => {
       }
 
       alert("Account created successfully!");
-      navigate("/dashboard");
+      navigate("/");
     } catch (err) {
       setError("Network error. Please try again.");
       console.error("Registration error:", err);

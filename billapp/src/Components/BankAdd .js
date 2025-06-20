@@ -126,12 +126,23 @@ const BankAdd = () => {
         },
       });
 
-      if (!response.ok) throw new Error("Failed to fetch deleted cash entries");
+      if (!response.ok) {
+        // If 404, it means no deleted entries exist yet, which is fine
+        if (response.status === 404) {
+          setDeletedCashEntries([]);
+          return;
+        }
+        throw new Error("Failed to fetch deleted cash entries");
+      }
 
       const data = await response.json();
       setDeletedCashEntries(data);
     } catch (err) {
-      setError(err.message);
+      // Only show error if it's not a 404 (which is expected when no deleted entries exist)
+      if (err.message !== "Failed to fetch deleted cash entries" || !err.message.includes("404")) {
+        console.error("Error fetching deleted cash entries:", err);
+      }
+      setDeletedCashEntries([]);
     } finally {
       setLoading(false);
     }
@@ -423,32 +434,34 @@ const BankAdd = () => {
   };
 
   return (
-    <div className="container mt-4">
+    <div className="container mt-4" style={{ boxShadow: " 0 2px 6px #6f7172fd", borderRadius: "20px", backgroundColor: "rgba(249, 249, 250, 0.99)" }}>
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h2>Bank & Cash Management</h2>
         <div>
           <button className="btn btn-outline-secondary me-2" onClick={() => setShowDeleted(!showDeleted)}>
             {showDeleted ? "Hide Deleted Items" : "View Deleted Items"}
           </button>
-          <button 
-            className="btn btn-warning me-2" 
+          <button
+            className="new-bill-btn me-2"
             onClick={() => {
               resetCashForm();
               setShowCashForm(!showCashForm);
+              setShowForm(false)
             }}
             disabled={loading}
           >
             {showCashForm ? "Cancel Cash Entry" : "Add Cash Entry"}
           </button>
           <button
-            className="btn btn-primary"
+            className="new-bill-btn me-2"
             onClick={() => {
               resetForm();
-              setShowForm(true);
+              setShowForm(!showForm);
+              setShowCashForm(false)
             }}
             disabled={loading}
           >
-            {loading ? "Loading..." : "Add Bank"}
+            {showForm ? "Cancel Bank Form" : "Add Bank"}
           </button>
         </div>
       </div>
@@ -508,7 +521,7 @@ const BankAdd = () => {
               step="0.01"
             />
           </div>
-          <button type="submit" className="btn btn-success me-2" disabled={loading}>
+          <button type="submit" className="btn btn-success me-2" style={{ backgroundColor: "#195277" }} disabled={loading}>
             {loading ? "Processing..." : editingBank ? "Update" : "Add"} Bank
           </button>
           <button type="button" className="btn btn-secondary" onClick={resetForm} disabled={loading}>
@@ -553,7 +566,7 @@ const BankAdd = () => {
               rows="3"
             />
           </div>
-          <button type="submit" className="btn btn-success me-2" disabled={loading}>
+          <button type="submit" className="btn btn-success me-2" style={{ backgroundColor: "#195277" }} disabled={loading}>
             {loading ? "Processing..." : editingCashEntry ? "Update" : "Add"} Cash Entry
           </button>
           <button type="button" className="btn btn-secondary" onClick={resetCashForm} disabled={loading}>
@@ -574,37 +587,43 @@ const BankAdd = () => {
               </div>
             ) : banks.length > 0 ? (
               <div className="table-responsive">
-                <table className="table table-bordered table-hover">
-                  <thead className="table-light">
+                <table className="statement-table ">
+                  <thead>
                     <tr>
-                      <th>Bank Name</th>
-                      <th>Account Number</th>
-                      <th>Amount</th>
-                      <th>Actions</th>
+                      <th style={{ backgroundColor: "#afafaf", border: "1px solid #a09e9e" }}>Bank Name</th>
+                      <th style={{ backgroundColor: "#afafaf", border: "1px solid #a09e9e" }}>Account Number</th>
+                      <th style={{ backgroundColor: "#afafaf", border: "1px solid #a09e9e" }}>Amount</th>
+                      <th style={{ backgroundColor: "#afafaf", border: "1px solid #a09e9e" }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {banks.map((bank) => (
                       <tr key={bank.id}>
-                        <td>{bank.bank_name}</td>
-                        <td>{bank.account_number}</td>
-                        <td>{bank.amount}</td>
-                        <td>
-                          <button
-                            className="btn btn-sm btn-warning me-2"
-                            onClick={() => handleEditBank(bank)}
-                            disabled={loading}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="btn btn-sm btn-danger"
-                            data-bs-toggle="modal"
-                            data-bs-target={`#deleteBankModal-${bank.id}`}
-                            disabled={loading}
-                          >
-                            Delete
-                          </button>
+                        <td style={{ border: "1px solid #a09e9e", width: "210px" }} className="text-center">{bank.bank_name}</td>
+                        <td style={{ border: "1px solid #a09e9e", width: "236px" }} className="text-center">{bank.account_number}</td>
+                        <td style={{ border: "1px solid #a09e9e", width: "215px" }} className="text-center">{bank.amount}</td>
+                        <td style={{ border: "1px solid #a09e9e", width: "191px" }} className="text-center">
+                          <div className="tooltip-container">
+                            <button
+                              className="action-btn edit"
+                              onClick={() => handleEditBank(bank)}
+                              disabled={loading}
+                            >
+                              <i className="fa-solid fa-pen-to-square"></i>
+                            </button>
+                            <span className="tooltip-text"style={{top:"20px",left:"60px"}}>Edit</span>
+                          </div>
+                          <div className="tooltip-container">
+                            <button
+                              className="action-btn delete"
+                              data-bs-toggle="modal"
+                              data-bs-target={`#deleteBankModal-${bank.id}`}
+                              disabled={loading}
+                            >
+                              <i className="fa-solid fa-trash"></i>
+                            </button>
+                            <span className="tooltip-text"style={{top:"20px",left:"60px"}}>Delete</span>
+                          </div>
 
                           <div
                             className="modal fade"
@@ -671,37 +690,43 @@ const BankAdd = () => {
               </div>
             ) : cashEntries.length > 0 ? (
               <div className="table-responsive">
-                <table className="table table-bordered table-hover">
-                  <thead className="table-light">
+                <table className="statement-table ">
+                  <thead >
                     <tr>
-                      <th>Amount</th>
-                      <th>Date</th>
-                      <th>Description</th>
-                      <th>Actions</th>
+                      <th style={{ backgroundColor: "#afafaf", border: "1px solid #a09e9e" }}>Date</th>
+                      <th style={{ backgroundColor: "#afafaf", border: "1px solid #a09e9e" }}>Description</th>
+                      <th style={{ backgroundColor: "#afafaf", border: "1px solid #a09e9e" }}>Amount</th>
+                      <th style={{ backgroundColor: "#afafaf", border: "1px solid #a09e9e" }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {cashEntries.map((entry) => (
                       <tr key={entry.id}>
-                        <td>{entry.amount}</td>
-                        <td>{formatDate(entry.date)}</td>
-                        <td>{entry.description || "-"}</td>
-                        <td>
-                          <button
-                            className="btn btn-sm btn-warning me-2"
-                            onClick={() => handleEditCashEntry(entry)}
-                            disabled={loading}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="btn btn-sm btn-danger"
-                            data-bs-toggle="modal"
-                            data-bs-target={`#deleteCashModal-${entry.id}`}
-                            disabled={loading}
-                          >
-                            Delete
-                          </button>
+                        <td style={{ border: "1px solid #a09e9e", width: "210px" }} className="text-center">{formatDate(entry.date)}</td>
+                        <td style={{ border: "1px solid #a09e9e", width: "236px" }} className="text-center">{entry.description || "-"}</td>
+                        <td style={{ border: "1px solid #a09e9e", width: "215px" }} className="text-center">{entry.amount}</td>
+                        <td style={{ border: "1px solid #a09e9e", width: "191px" }} className="text-center">
+                          <div className="tooltip-container">
+                            <button
+                              className="action-btn edit"
+                              onClick={() => handleEditCashEntry(entry)}
+                              disabled={loading}
+                            >
+                              <i className="fa-solid fa-pen-to-square"></i>
+                            </button>
+                            <span className="tooltip-text" style={{top:"20px",left:"60px"}}>Edit</span>
+                          </div>
+                          <div className="tooltip-container">
+                            <button
+                              className="action-btn delete"
+                              data-bs-toggle="modal"
+                              data-bs-target={`#deleteCashModal-${entry.id}`}
+                              disabled={loading}
+                            >
+                              <i className="fa-solid fa-trash"></i>
+                            </button>
+                            <span className="tooltip-text" style={{top:"20px",left:"60px"}}>Delete</span>
+                          </div>
 
                           <div
                             className="modal fade"
@@ -772,31 +797,35 @@ const BankAdd = () => {
               </div>
             ) : deletedBanks.length > 0 ? (
               <div className="table-responsive">
-                <table className="table table-bordered table-hover">
-                  <thead className="table-light">
+                <table className="statement-table">
+                  <thead >
                     <tr>
-                      <th>Bank Name</th>
-                      <th>Account Number</th>
-                      <th>Amount</th>
-                      <th>Deleted At</th>
-                      <th>Actions</th>
+                      <th style={{ backgroundColor: "#afafaf", border: "1px solid #a09e9e" }}>Bank Name</th>
+                      <th style={{ backgroundColor: "#afafaf", border: "1px solid #a09e9e" }}>Account Number</th>
+                      <th style={{ backgroundColor: "#afafaf", border: "1px solid #a09e9e" }}>Amount</th>
+                      {/* <th style={{backgroundColor:"#afafaf",border:"1px solid #a09e9e"}}>Deleted At</th> */}
+                      <th style={{ backgroundColor: "#afafaf", border: "1px solid #a09e9e" }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {deletedBanks.map((bank) => (
                       <tr key={bank.id}>
-                        <td>{bank.bank_name}</td>
-                        <td>{bank.account_number}</td>
-                        <td>{bank.amount}</td>
-                        <td>{bank.deleted_at ? formatDate(bank.deleted_at) : "N/A"}</td>
-                        <td>
-                          <button
-                            className="btn btn-sm btn-success"
-                            onClick={() => handleRestoreBank(bank.id)}
-                            disabled={loading}
-                          >
-                            {loading ? "Restoring..." : "Restore"}
-                          </button>
+                        <td style={{ border: "1px solid #a09e9e", width: "210px" }} className="text-center">{bank.bank_name}</td>
+                        <td style={{ border: "1px solid #a09e9e", width: "236px", width: "215px" }} className="text-center">{bank.account_number}</td>
+                        <td style={{ border: "1px solid #a09e9e", width: "215px" }} className="text-center">{bank.amount}</td>
+                        {/* <td style={{border:"1px solid #a09e9e"}} className="text-center">{bank.deleted_at ? formatDate(bank.deleted_at) : "N/A"}</td> */}
+                        <td style={{ border: "1px solid #a09e9e", width: "191px" }} className="text-center">
+                          <div className="tooltip-container">
+                            <button
+                              className="btn btn-sm" style={{ backgroundColor: "wheat", fontSize: "20px" }}
+                              onClick={() => handleRestoreBank(bank.id)}
+                              disabled={loading}
+                            >
+                              {loading ? "Restoring..." : <i className="fa-solid fa-trash-arrow-up fa-bounce"></i>}
+                            </button>
+                            <span className="tooltip-text" style={{top:"20px",left:"60px"}}>Delete</span>
+                          </div>
+
                         </td>
                       </tr>
                     ))}
@@ -818,30 +847,30 @@ const BankAdd = () => {
               </div>
             ) : deletedCashEntries.length > 0 ? (
               <div className="table-responsive">
-                <table className="table table-bordered table-hover">
-                  <thead className="table-light">
+                <table className="statement-table ">
+                  <thead>
                     <tr>
-                      <th>Amount</th>
-                      <th>Date</th>
-                      <th>Description</th>
-                      <th>Deleted At</th>
-                      <th>Actions</th>
+                      <th style={{ backgroundColor: "#afafaf", border: "1px solid #a09e9e" }}>Date</th>
+                      <th style={{ backgroundColor: "#afafaf", border: "1px solid #a09e9e" }}>Amount</th>
+                      <th style={{ backgroundColor: "#afafaf", border: "1px solid #a09e9e" }}>Description</th>
+                      {/* <th style={{backgroundColor:"#afafaf",border:"1px solid #a09e9e"}}>Deleted At</th> */}
+                      <th style={{ backgroundColor: "#afafaf", border: "1px solid #a09e9e" }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {deletedCashEntries.map((entry) => (
                       <tr key={entry.id}>
-                        <td>{entry.amount}</td>
-                        <td>{formatDate(entry.date)}</td>
-                        <td>{entry.description || "-"}</td>
-                        <td>{entry.deleted_at ? formatDate(entry.deleted_at) : "N/A"}</td>
-                        <td>
+                        <td style={{ border: "1px solid #a09e9e", width: "210px" }} className="text-center">{entry.amount}</td>
+                        <td style={{ border: "1px solid #a09e9e", width: "236px" }} className="text-center">{formatDate(entry.date)}</td>
+                        <td style={{ border: "1px solid #a09e9e", width: "215px" }} className="text-center">{entry.description || "-"}</td>
+                        {/* <td style={{border:"1px solid #a09e9e"}} className="text-center">{entry.deleted_at ? formatDate(entry.deleted_at) : "N/A"}</td> */}
+                        <td style={{ border: "1px solid #a09e9e", width: "191px" }} className="text-center">
                           <button
-                            className="btn btn-sm btn-success"
+                            className="btn btn-sm" style={{ backgroundColor: "black" }}
                             onClick={() => handleRestoreCashEntry(entry.id)}
                             disabled={loading}
                           >
-                            {loading ? "Restoring..." : "Restore"}
+                            {loading ? "Restoring..." : <i className="fa-solid fa-trash-arrow-up fa-bounce"></i>}
                           </button>
                         </td>
                       </tr>

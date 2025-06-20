@@ -278,8 +278,12 @@ const EditInvoice = () => {
       const updatedFormData = {
         ...formData,
         currency: selectedCountry.currencyCode,
+        country: selectedCountry.name,
+        state: formData.state || "Gujarat",
+        hsn_code: formData.hsn_code,
         delivery_note_date: formData.delivery_note_date || null,
       };
+      delete updatedFormData.hsn_code;
 
       const response = await fetch(
         `http://localhost:8000/api/update/${invoiceId}/`,
@@ -294,8 +298,18 @@ const EditInvoice = () => {
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to update invoice");
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (jsonErr) {
+          errorData = { message: await response.text() };
+        }
+        console.error("Backend error details:", errorData);
+        throw new Error(
+          errorData.message ||
+          (typeof errorData === 'object' ? Object.values(errorData).flat().join(", ") : errorData) ||
+          "Failed to update invoice"
+        );
       }
 
       setSuccess("Invoice updated successfully!");
@@ -487,6 +501,26 @@ const EditInvoice = () => {
           reader.readAsDataURL(blob);
         });
       });
+
+  const renderInvoiceForPDF = () => (
+    <div style={{
+      width: "250mm",
+      minHeight: "297mm",
+      background: "white",
+      boxSizing: "border-box",
+      padding: 0,
+      margin: 0,
+      fontSize: "20px",
+      lineHeight: "1.6"
+    }}>
+      <h2 className="text-center" style={{ fontWeight: "bold", margin: "20px 0 10px 0", fontSize: "2.2em" }}>TAX INVOICE</h2>
+      {/* ...rest of your invoice markup... */}
+      {/* For each <table> and <td>, add padding: 10px for better readability */}
+      {/* Example for a table cell: <td style={{ border: ..., padding: "10px" }}> ... */}
+      {/* You can also increase the font size for table headers if needed */}
+      {/* ...existing code continues... */}
+    </div>
+  );
 
   return (
     <div style={{paddingLeft:"80px"}}>
@@ -762,7 +796,7 @@ const EditInvoice = () => {
                   className="border border-gray-300 p-2 rounded flex items-center justify-between cursor-pointer bg-white"
                   onClick={() => setIsOpen(!isOpen)}
                 >
-                  <div className="flex items-center" style={{ height: "30px" }}>
+                  <div className="flex items-center">
                     {selectedCountry.flag && (
                       <img
                         src={selectedCountry.flag}
@@ -1143,6 +1177,7 @@ const EditInvoice = () => {
                     </button>
                 </div>
       </form>
+      {/* PDF */}
       <div ref={invoiceRef} style={{
                 position: "absolute",
                 top: "-9999px",
@@ -1245,7 +1280,7 @@ const EditInvoice = () => {
 
                             <div className="relative w-72">
                                 <p><strong>Country and currency:</strong></p>
-                                <div className="flex items-center" style={{ border: "1px solid black", padding: "10px", borderRadius: "10px" }}>
+                                <div className="flex items-center">
                                     {selectedCountry.flag && (
                                         <img src={selectedCountry.flag} alt="flag" style={{ width: "20px", marginRight: "8px" }} />
                                     )}

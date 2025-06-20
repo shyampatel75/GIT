@@ -167,7 +167,7 @@ const BillManager = () => {
           onChange={(e) => setFilterText(e.target.value)}
           style={{ maxWidth: "300px" }}
         />
-        <button className="btn btn-secondary" onClick={() => setFilterText("")}>
+        <button className="action-btn clear" onClick={() => setFilterText("")}>
           Clear
         </button>
       </div>
@@ -186,8 +186,8 @@ const BillManager = () => {
               {allCombined.length === 0 ? (
                 <p>No transactions found.</p>
               ) : (
-                <table className="table table-bordered table-hover text-center">
-                  <thead className="table-dark">
+                <table className="custom-table">
+                  <thead>
                     <tr>
                       <th>No.</th>
                       <th>Type</th>
@@ -247,8 +247,8 @@ const BillManager = () => {
               {filteredClients.length === 0 ? (
                 <p>No buyers found.</p>
               ) : (
-                <table className="table table-bordered table-hover text-center">
-                  <thead className="table-dark">
+                <table className="custom-table">
+                  <thead>
                     <tr>
                       <th>No.</th>
                       <th>Buyer Name</th>
@@ -261,6 +261,7 @@ const BillManager = () => {
                       <tr
                         key={index}
                         style={{ cursor: "pointer" }}
+                         className="address-hover" title="click to open"
                         onClick={() =>
                           navigate("/invoice-details/:id", {
                             state: {
@@ -288,8 +289,8 @@ const BillManager = () => {
               {filteredOther.length === 0 ? (
                 <p>No transactions found.</p>
               ) : (
-                <table className="table table-bordered table-hover text-center">
-                  <thead className="table-dark">
+                <table className="custom-table">
+                  <thead>
                     <tr>
                       <th>No.</th>
                       <th>Transaction Type</th>
@@ -303,7 +304,7 @@ const BillManager = () => {
                     {filteredOther.map((txn, index) => (
                       <tr
                         key={index}
-                        style={{ cursor: "pointer" }}
+                        style={{ cursor: "pointer" }}className="address-hover" title="click to open"
                         onClick={() => navigate(`/banking/other-type/${txn.other_type}`)}
                       >
                         <td>{index + 1}</td>
@@ -326,8 +327,8 @@ const BillManager = () => {
               {filteredBuyers.length === 0 ? (
                 <p>No transactions found.</p>
               ) : (
-                <table className="table table-bordered table-hover text-center">
-                  <thead className="table-dark">
+                <table className="custom-table">
+                  <thead>
                     <tr>
                       <th>No.</th>
                       <th>Buyer Name</th>
@@ -341,7 +342,7 @@ const BillManager = () => {
                     {filteredBuyers.map((txn, index) => (
                       <tr
                         key={index}
-                        style={{ cursor: "pointer" }}
+                        style={{ cursor: "pointer" }}className="address-hover" title="click to open"
                         onClick={() =>
                           navigate(`/banking/buyer/${txn.buyer_name}`, {
                             state: { buyer_name: txn.transaction_date },

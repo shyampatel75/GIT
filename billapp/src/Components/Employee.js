@@ -159,12 +159,12 @@ const SalaryManager = () => {
   };
 
   return (
-    <div className="p-6" style={{ paddingLeft: "100px" }}>
+    <div className="year_container">
       <h1 className="text-2xl font-bold mb-4">Salary Manager</h1>
 
       <button
         onClick={toggleForm}
-        className="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        className="button-sumbit-banking btn-all"
       >
         {showForm ? "Cancel" : "Add Salary"}
       </button>
@@ -172,7 +172,7 @@ const SalaryManager = () => {
         {showForm ? (
         <form
           onSubmit={handleSubmit}
-          className="p-4 border rounded bg-gray-50 space-y-4"
+         className="form-container" 
         >
           <div>
             <label className="block font-medium mb-1">Name</label>
@@ -236,7 +236,7 @@ const SalaryManager = () => {
 
           <button
             type="submit"
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+            className="button-sumbit-banking btn-all"
           >
             Submit
           </button>
@@ -246,8 +246,8 @@ const SalaryManager = () => {
       ) : (
         <>
           {salaryList.length > 0 && (
-            <table className="w-full border border-gray-300 mt-4">
-              <thead className="bg-gray-100">
+            <table className="custom-table">
+              <thead>
                 <tr>
                   <th className="p-2 border">Name</th>
                   <th className="p-2 border">Amount</th>
@@ -273,18 +273,26 @@ const SalaryManager = () => {
                     <td className="p-2 border">{salary.email}</td>
                     <td className="p-2 border">{salary.number}</td>
                     <td className="p-2 border space-x-2">
+                    <div className="tooltip-container">
                       <button
                         onClick={() => handleEditClick(salary)}
-                        className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600"
+                         className="action-btn edit"
                       >
-                        Edit
+                        <i class="fa-solid fa-pen-to-square"></i>
                       </button>
+                      <span className="tooltip-text">Edit</span>
+                    </div>
+
+                    <div className="tooltip-container">
                       <button
                         onClick={() => handleDelete(salary.id)}
-                        className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+                         className="action-btn delete"
                       >
-                        Delete
-                      </button>
+                        <i class="fa-solid fa-trash"></i>
+                       </button>
+                      <span className="tooltip-text">Delete</span>
+                    </div>
+                    
                     </td>
                   </tr>
                 ))}

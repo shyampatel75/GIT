@@ -83,15 +83,15 @@ const YearDetails = () => {
   }, [yearRange, navigate]);
 
   return (
-    <div style={{ padding: "20px 80px" }}>
+    <div className="year_container">
       <h2>Year: {yearRange}</h2>
       {loading ? (
         <p>Loading...</p>
       ) : error ? (
         <p className="text-danger">{error}</p>
       ) : (
-        <table className="table table-bordered table-hover text-center">
-          <thead className="table-dark">
+        <table className="custom-table">
+          <thead>
             <tr>
               <th>Sr. No.</th>
               <th>Buyer Name</th>
@@ -106,8 +106,9 @@ const YearDetails = () => {
                 <td>{client.buyer_name}</td>
                 <td>{client.buyer_gst}</td>
                 <td>
+                <div className="tooltip-container">
                   <button
-                    className="btn btn-primary"
+                    className="view-button"
                     onClick={async () => {
                       const token = localStorage.getItem("access_token");
                       try {
@@ -140,8 +141,10 @@ const YearDetails = () => {
                       }
                     }}
                   >
-                    View
+                   <i class="fa-regular fa-eye"></i>
                   </button>
+                  <span className="tooltip-text">View</span>
+                </div>
                 </td>
               </tr>
             ))}

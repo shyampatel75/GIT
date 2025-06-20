@@ -1,66 +1,27 @@
-import React, { useEffect, useState } from "react";
+import React from 'react';
+import './buye.css'; // custom styling
+import image from './images.jpg'; // ✅ correct
+import image1 from './images__1_-removebg-preview.png';
 
-const Buyer = () => {
-  const [states, setStates] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedState, setSelectedState] = useState("");
-
-  useEffect(() => {
-    const fetchIndianStates = async () => {
-      try {
-        const response = await fetch("https://countriesnow.space/api/v0.1/countries/states", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            country: "India",
-          }),
-        });
-
-        const data = await response.json();
-
-        if (data.error) {
-          throw new Error("Failed to fetch states");
-        }
-
-        setStates(data.data.states);
-      } catch (error) {
-        console.error("Error fetching Indian states:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchIndianStates();
-  }, []);
-
+const Login = () => {
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>Buyer Page</h1>
-
-      <label htmlFor="state">Select State:</label><br />
-      {loading ? (
-        <p>Loading states...</p>
-      ) : states.length > 0 ? (
-        <select
-          id="state"
-          name="state"
-          value={selectedState}
-          onChange={(e) => setSelectedState(e.target.value)}
-        >
-          <option value="">-- Select State --</option>
-          {states.map((state, index) => (
-            <option key={index} value={state.name}>
-              {state.name}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <p>No states found. Please check the API response.</p>
-      )}
+    <div className="login-container"  style={{ backgroundImage: `url(${image})`}}>
+      <div className="login-card">
+        <div className="left-panel">
+          <img src={image1} alt="plants" className="plants-img" />
+        </div>
+        <div className="right-panel">
+          
+          <h2>Let's get started.</h2>
+          <input type="email" placeholder="Email" />
+          <input type="password" placeholder="Password" />
+          <button className="sign-in-btn">SIGN IN</button>
+          <p>Do not have an account? <a href="#">Sign Up here!</a></p>
+          
+        </div>
+      </div>
     </div>
   );
 };
 
-export default Buyer;
+export default Login;

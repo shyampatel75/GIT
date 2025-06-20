@@ -2,64 +2,41 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-import './Address.css';
 
-const Address = () => {
+const Clients = () => {
   const navigate = useNavigate();
-  const printRef = useRef();
-
-  // State declarations at the top
   const [invoices, setInvoices] = useState([]);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [logoLoaded, setLogoLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [initialLoad, setInitialLoad] = useState(true); // Moved to top with other states
+  const [success, setSuccess] = useState(false);
+  const printRef = useRef();
 
-
-  // ✅ Universal fetch wrapper with safe JSON handling
   const fetchWithAuth = async (url, options = {}) => {
     const token = localStorage.getItem("access_token");
-    if (!token) {
-      navigate("/login");
-      return null;
-    }
+    const headers = {
+      ...options.headers,
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
 
     try {
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          ...options.headers,
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
+      const response = await fetch(url, { ...options, headers });
       if (!response.ok) {
         if (response.status === 401) {
-          navigate("/login");
+          navigate('/login');
           return null;
         }
-
-        // Try reading error message safely
-        const errorText = await response.text();
-        const errorData = errorText ? JSON.parse(errorText) : {};
-        throw new Error(errorData.message || `HTTP error! Status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-
-      // ✅ Handle DELETE responses with no body
-      const text = await response.text();
-      return text ? JSON.parse(text) : {}; // safe fallback
+      return await response.json();
     } catch (error) {
-      console.error("Fetch error:", error.message);
-      // ❌ Don't show toast here to avoid duplicates
-      throw error; // allow `handleDelete` to catch and toast 
+      console.error('Fetch error:', error);
+      setError(error.message || "Failed to fetch data");
+      return null;
     }
   };
-
-
 
   const fetchInvoices = useCallback(async () => {
     try {
@@ -68,18 +45,15 @@ const Address = () => {
       const data = await fetchWithAuth("http://localhost:8000/api/grouped-invoices/");
       if (data) {
         setInvoices(data);
-        if (!initialLoad) {
-          toast.success("Invoices loaded successfully");
-        }
+        setSuccess("Invoices loaded successfully");
       }
     } catch (err) {
       console.error("Error fetching invoices:", err);
-      toast.error(err.message || "Failed to load invoices");
+      setError(err.message || "Error fetching invoices");
     } finally {
       setLoading(false);
-      setInitialLoad(false);
     }
-  }, [navigate, initialLoad]); // initialLoad is now properly in scope
+  }, [navigate]);
 
   useEffect(() => {
     fetchInvoices();
@@ -130,29 +104,37 @@ const Address = () => {
       setLoading(true);
       setError("");
 
+      // Fetch invoice data
       const pdfBasicDetail = await fetchWithAuth(
         `http://localhost:8000/api/invoices/${invoiceId}/`
       );
       if (!pdfBasicDetail) return;
 
+      // Fetch settings data
       const pdfMainDetails = await fetchWithAuth(
         `http://localhost:8000/api/settings/`
       );
       if (!pdfMainDetails) return;
 
+      // Set combined data - note: pdfMainDetails is already the object
       setSelectedInvoice({
         ...pdfBasicDetail,
-        ...pdfMainDetails[0]
+        ...pdfMainDetails // No need for [0] since it's not an array
       });
 
+      // Preload logo
       const logoImg = new Image();
       logoImg.crossOrigin = "Anonymous";
-      logoImg.src = `http://127.0.0.1:8000${pdfMainDetails[0]?.logo || '/media/favicon_cvGw7pn.png'}`;
+      logoImg.src = `http://localhost:8000${pdfMainDetails?.logo || '/media/favicon_cvGw7pn.png'}`;
       logoImg.onload = () => setLogoLoaded(true);
+      logoImg.onerror = () => {
+        console.warn("Failed to load logo, using default");
+        setLogoLoaded(true); // Still proceed even if logo fails
+      };
 
     } catch (err) {
       console.error("Download error:", err);
-      toast.error(err.message || "Failed to prepare invoice");
+      setError(err.message || "Failed to prepare invoice");
     } finally {
       setLoading(false);
     }
@@ -164,18 +146,25 @@ const Address = () => {
     }
   }, [selectedInvoice, logoLoaded]);
 
-  const generatePDF = async () => {
-    const input = printRef?.current;
+  const pdfRef = useRef(null);
+
+  const generatePDF = async (invoiceNumber) => {
+    const input = pdfRef.current;
+
     if (!input) {
-      toast.error("PDF content not found");
+      setError("PDF content not found.");
       return;
     }
 
     try {
+      // Give a brief delay to ensure DOM is fully rendered
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       const canvas = await html2canvas(input, {
         useCORS: true,
+        allowTaint: true,
         scale: 2,
-        logging: true,
+        scrollY: -window.scrollY, // Prevent scrolling issues
       });
 
       const imgData = canvas.toDataURL("image/png");
@@ -184,43 +173,61 @@ const Address = () => {
       const margin = 10;
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const availableWidth = pageWidth - 2 * margin;
-      const imgHeight = (canvas.height * availableWidth) / canvas.width;
+      const maxWidth = pageWidth - 2 * margin;
+      const maxHeight = pageHeight - 2 * margin;
 
-      pdf.addImage(imgData, "PNG", margin, (pageHeight - imgHeight) / 2, availableWidth, imgHeight);
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const imgAspectRatio = imgWidth / imgHeight;
 
-      const fileName = `Invoice_${selectedInvoice.invoice_number}.pdf`;
+      let renderWidth = maxWidth;
+      let renderHeight = maxWidth / imgAspectRatio;
+
+      if (renderHeight > maxHeight) {
+        renderHeight = maxHeight;
+        renderWidth = maxHeight * imgAspectRatio;
+      }
+
+      const x = (pageWidth - renderWidth) / 2;
+      const y = (pageHeight - renderHeight) / 2;
+
+      pdf.addImage(imgData, "PNG", x, y, renderWidth, renderHeight);
+
+      const fileName = `Invoice_${selectedInvoice?.buyer_name || "Client"}_${invoiceNumber}.pdf`;
       pdf.save(fileName);
-      toast.success("Invoice downloaded successfully!");
-    } catch (err) {
-      console.error("PDF generation error:", err);
-      toast.error("Failed to generate PDF");
-    } finally {
-      setSelectedInvoice(null);
-      setLogoLoaded(false);
+
+      setSuccess("Invoice downloaded successfully!");
+    } catch (error) {
+      console.error("PDF generation error:", error);
+      setError("Failed to generate PDF");
     }
   };
 
-const handleNewBill = (invoice) => {
-  navigate('/tax-invoice', {
-    state: {
-      buyerData: {
-        buyer_name: invoice?.buyer_name || '',
-        buyer_address: invoice?.buyer_address || '',
-        buyer_gst: invoice?.buyer_gst || '',
-      },
-      consigneeData: {
-        consignee_name: invoice?.consignee_name || '',
-        consignee_address: invoice?.consignee_address || '',
-        consignee_gst: invoice?.consignee_gst || '',
-      },
-      country: invoice?.country || 'India',  // Pass the country
-      currency: invoice?.currency || 'INR',  // Pass the currency
-      state: invoice?.state || 'Gujarat'     // Pass the state if India
-    }
-  });
-};
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  };
 
+  const handleNewBill = (invoice) => {
+    navigate('/tax-invoice', {
+      state: {
+        buyerData: {
+          buyer_name: invoice?.buyer_name || '',
+          buyer_address: invoice?.buyer_address || '',
+          buyer_gst: invoice?.buyer_gst || '',
+        },
+        consigneeData: {
+          consignee_name: invoice?.consignee_name || '',
+          consignee_address: invoice?.consignee_address || '',
+          consignee_gst: invoice?.consignee_gst || '',
+        }
+      }
+    });
+  };
 
   const handleEdit = (invoice) => {
     navigate(`/edit-invoice/${invoice.id}`, {
@@ -231,45 +238,73 @@ const handleNewBill = (invoice) => {
     });
   };
 
-  // ✅ Deletion handler with only 1 toast message
   const handleDelete = async (invoiceId) => {
-    if (!window.confirm("Are you sure you want to delete this invoice?")) return;
+    if (window.confirm("Are you sure you want to delete this invoice?")) {
+      try {
+        setLoading(true);
+        setError("");
 
-    try {
-      // Optimistically update UI
-      setInvoices((prev) =>
-        prev
-          .map((group) => ({
-            ...group,
-            invoices: group.invoices.filter((inv) => inv.id !== invoiceId),
-          }))
-          .filter((group) => group.invoices.length > 0)
-      );
+        const token = localStorage.getItem("access_token");
+        const response = await fetch(
+          `http://localhost:8000/api/delete/${invoiceId}/`,
+          {
+            method: "DELETE",
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
 
-      await fetchWithAuth(`http://localhost:8000/api/delete/${invoiceId}/`, {
-        method: "DELETE",
-      });
-
-      toast.success("Invoice deleted successfully");
-    } catch (err) {
-      console.error("Error deleting invoice:", err.message);
-      toast.error("Failed to delete invoice. Please try again.");
-      fetchInvoices(); // Restore data
+        if (response.ok) {
+          setInvoices(prevInvoices =>
+            prevInvoices.filter(invoice => invoice.id !== invoiceId)
+          );
+          alert("Invoice deleted successfully!");
+        } else {
+          if (response.status === 401) {
+            navigate('/login');
+            return;
+          }
+          throw new Error("Failed to delete invoice");
+        }
+      } catch (err) {
+        console.error("Error deleting invoice:", err);
+        setError(err.message || "Error deleting invoice");
+        alert("An error occurred while deleting the invoice.");
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
-
-
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB');
-  };
+  // Check if user is authenticated on component mount
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      navigate('/login');
+    }
+  }, [navigate]);
 
   return (
     <div className="year_container">
-      <ToastContainer position="top-right" autoClose={3000} />
+      {/* {error && (
+        <div className="alert alert-danger">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="alert alert-success">
+          {success}
+        </div>
+      )} */}
+      {loading && (
+        <div className="text-center mt-3">
+          <div className="spinner-border" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      )}
 
       <div className="header-bar">
         <button
@@ -278,7 +313,7 @@ const handleNewBill = (invoice) => {
           onClick={() => navigate("/tax-invoice")}
           disabled={loading}
         >
-          <i className="bi bi-plus-lg"></i> {loading ? "Loading..." : "New Bills"}
+          <i className="bi bi-plus-lg"></i> New Bills
         </button>
       </div>
 
@@ -286,48 +321,55 @@ const handleNewBill = (invoice) => {
         <thead>
           <tr>
             <th>No.</th>
-            <th>Buyer</th>
+            <th>Buyer Name</th>
             <th>Address</th>
-            <th>Invoice No.</th>
-            <th>Total</th>
-            <th>Actions</th>
+            <th>Bill Number</th>
+            <th>Total Amount</th>
+            <th>items</th>
           </tr>
         </thead>
         <tbody>
-          {loading && invoices.length === 0 ? (
+          {loading ? (
             <tr>
-              <td colSpan="7" className="text-center">Loading invoices...</td>
+              <td colSpan="6" className="text-center">
+                <div className="spinner-border" role="status">
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+              </td>
+            </tr>
+          ) : error ? (
+            <tr>
+              <td colSpan="6" className="text-center text-danger">
+                {error}
+                <button className="btn btn-link" onClick={fetchInvoices}>
+                  Retry
+                </button>
+              </td>
             </tr>
           ) : invoices.length === 0 ? (
             <tr>
-              <td colSpan="7" className="text-center">No invoices found</td>
+              <td colSpan="6" className="text-center">
+                No invoices found
+              </td>
             </tr>
           ) : (
-            invoices.flatMap((group, groupIndex) =>
-              group.invoices.map((invoice, invoiceIndex) => (
+            invoices.flatMap((group) => (
+              group.invoices.map((invoice, idx) => (
                 <tr key={invoice.id}>
-                  <td>{groupIndex + 1}.{invoiceIndex + 1}</td>
+                  <td>{idx === 0 ? group.serial_number : ''}</td>
                   <td>{group.buyer_name}</td>
-                  <td
-                    className="truncate address-hover"
-                    title={`Click to copy: ${group.buyer_address}`}
-                    onClick={() => {
-                      navigator.clipboard.writeText(group.buyer_address);
-                      toast.success("Address copied to clipboard");
-                    }}
-                  >
+                  <td>
                     {group.buyer_address.length > 20
-                      ? group.buyer_address.slice(0, 20) + "..."
+                      ? group.buyer_address.substring(0, 20) + "..."
                       : group.buyer_address}
                   </td>
                   <td>{invoice.invoice_number}</td>
                   <td>
                     {invoice.currency} {parseFloat(invoice.total_with_gst).toFixed(2)}
                   </td>
-                  <td style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                  <td className="d-flex flex-wrap gap-2 justify-content-center">
                     <div className="tooltip-container">
                       <button
-                        type="button"
                         className="action-btn view"
                         onClick={() => navigate(`/invoice-detail/${invoice.id}`)}
                         disabled={loading}
@@ -336,16 +378,7 @@ const handleNewBill = (invoice) => {
                       </button>
                       <span className="tooltip-text">View</span>
                     </div>
-                    <div className="tooltip-container">
-                      <button
-                        className="action-btn download"
-                        onClick={() => handleDownload(invoice.id)}
-                        disabled={loading}
-                      >
-                        <i className="fa-solid fa-download"></i>
-                      </button>
-                      <span className="tooltip-text">Download</span>
-                    </div>
+
                     <div className="tooltip-container">
                       <button
                         className="action-btn edit"
@@ -356,6 +389,18 @@ const handleNewBill = (invoice) => {
                       </button>
                       <span className="tooltip-text">Edit</span>
                     </div>
+
+                    <div className="tooltip-container">
+                      <button
+                        className="action-btn download"
+                        onClick={() => handleDownload(invoice.id)}
+                        disabled={loading}
+                      >
+                        <i className="fa-solid fa-download"></i>
+                      </button>
+                      <span className="tooltip-text">Download</span>
+                    </div>
+
                     <div className="tooltip-container">
                       <button
                         className="action-btn delete"
@@ -366,7 +411,8 @@ const handleNewBill = (invoice) => {
                       </button>
                       <span className="tooltip-text">Delete</span>
                     </div>
-                     <div className="tooltip-container">
+
+                    <div className="tooltip-container">
                       <button
                         className="action-btn new"
                         onClick={() => handleNewBill(invoice)}
@@ -376,34 +422,35 @@ const handleNewBill = (invoice) => {
                       </button>
                       <span className="tooltip-text">Newbill</span>
                     </div>
-                    
                   </td>
                 </tr>
               ))
-            )
+            ))
           )}
         </tbody>
       </table>
 
+      {/* Hidden printable invoice for PDF */}
       {selectedInvoice && (
-        <div ref={printRef} style={{ position: "absolute", left: "-9999px" }}>
+        <div ref={pdfRef} style={{ position: "absolute", left: "-9999px" }}>
           <div style={{ paddingLeft: "10px" }}>
             <div style={{ paddingRight: "10px" }}>
               <h2 className="text-center">TAX INVOICE</h2>
               <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white" }}>
                 <div className="row date-tables">
                   <div className="col-6">
+                    {/* Seller Info */}
                     <table className="table table-bordered black-bordered">
                       <tbody style={{ border: "2px solid" }}>
                         <tr>
                           <td className="gray-background">
                             <strong style={{ fontSize: "15px" }}>
-                              Grabsolve Infotech:
+                              {selectedInvoice.company_name}:
                             </strong>
                           </td>
                         </tr>
                         <tr>
-                          <td>
+                          <td style={{ padding: "10px", height: "150px" }}>
                             {selectedInvoice.seller_address}
                             <br />
                             Email: {selectedInvoice.seller_email}
@@ -420,6 +467,7 @@ const handleNewBill = (invoice) => {
                       </tbody>
                     </table>
 
+                    {/* Buyer Info */}
                     <table className="table table-bordered black-bordered">
                       <tbody style={{ border: "2px solid" }}>
                         <tr>
@@ -428,24 +476,25 @@ const handleNewBill = (invoice) => {
                           </td>
                         </tr>
                         <tr>
-                          <td
-                            style={{
-                              maxWidth: "250px",
-                              overflowWrap: "break-word",
-                              height: "150px",
-                            }}
-                          >
-                            {selectedInvoice.buyer_address}
+                          <td style={{
+                            maxWidth: "250px",
+                            overflowWrap: "break-word",
+                            height: "150px"
+                          }}>
+                            <div style={{ whiteSpace: "pre-wrap" }}>
+                              {selectedInvoice.buyer_address}
+                            </div>
                           </td>
                         </tr>
                         <tr>
                           <td className="gray-background">
-                            <strong>GSTIN/UIN:</strong> {selectedInvoice.buyer_gst}
+                            <strong>GSTIN/UIN:</strong> {selectedInvoice.buyer_gst || (selectedInvoice.country === "India" ? "Not Provided" : "N/A")}
                           </td>
                         </tr>
                       </tbody>
                     </table>
 
+                    {/* Consignee Info */}
                     <table className="table table-bordered black-bordered">
                       <tbody style={{ border: "2px solid" }}>
                         <tr>
@@ -454,19 +503,19 @@ const handleNewBill = (invoice) => {
                           </td>
                         </tr>
                         <tr>
-                          <td
-                            style={{
-                              maxWidth: "250px",
-                              overflowWrap: "break-word",
-                              height: "150px",
-                            }}
-                          >
-                            {selectedInvoice.consignee_address}
+                          <td style={{
+                            maxWidth: "250px",
+                            overflowWrap: "break-word",
+                            height: "150px"
+                          }}>
+                            <div style={{ whiteSpace: "pre-wrap" }}>
+                              {selectedInvoice.consignee_address}
+                            </div>
                           </td>
                         </tr>
                         <tr>
                           <td className="gray-background">
-                            <strong>GSTIN/UIN:</strong> {selectedInvoice.consignee_gst}
+                            <strong>GSTIN/UIN:</strong> {selectedInvoice.consignee_gst || (selectedInvoice.country === "India" ? "Not Provided" : "N/A")}
                           </td>
                         </tr>
                       </tbody>
@@ -478,13 +527,11 @@ const handleNewBill = (invoice) => {
                       <tbody style={{ border: "2px solid" }}>
                         <tr>
                           <td style={{ width: "50%" }}>Invoice No.</td>
-                          <td>
-                            {selectedInvoice.invoice_number}
-                          </td>
+                          <td>{selectedInvoice.invoice_number}</td>
                         </tr>
                         <tr>
                           <td>Date</td>
-                          <td>{new Date(selectedInvoice.invoice_date).toLocaleDateString("en-GB")}</td>
+                          <td>{formatDate(selectedInvoice.invoice_date)}</td>
                         </tr>
                         <tr>
                           <td>Delivery Note</td>
@@ -496,7 +543,7 @@ const handleNewBill = (invoice) => {
                         </tr>
                         <tr>
                           <td>Delivery Note Date</td>
-                          <td>{new Date(selectedInvoice.delivery_note_date).toLocaleDateString("en-GB")}</td>
+                          <td>{selectedInvoice.delivery_note_date ? formatDate(selectedInvoice.delivery_note_date) : ''}</td>
                         </tr>
                         <tr>
                           <td>Destination</td>
@@ -516,36 +563,65 @@ const handleNewBill = (invoice) => {
                           <td style={{
                             maxWidth: "250px",
                             overflowWrap: "break-word",
-                            height: "150px",
-                          }}>{selectedInvoice.Terms_to_delivery}</td>
+                            height: "150px"
+                          }}>
+                            {selectedInvoice.Terms_to_delivery}
+                          </td>
                         </tr>
                       </tbody>
                     </table>
 
                     <div className="relative w-72">
-                      <p>
-                        <strong>Country and currency:</strong>
+                      <p style={{ display: "flex", alignItems: "center", fontWeight: 500, gap: 8, margin: 0 }}>
+                        {/* Flag first */}
+                        {selectedInvoice.country_flag && (
+                          <img
+                            src={selectedInvoice.country_flag}
+                            alt={`${selectedInvoice.country} flag`}
+                            style={{
+                              width: 32,
+                              height: 24,
+                              border: "1px solid #ccc",
+                              objectFit: "cover",
+                              marginRight: 8
+                            }}
+                          />
+                        )}
+                        {/* Country name */}
+                        <span>{selectedInvoice.country}</span>
+                        {/* Dash */}
+                        <span>-</span>
+                        {/* Currency symbol and code */}
+                        <span>
+                          {selectedInvoice.currency === "INR" && "₹"}
+                          {selectedInvoice.currency === "USD" && "$"}
+                          {selectedInvoice.currency === "AUD" && "A$"}
+                          {/* Add more currency symbols as needed */}
+                          {" (" + selectedInvoice.currency + ")"}
+                        </span>
                       </p>
-                      <div
-                        className="border border-gray-300 p-2 rounded flex items-center justify-between cursor-pointer bg-white">
-                        <div
-                          className="flex items-center"
-                          style={{ height: "30px" }}
-                        >
-                          <span className="mr-2">
-                            {selectedInvoice.country} {selectedInvoice.currency}
-                          </span>
-                        </div>
-                      </div>
                     </div>
+
+                    {selectedInvoice.country !== "India" && (
+                      <div className="mt-2">
+                        <>
+                          <div className="lut">
+                            <p style={{ margin: "0px" }}>Declare under LUT</p>
+                          </div>
+                          <div className="lut mt-3">
+                            <p style={{ margin: "0px" }}>{selectedInvoice.company_code}</p>
+                          </div>
+                        </>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <div className="row">
                   <div className="col-xs-12">
-                    <table className="table table-bordered black-bordered">
+                    <table className="table table-bordered black-bordered" style={{ textAlign: "center" }}>
                       <thead>
-                        <tr className="trbody" >
+                        <tr className="trbody">
                           <th style={{ backgroundColor: "#f1f3f4" }}>SI No.</th>
                           <th style={{ backgroundColor: "#f1f3f4" }}>Particulars</th>
                           <th style={{ backgroundColor: "#f1f3f4" }}>HSN/SAC</th>
@@ -554,11 +630,11 @@ const handleNewBill = (invoice) => {
                           <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
                         </tr>
                       </thead>
-                      <tbody style={{ border: "2px solid" }}>
+                      <tbody>
                         <tr style={{ height: "111px" }}>
                           <td>1</td>
-                          <td>{selectedInvoice.Particulars}</td>
-                          <td style={{ width: "130px" }}>{selectedInvoice.hsn_code}</td>
+                          <td style={{ width: "526px" }}>{selectedInvoice.Particulars}</td>
+                          <td style={{ width: "130px", paddingTop: "16px" }}>{selectedInvoice.hsn_code || selectedInvoice.hsn_sac_code}</td>
                           <td style={{ width: "10%" }}>{selectedInvoice.total_hours}</td>
                           <td style={{ width: "10%" }}>{selectedInvoice.rate}</td>
                           <td style={{ width: "200px" }}>
@@ -567,7 +643,25 @@ const handleNewBill = (invoice) => {
                             </span>
                           </td>
                         </tr>
-                        {selectedInvoice.country === "India" && (
+
+                        {/* IGST for other states */}
+                        {selectedInvoice.country === "India" && selectedInvoice.state !== "Gujarat" && (
+                          <tr className="inside-india">
+                            <td></td>
+                            <td>
+                              <span style={{ float: "right" }}>IGST @ 18%</span>
+                            </td>
+                            <td></td>
+                            <td></td>
+                            <td>18%</td>
+                            <td id="igst">
+                              <span className="currency-sym">{selectedInvoice.currency} {selectedInvoice.taxtotal}</span>
+                            </td>
+                          </tr>
+                        )}
+
+                        {/* CGST/SGST for Gujarat */}
+                        {selectedInvoice.country === "India" && selectedInvoice.state === "Gujarat" && (
                           <>
                             <tr className="inside-india">
                               <td></td>
@@ -595,14 +689,27 @@ const handleNewBill = (invoice) => {
                             </tr>
                           </>
                         )}
+
+                        {/* Total row */}
                         <tr>
-                          <td colSpan="5" className="text-right">
-                            <strong>Total</strong>
-                          </td>
-                          <td>
-                            <strong id="total-with-gst">
-                              {selectedInvoice.currency} {selectedInvoice.total_with_gst}
-                            </strong>
+                          <td colSpan="6">
+                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                              {/* Left side: INR Equivalent (if applicable) */}
+                              {selectedInvoice.country !== "India" && selectedInvoice.inr_equivalent && (
+                                <div style={{ whiteSpace: 'nowrap' }}>
+                                  INR Equivalent: INR {Number(selectedInvoice.inr_equivalent).toFixed(2)}
+                                </div>
+                              )}
+
+                              {/* Right side: Total (always right aligned) */}
+                              <div style={{ whiteSpace: 'nowrap', marginLeft: 'auto', textAlign: 'right' }}>
+                                <strong>Total:</strong> &nbsp;
+                                <strong id="total-with-gst">
+                                  <span className="currency-sym">{selectedInvoice.currency} </span>
+                                  {selectedInvoice.total_with_gst}
+                                </strong>
+                              </div>
+                            </div>
                           </td>
                         </tr>
                       </tbody>
@@ -618,8 +725,8 @@ const handleNewBill = (invoice) => {
                           <strong>Amount Chargeable (in words):</strong>
                         </p>
                         <h4 className="total-in-words">
-                          <span className="currency-text">INR </span>
-                          {numberToWords(Math.floor(selectedInvoice.total_with_gst))}
+                          <span className="currency-text">{selectedInvoice.currency} </span>
+                          {numberToWords(Math.floor(selectedInvoice.total_with_gst))} Only
                         </h4>
                         <div className="top-right-corner">
                           <span>E. & O.E</span>
@@ -629,85 +736,112 @@ const handleNewBill = (invoice) => {
                   </div>
                 </div>
 
-                <div className="row">
-                  {selectedInvoice.country === "India" && (
+                {selectedInvoice.country === "India" && (
+                  <div className="row">
                     <div className="col-xs-12 inside-india">
                       <table className="table table-bordered invoice-table">
                         <thead>
-                          <tr>
-                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
-                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
-                            <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Central Tax</th>
-                            <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">State Tax</th>
-                            <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2" rowSpan="2">
-                              Total Tax Amount
-                            </th>
-                          </tr>
-                          <tr>
-                            <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                            <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                            <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                            <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                          </tr>
+                          {selectedInvoice.state === "Gujarat" ? (
+                            <>
+                              <tr>
+                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Central Tax</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">State Tax</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
+                              </tr>
+                              <tr>
+                                <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                              </tr>
+                            </>
+                          ) : (
+                            <>
+                              <tr>
+                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Integrated Tax</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
+                              </tr>
+                              <tr>
+                                <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                              </tr>
+                            </>
+                          )}
                         </thead>
                         <tbody style={{ border: "2px solid" }}>
                           <tr>
-                            <td>
-                              <span className="hns_select_text">{selectedInvoice.hsn_code}</span>
-                            </td>
-                            <td className="taxable-value">
-                              {selectedInvoice.base_amount}
-                            </td>
-                            <td>9%</td>
-                            <td className="tax-cgst">{selectedInvoice.cgst}</td>
-                            <td>9%</td>
-                            <td className="tax-sgst">{selectedInvoice.sgst}</td>
-                            <td className="all-tax-amount">{selectedInvoice.taxtotal}</td>
+                            <td>{selectedInvoice.hsn_code}</td>
+                            <td>{selectedInvoice.base_amount}</td>
+                            {selectedInvoice.state === "Gujarat" ? (
+                              <>
+                                <td>9%</td>
+                                <td>{selectedInvoice.cgst}</td>
+                                <td>9%</td>
+                                <td>{selectedInvoice.sgst}</td>
+                                <td>{selectedInvoice.taxtotal}</td>
+                              </>
+                            ) : (
+                              <>
+                                <td>18%</td>
+                                <td>{selectedInvoice.taxtotal}</td>
+                                <td>{selectedInvoice.taxtotal}</td>
+                              </>
+                            )}
                           </tr>
                           <tr className="total-row">
                             <td>Total</td>
-                            <td className="total-taxable">
-                              {selectedInvoice.base_amount}
-                            </td>
-                            <td></td>
-                            <td className="total-tax-cgst">{selectedInvoice.cgst}</td>
-                            <td></td>
-                            <td className="total-tax-sgst">{selectedInvoice.sgst}</td>
-                            <td className="total-tax-amount">
-                              {selectedInvoice.taxtotal}
-                            </td>
+                            <td>{selectedInvoice.base_amount}</td>
+                            {selectedInvoice.state === "Gujarat" ? (
+                              <>
+                                <td></td>
+                                <td>{selectedInvoice.cgst}</td>
+                                <td></td>
+                                <td>{selectedInvoice.sgst}</td>
+                                <td>{selectedInvoice.taxtotal}</td>
+                              </>
+                            ) : (
+                              <>
+                                <td></td>
+                                <td>{selectedInvoice.igst}</td>
+                                <td>{selectedInvoice.taxtotal}</td>
+                              </>
+                            )}
                           </tr>
                         </tbody>
                       </table>
                     </div>
-                  )}
-                  <div style={{ padding: "0 0 0 20px" }}>
-                    <div className="col-xs-12 inside-india">
-                      <div>
-                        <strong>Tax Amount (in words):</strong>
-                        <span className="total-tax-in-words">
-                          <span className="currency-text">INR </span>
-                          {numberToWords(Math.floor(selectedInvoice.total_with_gst))}
-                        </span>
+                    <div style={{ padding: "0 0 0 20px" }}>
+                      <div className="col-xs-12 inside-india">
+                        <div>
+                          <strong>Tax Amount (in words):</strong>
+                          <span className="total-tax-in-words">
+                            <span className="currency-text">{selectedInvoice.currency} </span>
+                            {numberToWords(Math.floor(selectedInvoice.total_with_gst))} Only
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="col-xs-12">
-                      <div>
-                        <h4>
-                          <strong>Remarks:</strong>
-                        </h4>
-                        <h5 className="html-remark">{selectedInvoice.remark}</h5>
+                      <div className="col-xs-12">
+                        <div>
+                          <h4>
+                            <strong>Remarks:</strong>
+                          </h4>
+                          <h5 className="html-remark">{selectedInvoice.remark}</h5>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
 
-                <div className="row">
-                  <div className="col-x-12">
+                <div className="row mb-3">
+                  <div className="col-x-12 mb-3">
                     <div className="hr">
                       <strong>Company's Bank Details</strong>
                       <br />
-                      A/c Holder's Name: {selectedInvoice.seller_name}
+                      A/c Holder's Name: {selectedInvoice.bank_account_holder}
                       <br />
                       Bank Name: {selectedInvoice.bank_name}
                       <br />
@@ -722,19 +856,18 @@ const handleNewBill = (invoice) => {
                     <div className="text-right signatory">
                       {selectedInvoice.logo && (
                         <img
-                          src={`http://127.0.0.1:8000${selectedInvoice.logo}`}
+                          src={`http://localhost:8000${selectedInvoice.logo}`}
                           alt="Company Logo"
                           className="logo-image"
                         />
                       )}
-
-                      <p>for Grabsolve Infotech</p>
+                      <p>for {selectedInvoice.company_name || 'Grabsolve Infotech'}</p>
                       <p>Authorized Signatory</p>
                     </div>
                   </div>
                 </div>
               </div>
-              <p className="text-center">This is a Computer Generated Invoice</p>
+              <p className="text-center" style={{ marginBottom: "0px" }}>This is a Computer Generated Invoice</p>
             </div>
           </div>
         </div>
@@ -743,4 +876,4 @@ const handleNewBill = (invoice) => {
   );
 };
 
-export default Address;
+export default Clients;

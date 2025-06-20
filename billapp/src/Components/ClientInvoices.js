@@ -222,7 +222,7 @@ const Clientinvoices = () => {
   };
 
   return (
-    <div style={{ paddingLeft: "80px" }}>
+    <div className="year_container">
       {error && <div className="alert alert-danger">{error}</div>}
       {success && <div className="alert alert-success">{success}</div>}
 
@@ -230,8 +230,8 @@ const Clientinvoices = () => {
         {client ? `${client.buyer_name} - ${client.buyer_gst}` : "All Invoices"}
       </h2>
 
-      <table className="table table-bordered table-hover text-center mt-3">
-        <thead className="table-dark">
+      <table className="custom-table">
+        <thead>
           <tr>
             <th>Sr. No.</th>
             <th>Buyer Name</th>
@@ -266,37 +266,48 @@ const Clientinvoices = () => {
                   {parseFloat(invoice.total_with_gst).toFixed(2)}
                 </td>
                 <td>
-                  <button
-                    className="btn btn-outline-primary"
-                    onClick={() =>
-                      navigate(`/invoice-detail/${invoice.id}`, {
-                        state: { invoice },
-                      })
-                    }
-                    disabled={loading}
-                  >
-                    View
-                  </button>
+                  <div className="tooltip-container">
+                    <button
+                      className="view-button"
+                      onClick={() =>
+                        navigate(`/invoice-detail/${invoice.id}`, {
+                          state: { invoice },
+                        })
+                      }
+                      disabled={loading}
+                    >
+                      <i class="fa-regular fa-eye"></i>
+                    </button>
+                    <span className="tooltip-text">View</span>
+                  </div>
                 </td>
+
                 <td>
+                    <div className="tooltip-container">
                   <button
-                    className="btn btn-outline-success"
+                    className="download-button"
                     onClick={() => handleDownload(invoice)}
                     disabled={loading && selectedInvoice?.id === invoice.id}
                   >
                     {loading && selectedInvoice?.id === invoice.id
                       ? "Generating..."
-                      : "Download"}
+                      : <i class="fa-solid fa-download"></i>}
                   </button>
+                    <span className="tooltip-text">Download</span>
+                  </div>
                 </td>
+
                 <td>
-                  <button
-                    className="deletebutton"
+                   <div className="tooltip-container">
+                    <button
+                    className="delete-button"
                     onClick={() => handleDelete(invoice.id)}
                     disabled={loading}
                   >
-                    Delete
-                  </button>
+                    <i class="fa-solid fa-trash"></i>
+                    </button>
+                    <span className="tooltip-text">Delete</span>
+                  </div>
                 </td>
               </tr>
             ))

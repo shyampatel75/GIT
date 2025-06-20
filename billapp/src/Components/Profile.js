@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 
 const Profile = () => {
     const [showFileUpload, setShowFileUpload] = useState(false);
@@ -17,11 +18,13 @@ const Profile = () => {
     const [error, setError] = useState("");
     const [success, setSuccess] = useState(false);
 
+    const navigate = useNavigate();
+
     const fetchProfile = useCallback(async () => {
         try {
             setLoading(true);
             const token = localStorage.getItem("access_token");
-            
+
             const [userResponse, profileResponse] = await Promise.all([
                 fetch("http://localhost:8000/api/auth/me/", {
                     headers: {
@@ -96,11 +99,11 @@ const Profile = () => {
         try {
             const token = localStorage.getItem("access_token");
             let formData = new FormData();
-            
+
             // Add basic profile data
             formData.append("first_name", profileData.first_name);
             formData.append("mobile", profileData.mobile);
-            
+
             // Add images if they exist
             if (images.image1) formData.append("image1", images.image1);
             if (images.image2) formData.append("image2", images.image2);
@@ -132,7 +135,7 @@ const Profile = () => {
     };
 
     return (
-        <div className="container mt-5">
+        <div style={{ padding: "34px 55px 18px 128px" }}>
             {error && (
                 <div className="alert alert-danger">
                     {error}
@@ -145,62 +148,76 @@ const Profile = () => {
             )}
 
             {!showFileUpload ? (
-                <div className="card p-4">
-                    {/* <div className="text-center mb-3">
-                        <img
-                            src={images.image1Preview || "/images/default-profile.png"}
-                            alt="Profile"
-                            className="rounded-circle"
-                            width="100"
-                            height="100"
-                            onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.src = "/images/default-profile.png";
-                            }}
-                        />
-                    </div> */}
-                    <div className="mb-3">
-                        <label>Name</label>
-                        <input
-                            type="text"
-                            name="first_name"
-                            className="form-control"
-                            placeholder="Enter Name"
-                            value={profileData.first_name}
-                            onChange={handleInputChange}
-                            disabled={loading}
-                        />
+                <>
+
+                    <div className="card p-4">
+                        {/* <div className="text-center mb-3">
+                            <img
+                                src={images.image1Preview || "/images/default-profile.png"}
+                                alt="Profile"
+                                className="rounded-circle"
+                                width="100"
+                                height="100"
+                                onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src = "/images/default-profile.png";
+                                }}
+                            />
+                        </div> */}
+                        <div className="mb-3">
+                            <label>Name</label>
+                            <input
+                                type="text"
+                                name="first_name"
+                                className="form-control"
+                                placeholder="Enter Name"
+                                value={profileData.first_name}
+                                onChange={handleInputChange}
+                                disabled={loading}
+                            />
+                        </div>
+                        <div className="mb-3">
+                            <label>Email</label>
+                            <input
+                                type="email"
+                                name="email"
+                                className="form-control"
+                                value={profileData.email}
+                                readOnly
+                            />
+                        </div>
+                        <div className="mb-3">
+                            <label>Mobile Number</label>
+                            <input
+                                type="text"
+                                name="mobile"
+                                className="form-control"
+                                placeholder="Enter Mobile Number"
+                                value={profileData.mobile}
+                                onChange={handleInputChange}
+                                disabled={loading}
+                            />
+                        </div>
+                        <div className="mt-4 d-flex justify-content-between">
+                            <button
+                                type="button"
+                                className="action-btn back-btn mb-3"
+                                onClick={() => navigate(-1)}
+                                disabled={loading}
+                            >
+                                ← Back
+                            </button>
+
+                            <button
+                                onClick={() => setShowFileUpload(true)}
+                                className="button-sumbit-banking btn-all text-center"
+                                disabled={loading}
+                            >
+                                {loading ? "Loading..." : "Next"}
+                            </button>
+                        </div>
                     </div>
-                    <div className="mb-3">
-                        <label>Email</label>
-                        <input
-                            type="email"
-                            name="email"
-                            className="form-control"
-                            value={profileData.email}
-                            readOnly
-                        />
-                    </div>
-                    <div className="mb-3">
-                        <label>Mobile Number</label>
-                        <input
-                            type="text"
-                            name="mobile"
-                            className="form-control"
-                            placeholder="Enter Mobile Number"
-                            value={profileData.mobile}
-                            onChange={handleInputChange}
-                            disabled={loading}
-                        />
-                    </div>
-                    <button 
-                        onClick={() => setShowFileUpload(true)} 
-                        className="btn btn-primary w-100"
-                        disabled={loading}
-                    >
-                        {loading ? "Loading..." : "Next"}
-                    </button>
-                </div>
+                </>
             ) : (
                 <form onSubmit={handleSubmit}>
                     <div className="card p-4">
@@ -247,15 +264,15 @@ const Profile = () => {
                         <div className="mt-4 d-flex justify-content-between">
                             <button
                                 type="button"
-                                className="btn btn-secondary"
+                                className="action-btn back-btn"
                                 onClick={() => setShowFileUpload(false)}
                                 disabled={loading}
                             >
-                                Back
+                                ← Back
                             </button>
                             <button
                                 type="submit"
-                                className="btn btn-primary"
+                                className="button-sumbit-banking btn-all"
                                 disabled={loading}
                             >
                                 {loading ? "Saving..." : "Save Profile"}

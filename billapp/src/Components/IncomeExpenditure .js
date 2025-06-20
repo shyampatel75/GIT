@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import './style/incomeexpenditure.css'
 
 const IncomeExpenditure = () => {
     const [data, setData] = useState([]);
@@ -42,8 +43,7 @@ const IncomeExpenditure = () => {
             {/* Left Sidebar */}
             <div
                 className="bg-light border-end d-flex flex-column"
-                style={{ width: "350px", paddingLeft: "80px" }}
-            >
+                style={{ width: "350px", paddingLeft: "80px" }} >
                 <div className="p-3 border-bottom">
                     <h4>Income & Expenditure</h4>
                 </div>
@@ -51,12 +51,16 @@ const IncomeExpenditure = () => {
                     {buttons.map((button, index) => (
                         <button
                             key={index}
-                            className={`btn btn-primary mb-3 ${selectedButton === button.name ? "active" : ""}`}
+                            className={`button-sumbit-banking btn-all mb-3 ${selectedButton === button.name ? "active" : ""}`}
                             onClick={() => {
                                 setSelectedButton(button.name);
                                 fetchData(button.api);
                             }}
-                            style={{ height: "70px", width: "80%" }}
+                            style={{
+                                backgroundColor: selectedButton === button.name ? "#2a75a730" : "#2a75a7",
+                                color: selectedButton === button.name ? "#2a75a7" : "#ffffff",
+                                height: "70px", width: "80%"
+                            }}
                         >
                             {button.name}
                         </button>
@@ -65,14 +69,14 @@ const IncomeExpenditure = () => {
             </div>
 
             {/* Right Content */}
-            <div className="flex-grow-1 p-4">
+            {/* Right Content */}
+            <div className="p-4 w-75 mx-auto">
                 {loading ? (
                     <div className="text-center">Loading...</div>
                 ) : data.length > 0 ? (
-                    <div className="table-responsive">
-                        <table className="table table-bordered table-striped">
-                            <thead className="table-dark">
-                                <tr>
+                        <table className="table rounded-4 overflow-hidden table-bordered table-hover table-sm w-100 expenditure-table">
+                            <thead >
+                                <tr >    
                                     {Object.keys(data[0]).map((key) => (
                                         <th key={key}>{key}</th>
                                     ))}
@@ -84,7 +88,7 @@ const IncomeExpenditure = () => {
                                         {Object.entries(item).map(([key, value], i) => {
                                             let displayValue = value;
 
-                                            // Check if value is a valid date string
+                                            // Convert valid date to dd/mm/yyyy
                                             if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
                                                 const date = new Date(value);
                                                 if (!isNaN(date)) {
@@ -97,12 +101,11 @@ const IncomeExpenditure = () => {
 
                                             return <td key={i}>{displayValue}</td>;
                                         })}
-
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
-                    </div>
+                   
                 ) : (
                     <div className="text-center mt-5">
                         <img
@@ -115,6 +118,7 @@ const IncomeExpenditure = () => {
                     </div>
                 )}
             </div>
+
         </div>
     );
 };

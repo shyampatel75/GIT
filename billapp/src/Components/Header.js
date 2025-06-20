@@ -40,14 +40,15 @@ const Header = () => {
             src={profile.image1_url}
             alt="Profile"
             className="profile-image"
+            
           />
         ) : (
-          <i className="bi bi-person-circle profile-icon"></i>
+                <i className="bi bi-person-circle profile-icon"></i>
         )}
       </div>
 
       <div className="header-right" >
-        <i className="bi bi-person-circle profile-icon clickable" onClick={() => navigate("/profile")}></i>
+        <i class="fa-solid fa-users-gear profile-icon clickable"  title="Profile Setting"  onClick={() => navigate("/profile")}></i>
       </div>
     </header>
   );

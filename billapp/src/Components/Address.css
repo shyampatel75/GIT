@@ -12,225 +12,6 @@
 
 /* View Button */
 .action-btn.view {
-  background-color: #d1e8f7;
-  color: #181a1d;
-}
-
-.action-btn.view:hover {
-  background-color: #d3dbe2;
-  transform: scale(1.05);
-}
-
-/* new button */
-.action-btn.new {
-  background-color: #E6F4EA;
-  color: #2E7D32;
-}
-
-.action-btn.new:hover {
-  background-color: #bedfca;
-  transform: scale(1.05);
-}
-
-/* Download Button */
-.action-btn.download {
-  background-color: #E9F5FF;
-  color: #0B5ED7;
-}
-
-.action-btn.download:hover {
-  background-color: #bbdaf1;
-  transform: scale(1.05);
-}
-
-/* Edit Button */
-.action-btn.edit {
-  background-color: #FFF4E5;
-  color: #B26A00;
-}
-
-.action-btn.edit:hover {
-  background-color: #fcdfbd;
-  transform: scale(1.05);
-}
-
-/* Delete Button */
-.action-btn.delete {
-  background-color: #FDECEA;
-  color: #C62828;
-}
-
-.action-btn.delete:hover {
-  background-color: #FAC8C5;
-  transform: scale(1.05);
-}
-
-/* //clear button */
-.action-btn.clear {
-  background-color: #020202;
-  color: #e0e3e6;
-
-}
-
-.action-btn.clear:hover {
-  background-color: #434446;
-  transform: scale(1.05);
-}
-
-
-.address-hover {
-  cursor: pointer;
-  /* text-decoration: underline dotted; */
-}
-
-.alert {
-  margin: 10px 20px;
-  transition: opacity 0.5s ease;
-}
-
-/* it is for see the title like what is this when hover */
-.tooltip-container {
-  position: relative;
-  display: inline-block;
-}
-
-.tooltip-text {
-  visibility: hidden;
-  width: auto;
-  font-size: x-small;
-  background-color: #2b2929ec;
-  color: #dad1d1;
-  text-align: center;
-  border-radius: 6px;
-  padding: 6px 8px;
-  position: absolute;
-  z-index: 1;
-  top: 26px;
-  left: 55px;
-  transform: translateX(-50%);
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.tooltip-container:hover .tooltip-text {
-  visibility: visible;
-  opacity: 1;
-}
-.year_container {
-  height: 100vh;
-  padding: 10px 20px 20px 80px;
-  /* background-color: #e3e8ebaf; */
-  
-}
-.custom-table {
-  width: 100%;
-  border-collapse: collapse;
-  background-color: white;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.08);
-  margin-top: 20px;
-  
-}
-.custom-table th,
-.custom-table thead {
-  background-color: rgb(114, 113, 113);
-  color: rgb(243, 239, 239);
-}
-
-.custom-table th,
-.custom-table td {
-  padding: 14px 20px;
-  border-bottom: 1px solid #ddd;
-  font-size: 19px;
-  text-align: center;
-}
-
-.custom-table tbody tr:hover {
-  background-color: #f1f1f1;
-}
-
-.view-button,
-.download-button,
-.delete-button {
-  border: none;
-  padding: 8px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: background-color 0.3s ease, transform 0.2s ease;
-}
-.view-button{
-  background-color: #bcc6d1  ;
-  color: #181a1d  ;
-}
-.view-button:hover {
-  background-color: #d3dbe2;
-  transform: scale(1.05);
-}
-
-.download-button {
-   background-color: #d1e8fa ;
-  color: #0B5ED7 ;
-}
-
-.download-button:hover {
-  background-color: #bbdaf1;
-  transform: scale(1.05);
-}
-
-.delete-button {
-  background-color: #fce1de ;
-  color: #C62828 ;
-}
-
-.delete-button:hover {
-  background-color: #FAC8C5;
-  transform: scale(1.05);
-}
-.new-bill-btn {
-  background-color: #195277;
-  color: white;
-  border: none;
-  padding: 10px 18px;
-  border-radius: 6px;
-  font-size: 16px;
-  cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
-}
-
-.new-bill-btn:hover {
-  background-color: #2a75a7;
-  transform: scale(1.05);
-
-}
-
-.bill-table-section .title {
-  margin-bottom: 15px;
-  font-size: 24px;
-  color: #333;
-}
-
-.header-bar {
-  display: flex;
-  justify-content: flex-end;
-  padding: 10px 40px 10px 0;
-}
-.action-btn {
-  border: none;
-  padding: 6px 12px;
-  margin: 0 4px;
-  border-radius: 6px;
-  font-size: 16px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
-}
-
-/* View Button */
-.action-btn.view {
   background-color: #bcc6d1;
   color: black;
 }
@@ -337,4 +118,18 @@
 .tooltip-container:hover .tooltip-text {
   visibility: visible;
   opacity: 1;
+}
+
+.conversion-toggle-btn {
+  padding: 8px 12px;
+  margin-left: 10px;
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.conversion-toggle-btn:hover {
+  background-color: #e0e0e0;
 }

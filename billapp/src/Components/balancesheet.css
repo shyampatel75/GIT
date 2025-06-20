@@ -1,0 +1,48 @@
+.balance-sheet-container {
+  width: 80%;
+  margin: 0 auto;
+}
+.balance-sheet-sections {
+  display: flex;
+  justify-content: space-between;
+}
+.balance-sheet-box {
+  width: 45%;
+  border: 1px solid #aaa;
+  padding: 20px;
+  border-radius: 8px;
+  background: #f9f9f9;
+}
+.balance-sheet-row, .balance-sheet-total {
+  display: flex;
+  justify-content: space-between;
+  margin: 8px 0;
+  font-size: 1.1em;
+}
+.balance-sheet-total {
+  font-weight: bold;
+  border-top: 1px solid #aaa;
+  padding-top: 8px;
+}
+.balance-sheet-img {
+  display: block;
+  margin: 0 auto 10px auto;
+  width: 50px;   /* Adjust size as needed */
+  height: 50px;
+  object-fit: contain;
+}
+
+
+
+
+
+
+.balance-sheet-sections {
+    display: flex
+;
+}.left {
+    width: 50%;
+}
+.right{
+    width: 50%;
+}

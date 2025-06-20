@@ -43,15 +43,15 @@ export default function SettingsPage() {
     }
   };
 
-  const addHsnCode = () => {
-    if (newHsn.trim()) {
-      setFormData((prev) => ({
-        ...prev,
-        HSN_codes: [...prev.HSN_codes, newHsn.trim()],
-      }));
-      setNewHsn("");
-    }
-  };
+const addHsnCode = () => {
+  if (newHsn.trim() && !formData.HSN_codes.includes(newHsn.trim())) {
+    setFormData(prev => ({
+      ...prev,
+      HSN_codes: [...prev.HSN_codes, newHsn.trim()]
+    }));
+    setNewHsn("");
+  }
+};
 
   const removeHsnCode = (index) => {
     setFormData((prev) => ({
@@ -60,59 +60,46 @@ export default function SettingsPage() {
     }));
   };
 
-  const handleSave = async () => {
-    setLoading(true);
-
+ const handleSave = async () => {
+  setLoading(true);
+  
+  try {
     const token = localStorage.getItem("access_token");
-    if (!token) {
-      toast.error("You need to login first");
-      navigate("/login");
-      return;
-    }
-
     const formDataToSend = new FormData();
-
+    
+    // Convert HSN_codes array to JSON string
+    formDataToSend.append('HSN_codes', JSON.stringify(formData.HSN_codes));
+    
+    // Append other fields
     Object.entries(formData).forEach(([key, value]) => {
-      if (key === "HSN_codes") {
-        formDataToSend.append(key, JSON.stringify(value));
-      } else if (key === "logo" && value instanceof File) {
-        formDataToSend.append("logo", value);
-      } else if (key !== "logo" && key !== "logoUrl") {
+      if (key !== 'HSN_codes' && key !== 'logo' && key !== 'logoUrl') {
         formDataToSend.append(key, value);
       }
     });
-
-    try {
-      const response = await fetch("http://127.0.0.1:8000/api/settings/", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formDataToSend,
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        toast.success("Settings saved successfully!");
-
-        if (result.logo) {
-          setFormData((prev) => ({
-            ...prev,
-            logoUrl: `http://127.0.0.1:8000${result.logo}`,
-            logo: null,
-          }));
-        }
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.message || "Save failed");
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      toast.error("An error occurred while saving");
-    } finally {
-      setLoading(false);
+    
+    if (formData.logo instanceof File) {
+      formDataToSend.append('logo', formData.logo);
     }
-  };
+
+    const response = await fetch("http://127.0.0.1:8000/api/settings/", {
+      method: "POST",
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formDataToSend
+    });
+
+    if (!response.ok) throw new Error("Failed to save settings");
+    
+    const result = await response.json();
+    toast.success("Settings saved successfully!");
+    
+  } catch (error) {
+    toast.error(error.message || "Failed to save settings");
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     const fetchSettings = async () => {

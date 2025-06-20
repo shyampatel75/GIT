@@ -5,7 +5,7 @@
     left: 0;
     width: 70px;
     height: 100vh;
-    background-color: #1f1e1ef6;
+    background-color: #2c2b2bda;
     color: white;
     overflow-x: hidden;
     transition: width 0.3s ease;
@@ -80,7 +80,7 @@
   align-items: center;
   padding: 0 1rem;
   height: 60px;
-  background-color: #9acce493;
+  background-color: #a4cde093;
   color: white;
   font-family: Arial, sans-serif;
   overflow: hidden;
@@ -125,10 +125,10 @@
 /* Profile icon */
 .profile-icon {
   font-size: 26px;
-  color: white;
+  color: #2e3a59;
   transition: color 0.3s ease;
 }
 
 .profile-icon.clickable:hover {
-  color: #000000;
+  color: #6179b6;
 }

@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+import autoTable from 'jspdf-autotable';
+// import html2canvas from "html2canvas";
+import './style/invoiceDetail.css';
 
 const InvoiceDetails = () => {
   const location = useLocation();
@@ -12,6 +14,9 @@ const InvoiceDetails = () => {
   const [error, setError] = useState("");
   const tableRef = useRef();
   const token = localStorage.getItem("access_token");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "";
@@ -40,7 +45,8 @@ const InvoiceDetails = () => {
 
   useEffect(() => {
     if (!token) return;
-    fetch("http://localhost:8000/api/banking/buyer/", {
+
+    fetch("http://localhost:8000/api/banking/company/", {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -51,68 +57,185 @@ const InvoiceDetails = () => {
       .catch(() => setBuyerDeposits([]));
   }, [token]);
 
-const handleGeneratePDF = async () => {
-  const element = tableRef.current;
-  element.style.backgroundColor = "#fff";
+  const handleGeneratePDF = () => {
+    setIsGeneratingPDF(true);
+    const doc = new jsPDF("p", "mm", "a4");
 
-  const canvas = await html2canvas(element, {
-    scale: 2,
-    backgroundColor: "#fff",
-    useCORS: true,
-  });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 10;
+    let cursorY = 15;
 
-  const pdf = new jsPDF("p", "mm", "a4");
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 10;
+    // PDF Header
+    doc.setFontSize(14);
+    doc.text("Statement of Account", pageWidth / 2, cursorY, { align: "center" });
+    cursorY += 10;
 
-  const pdfWidth = pageWidth - margin * 2;
-  const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    // ➕ Add date range info if selected
+    if (fromDate || toDate) {
+      const dateText = `Statement${fromDate ? ` From: ${formatDate(fromDate)}` : ""}${toDate ? ` To: ${formatDate(toDate)}` : ""}`;
+      doc.setFontSize(10);
+      doc.text(dateText, pageWidth / 2, cursorY, { align: "center" });
+      cursorY += 8;
+    }
 
-  pdf.addImage(
-    canvas.toDataURL("image/png"),
-    "PNG",
-    margin,
-    margin,
-    pdfWidth,
-    pdfHeight
-  );
+    doc.setFontSize(11);
+    doc.text(`Name: ${buyer_name}`, margin, cursorY);
+    cursorY += 6;
+    doc.text(`GST Number: ${buyer_gst}`, margin, cursorY);
+    cursorY += 6;
 
-  pdf.save(`Statement-${buyer_name}.pdf`);
-};
+    const { rows, balance, currency } = renderTableRows();
+
+    // ✅ Total balance at the top
+    doc.text(`Total Balance: INR ${balance.toFixed(2)}`, margin, cursorY);
+    cursorY += 10;
+
+    const tableRows = [];
+    const cellStyles = [];
+
+    rows.forEach(row => {
+      const cells = [];
+      const styles = [];
+
+      Array.from(row.props.children).forEach((cell, colIndex) => {
+        let val = cell.props.children;
+        if (Array.isArray(val)) val = val.join(" ");
+        if (typeof val !== "string" && typeof val !== "number") val = "";
+
+        if (colIndex === 1) {
+          const isInvoiceNumber = /^\d{2}-\d{4}\/\d{4}$/.test(val);
+          styles.push({ halign: isInvoiceNumber ? "center" : "left" });
+        } else if (colIndex >= 2) {
+          styles.push({ halign: "right" }); // ✅ Align Credit, Debit, Balance
+        } else {
+          styles.push({});
+        }
+
+        cells.push(val);
+      });
+
+      tableRows.push(cells);
+      cellStyles.push(styles);
+    });
+
+    // ✅ Add Total Balance row at end in last column
+    const totalRow = ["", "Total Balance:", `INR ${totalCredit.toFixed(2)}`, `INR ${totalDebit.toFixed(2)}`, `INR ${balance.toFixed(2)}`];
+    tableRows.push(totalRow);
+    cellStyles.push([
+      { fillColor: [241, 245, 249], textColor: [12, 74, 110] },
+      { fontStyle: "bold", halign: "right", fillColor: [241, 245, 249], textColor: [12, 74, 110] },
+      { halign: "right", fontStyle: "bold", fillColor: [241, 245, 249], textColor: [12, 74, 110] },
+      { halign: "right", fontStyle: "bold", fillColor: [241, 245, 249], textColor: [12, 74, 110] },
+      { halign: "right", fontStyle: "bold", fillColor: [241, 245, 249], textColor: [12, 74, 110] }
+    ]);
+
+    autoTable(doc, {
+      startY: cursorY,
+      head: [['Date', 'Description', 'Credit (Deposit)', 'Debit (Invoice)', 'Balance']],
+      body: tableRows,
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [111, 113, 114] },
+      margin: { left: margin, right: margin },
+      didParseCell: function (data) {
+        const rowIndex = data.row.index;
+        const columnIndex = data.column.index;
+
+        if (cellStyles[rowIndex] && cellStyles[rowIndex][columnIndex]) {
+          Object.assign(data.cell.styles, cellStyles[rowIndex][columnIndex]);
+        }
+      },
+      didDrawPage: function () {
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+
+        doc.setFontSize(8);
+        doc.text(`Page ${currentPage} of {totalPages}`, pageWidth / 2, pageHeight - 8, {
+          align: "center",
+        });
+      }
+    });
+
+    doc.putTotalPages("{totalPages}");
+    doc.save(`Statement-${buyer_name}.pdf`);
+    setIsGeneratingPDF(false);
+  };
 
 
   const renderTableRows = () => {
     let balance = 0;
+    let totalCredit = 0;
+    let totalDebit = 0;
     const rows = [];
 
-    invoices.forEach((inv) => {
-      const total = Number(inv.total_with_gst) || 0;
-      balance += total;
+    const from = fromDate ? new Date(fromDate) : null;
+    const to = toDate ? new Date(toDate) : null;
 
-      rows.push(
-        <tr key={`inv-${inv.invoice_number}`} className="bg-red-50 font-semibold w-100">
-          <td>{formatDate(inv.invoice_date)}</td>
-          <td>{inv.invoice_number}</td>
-          <td className="text-right">-</td>
-          <td className="text-right">
-            {inv.currency} {total.toFixed(2)}
-          </td>
-          <td className="text-right">
-            {inv.currency}  {balance.toFixed(2)}
-          </td>
-        </tr>
+    // Filter invoices if invoice date is in range OR it has any deposit in range
+    const filteredInvoices = invoices.filter((inv) => {
+      const invDate = new Date(inv.invoice_date);
+      const inInvoiceRange = (!from || invDate >= from) && (!to || invDate <= to);
+
+      const hasDepositInRange = buyerDeposits.some((d) => {
+        if (d.invoice_id !== inv.invoice_number) return false;
+        const depDate = new Date(d.transaction_date);
+        return (!from || depDate >= from) && (!to || depDate <= to);
+      });
+
+      return inInvoiceRange || hasDepositInRange;
+    });
+
+    // Group by invoice-number prefix (first two characters), as before
+    const invoiceGroups = {};
+    filteredInvoices.forEach((inv) => {
+      const prefix = inv.invoice_number?.substring(0, 2);
+      if (!invoiceGroups[prefix]) {
+        invoiceGroups[prefix] = [];
+      }
+      invoiceGroups[prefix].push(inv);
+    });
+
+    // Sort prefixes descending (so “07” appears above “06”)
+    const sortedPrefixes = Object.keys(invoiceGroups).sort((a, b) => Number(b) - Number(a));
+
+    sortedPrefixes.forEach((prefix) => {
+      const group = invoiceGroups[prefix].sort(
+        (a, b) => new Date(a.invoice_date) - new Date(b.invoice_date)
       );
 
-      buyerDeposits
-        .filter((d) => d.invoice_id === inv.invoice_number)
-        .forEach((dep, i) => {
-          const amount = Number(dep.deposit_amount) || 0;
-          balance -= amount;
+      group.forEach((inv) => {
+        const total = Number(inv.total_with_gst) || 0;
+        const invDate = new Date(inv.invoice_date);
+        balance -= total; // Decrease balance for debit transaction
+        totalDebit += total;
+        rows.push(
+          <tr key={`inv-${inv.invoice_number}`} className="bg-red-50 font-semibold">
+            <td className="text-center">{formatDate(inv.invoice_date)}</td>
+            <td className="text-center">{inv.invoice_number}</td>
+            <td className="text-right">-</td>
+            <td className="text-right">
+              {inv.currency} {total.toFixed(2)}
+            </td>
+            <td className="text-right">
+              {inv.currency} {balance.toFixed(2)}
+            </td>
+          </tr>
+        );
+        // Now render any deposits for this invoice that fall in the date range
+        const deposits = buyerDeposits
+          .filter((d) => d.invoice_id === inv.invoice_number)
+          .filter((d) => {
+            const depDate = new Date(d.transaction_date);
+            return (!from || depDate >= from) && (!to || depDate <= to);
+          })
+          .sort((a, b) => new Date(a.transaction_date) - new Date(b.transaction_date));
 
+        deposits.forEach((dep, i) => {
+          const amount = Number(dep.amount) || 0;
+          balance += amount; // Increase balance for credit transaction
+          totalCredit += amount;
           rows.push(
             <tr key={`dep-${inv.invoice_number}-${i}`} className="bg-green-50">
-              <td>{formatDate(dep.selected_date || dep.transaction_date)}</td>
+              <td className="text-center">{formatDate(dep.transaction_date)}</td>
               <td>{dep.notice || "Deposit"}</td>
               <td className="text-right">
                 {inv.currency} {amount.toFixed(2)}
@@ -124,9 +247,10 @@ const handleGeneratePDF = async () => {
             </tr>
           );
         });
+      });
     });
 
-    return { rows, balance, currency: invoices[0]?.currency || "" };
+    return { rows, balance, currency: invoices[0]?.currency || "", totalCredit, totalDebit };
   };
 
   if (error) {
@@ -147,33 +271,74 @@ const handleGeneratePDF = async () => {
     return <div className="text-center p-6 text-lg">Loading invoices...</div>;
   }
 
-  const { rows, balance, currency } = renderTableRows();
+  const { rows, balance, currency, totalCredit, totalDebit } = renderTableRows();
 
   return (
-    <div className="mx-auto bg-white p-6 rounded shadow-md" style={{ paddingLeft: "100px", minHeight: "100vh" }}>
+    <div className="statement-container">
       <div ref={tableRef}>
-      <h2 className="text-2xl font-bold text-center mb-6">Statement of Account</h2>
-      <div className="mb-4">
-        <p><strong>Buyer Name:</strong> {buyer_name}</p>
-        <p><strong>GST Number:</strong> {buyer_gst}</p>
-      </div>
+        <h2 className="statement-heading">Statement of Account</h2>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <div className="mb-4 fs-5">
+            <p><strong>Name:</strong> {buyer_name}</p>
+            <p><strong>GST Number:</strong> {buyer_gst}</p>
+            <p><strong>Total Balance:</strong> {balance.toFixed(2)}</p>
+          </div>
+          <div className="mb-4 flex gap-4 items-center">
+            {!isGeneratingPDF ? (
+              <>
+                <div>
+                  <label className="block font-semibold">From Date:</label> <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="border rounded px-2 py-1"
+                    style={{ width: "250px" }}
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold">To Date:</label> <input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="border rounded px-2 py-1"
+                    style={{ width: "250px" }}
+                  />
+                </div>
+              </>
+            ) : (
+              (fromDate || toDate) && (
+                <div className="text-right font-semibold text-sm ml-auto">
+                  Statement
+                  {fromDate && ` From: ${formatDate(fromDate)}`}
+                  {toDate && ` To: ${formatDate(toDate)}`}
+                </div>
+              )
+            )}
+          </div>
+        </div>
 
-        <h4 className="w-full text-center py-2" style={{ backgroundColor: "#51add9" }}>Account Activity</h4>
-        <table className="w-100 text-sm border mt-2">
+        <h4 className="activity-title">Account Activity</h4>
+        <table className="statement-table">
           <thead>
             <tr>
-              <th className="text-left p-2 border">Date</th>
-              <th className="text-left p-2 border">Description</th>
-              <th className="text-right p-2 border">Credit (Deposit)</th>
-              <th className="text-right p-2 border">Debit (Invoice)</th>
-              <th className="text-right p-2 border">Balance</th>
+              <th>Date</th>
+              <th>Description</th>
+              <th>Credit (Deposit)</th>
+              <th>Debit (Invoice)</th>
+              <th>Balance</th>
             </tr>
           </thead>
           <tbody>
             {rows}
-            <tr className="bg-gray-200 font-bold">
-              <td colSpan={4} className="text-right p-2 border">Remaining Balance:</td>
-              <td className="text-right p-2 border">
+            <tr className="remaining-balance">
+              <td colSpan={2} className="text-end p-2">Total Balance:</td>
+              <td className="text-right p-2">
+                {currency} {renderTableRows().totalCredit.toFixed(2)}
+              </td>
+              <td className="text-right p-2">
+                {currency}  {renderTableRows().totalDebit.toFixed(2)}
+              </td>
+              <td className="text-right p-2">
                 {currency} {balance.toFixed(2)}
               </td>
             </tr>
@@ -181,16 +346,16 @@ const handleGeneratePDF = async () => {
         </table>
       </div>
 
-      <div className="pt-4 d-flex justify-content-around">
+      <div className="statement-actions">
         <button
           onClick={() => navigate(-1)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+          className="action-btn back-btn"
         >
           ← Go Back
         </button>
         <button
           onClick={handleGeneratePDF}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+          className="button-sumbit-banking btn-all"
         >
           📄 Generate PDF
         </button>

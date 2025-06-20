@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import './style/YearTable.css';
+
 
 const YearTable = () => {
   const currentYear = new Date().getFullYear();
@@ -66,21 +68,21 @@ const YearTable = () => {
   }
 
   return (
-    <div style={{ height: "100vh" }}>
-      <div className="d-grid gap-2 d-md-flex justify-content-md-end pt-2 pb-2 px-4">
+     <div className="year-bill-container">
+      <div className="header-bar">
         <button
           onClick={() => navigate("/tax-invoice")}
           type="button"
-          className="naw-biladd"
-        >
-          <i className="bi bi-plus-lg"></i> New Bills
+          className="new-bill-btn" >
+         <i class="fa-solid fa-plus"></i> New Bills
         </button>
       </div>
-      <div style={{ padding: "10px 21px 10px 82px" }}>
+
+      <div className="bill-table-section">
         <h2>Year Bills</h2>
-        <div style={{ borderRadius: "10px", overflow: "hidden" }}>
-          <table className="table table-striped table-hover">
-            <thead className="table-dark">
+        <div  className="table-wrapper">
+          <table className="year-table">
+            <thead>
               <tr>
                 <th>Year Range</th>
               </tr>
@@ -90,10 +92,10 @@ const YearTable = () => {
                 <tr
                   key={yearRange}
                   onClick={() => navigate(`/${yearRange}`)}
-                  style={{ cursor: "pointer" }}
+                   className="table-row"
                 >
                   <td>
-                    <span className="text-dark">
+                    <span className="year-link">
                       <i className="bi bi-folder2"></i> <b>{yearRange}</b>
                     </span>
                   </td>

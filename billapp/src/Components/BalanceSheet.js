@@ -1,50 +1,182 @@
 import React, { useState, useEffect } from "react";
+import './style/balancesheet.css';
+
+const API_URL = "http://localhost:8000/api/banking/other/";
+const SALARY_API_URL = "http://localhost:8000/api/banking/salary/";
+const BUYER_API_URL = "http://localhost:8000/api/banking/buyer/";
+const INVOICE_API_URL = "http://localhost:8000/api/invoices/";
+const COMPANY_API_URL = "http://localhost:8000/api/banking/company/";
 
 const BalanceSheet = () => {
-  const [invoices, setInvoices] = useState([]);
-  const [deposits, setDeposits] = useState([]);
-  const [buyerTransactions, setBuyerTransactions] = useState([]);
-  const [otherTransactions, setOtherTransactions] = useState([]);
-  const [companyTransactions, setCompanyTransactions] = useState([]);
+  const [capital, setCapital] = useState([]);
+  const [fixedAssets, setFixedAssets] = useState([]);
+  const [loan, setLoan] = useState([]);
+  const [loanCredit, setLoanCredit] = useState([]);
+  const [loanDebit, setLoanDebit] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [salary, setSalary] = useState([]);
+  const [salaryTotal, setSalaryTotal] = useState(0);
+  const [buyer, setBuyer] = useState([]);
+  const [buyerTotal, setBuyerTotal] = useState(0);
+  // New state for custom transaction types
+  const [customTypes, setCustomTypes] = useState({});
+  const [customTypesCredit, setCustomTypesCredit] = useState({});
+  const [customTypesDebit, setCustomTypesDebit] = useState({});
+  // New state for invoices and company
+  const [invoiceDebits, setInvoiceDebits] = useState([]);
+  const [companyCredit, setCompanyCredit] = useState([]);
+  const [companyDebit, setCompanyDebit] = useState([]);
+  // New: store invoice totals by company
+  const [invoiceTotalsByCompany, setInvoiceTotalsByCompany] = useState({});
+  const [companyAmounts, setCompanyAmounts] = useState({});
 
   useEffect(() => {
     const fetchData = async () => {
-      const token = localStorage.getItem("access_token");
-
-      const headers = {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      };
-
       try {
-        const [invoicesRes, depositsRes, buyersRes, othersRes, companyRes] = await Promise.all([
-          fetch("http://localhost:8000/api/invoices/", { headers }),
-          fetch("http://localhost:8000/api/add-deposit/", { headers }),
-          fetch("http://localhost:8000/api/banking/buyer/", { headers }),
-          fetch("http://localhost:8000/api/banking/other/", { headers }),
-          fetch("http://localhost:8000/api/banking/company/", { headers }),
-        ]);
+        const token = localStorage.getItem("access_token");
+        const response = await fetch(API_URL, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        });
+        const data = await response.json();
+        console.log("API data:", data);
 
-        if (!invoicesRes.ok || !depositsRes.ok || !buyersRes.ok || !othersRes.ok || !companyRes.ok) {
-          throw new Error("Failed to fetch data");
-        }
+        // Use data directly (should be an array)
+        const capitalData = {};
+        const fixedAssetsData = {};
+        const loanData = {};
+        const loanCreditData = {};
+        const loanDebitData = {};
+        // New: Track custom transaction types
+        const customTypesData = {};
+        const customTypesCreditData = {};
+        const customTypesDebitData = {};
 
-        const invoicesData = await invoicesRes.json();
-        const depositsData = await depositsRes.json();
-        const buyersData = await buyersRes.json();
-        const othersData = await othersRes.json();
-        const companyData = await companyRes.json();
+        // New: Track total credit and debit for each loan
+        const loanTotals = {};
+        // New: Track total credit and debit for each custom type
+        const customTypesTotals = {};
+        
+        data.forEach(item => {
+          // Capital section: only "partner"
+          if (item.other_type && item.other_type.toLowerCase() === "partner") {
+            const name = item.other_notice;
+            const amount = Math.abs(parseFloat(item.other_amount)); // always positive
+            if (!capitalData[name]) capitalData[name] = 0;
+            if (item.transaction_type === "credit") {
+              capitalData[name] += amount;
+            } else if (item.transaction_type === "debit") {
+              capitalData[name] -= amount;
+            }
+          }
+          // Loan section: only "loan"
+          else if (item.other_type && item.other_type.toLowerCase() === "loan") {
+            const name = item.other_notice;
+            const amount = Math.abs(parseFloat(item.other_amount)); // always positive
+            if (!loanData[name]) loanData[name] = 0;
+            if (!loanCreditData[name]) loanCreditData[name] = 0;
+            if (!loanDebitData[name]) loanDebitData[name] = 0;
+            if (item.transaction_type === "credit") {
+              loanData[name] += amount;
+              loanCreditData[name] += amount;
+            } else if (item.transaction_type === "debit") {
+              loanData[name] -= amount;
+              loanDebitData[name] += amount;
+            }
+            // Update loan totals
+            if (!loanTotals[name]) loanTotals[name] = { credit: 0, debit: 0 };
+            if (item.transaction_type === "credit") {
+              loanTotals[name].credit += amount;
+            } else if (item.transaction_type === "debit") {
+              loanTotals[name].debit += amount;
+            }
+          }
+          // Fixed Assets section: only "fixed assets"
+          else if (item.other_type && item.other_type.toLowerCase() === "fixed assets") {
+            const asset = item.other_notice;
+            const amount = Math.abs(parseFloat(item.other_amount)); // always positive
+            if (!fixedAssetsData[asset]) fixedAssetsData[asset] = 0;
+            fixedAssetsData[asset] += amount;
+          }
+          // Custom transaction types: any other_type not predefined
+          else if (item.other_type) {
+            const customType = item.other_type;
+            const name = item.other_notice;
+            const amount = Math.abs(parseFloat(item.other_amount)); // always positive
+            
+            // Initialize data structures for this custom type
+            if (!customTypesData[customType]) customTypesData[customType] = {};
+            if (!customTypesCreditData[customType]) customTypesCreditData[customType] = {};
+            if (!customTypesDebitData[customType]) customTypesDebitData[customType] = {};
+            if (!customTypesTotals[customType]) customTypesTotals[customType] = {};
+            
+            if (!customTypesData[customType][name]) customTypesData[customType][name] = 0;
+            if (!customTypesCreditData[customType][name]) customTypesCreditData[customType][name] = 0;
+            if (!customTypesDebitData[customType][name]) customTypesDebitData[customType][name] = 0;
+            if (!customTypesTotals[customType][name]) customTypesTotals[customType][name] = { credit: 0, debit: 0 };
+            
+            if (item.transaction_type === "credit") {
+              customTypesData[customType][name] += amount;
+              customTypesCreditData[customType][name] += amount;
+              customTypesTotals[customType][name].credit += amount;
+            } else if (item.transaction_type === "debit") {
+              customTypesData[customType][name] -= amount;
+              customTypesDebitData[customType][name] += amount;
+              customTypesTotals[customType][name].debit += amount;
+            }
+          }
+        });
 
-        setInvoices(invoicesData);
-        setDeposits(depositsData);
-        setBuyerTransactions(buyersData);
-        setOtherTransactions(othersData);
-        setCompanyTransactions(companyData);
-      } catch (err) {
-        console.error(err);
-        setError(err.message || "An error occurred while fetching data");
+        // Prepare filtered lists for display
+        const filteredLoanCredit = Object.entries(loanTotals)
+          .filter(([_, v]) => v.credit - v.debit > 0)
+          .map(([name, v]) => [name, v.credit - v.debit]);
+        const filteredLoanDebit = Object.entries(loanTotals)
+          .filter(([_, v]) => v.debit - v.credit > 0)
+          .map(([name, v]) => [name, v.debit - v.credit]);
+        setLoanCredit(filteredLoanCredit);
+        setLoanDebit(filteredLoanDebit);
+
+        // Process custom types for display
+        const processedCustomTypes = {};
+        const processedCustomTypesCredit = {};
+        const processedCustomTypesDebit = {};
+        
+        Object.keys(customTypesTotals).forEach(customType => {
+          // Credit side: net positive balances (only show if balance > 0)
+          const creditEntries = Object.entries(customTypesTotals[customType])
+            .filter(([_, v]) => v.credit - v.debit > 0)
+            .map(([name, v]) => [name, v.credit - v.debit]);
+          
+          // Debit side: only show when credit side is 0 or negative for that person
+          const debitEntries = Object.entries(customTypesTotals[customType])
+            .filter(([name, v]) => {
+              const netBalance = v.credit - v.debit;
+              // Show on debit side only if net balance is 0 or negative
+              return netBalance <= 0 && v.debit > 0;
+            })
+            .map(([name, v]) => [name, Math.abs(v.credit - v.debit)]); // Show absolute value of negative balance
+          
+          if (creditEntries.length > 0) {
+            processedCustomTypesCredit[customType] = creditEntries;
+          }
+          if (debitEntries.length > 0) {
+            processedCustomTypesDebit[customType] = debitEntries;
+          }
+        });
+        
+        setCustomTypesCredit(processedCustomTypesCredit);
+        setCustomTypesDebit(processedCustomTypesDebit);
+
+        setCapital(Object.entries(capitalData));
+        setLoan(Object.entries(loanData));
+        setFixedAssets(Object.entries(fixedAssetsData));
+      } catch (error) {
+        console.error("Error fetching balance sheet data:", error);
+        setCapital([]);
+        setFixedAssets([]);
       } finally {
         setLoading(false);
       }
@@ -53,150 +185,377 @@ const BalanceSheet = () => {
     fetchData();
   }, []);
 
-  const totalDepositAmount = deposits.reduce(
-    (sum, deposit) => sum + (Number(deposit.amount) || 0),
-    0
-  );
+  // Fetch salary data
+  useEffect(() => {
+    const fetchSalary = async () => {
+      try {
+        const token = localStorage.getItem("access_token");
+        const response = await fetch(SALARY_API_URL, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        });
+        const data = await response.json();
+        // Group and sum by salary_name
+        const salaryMap = {};
+        data.forEach(item => {
+          const name = item.salary_name;
+          const amount = parseFloat(item.salary_amount);
+          if (!salaryMap[name]) salaryMap[name] = 0;
+          salaryMap[name] += amount;
+        });
+        const salaryArr = Object.entries(salaryMap);
+        setSalary(salaryArr);
+        setSalaryTotal(salaryArr.reduce((sum, [, amt]) => sum + amt, 0));
+      } catch (error) {
+        setSalary([]);
+        setSalaryTotal(0);
+      }
+    };
+    fetchSalary();
+  }, []);
 
-  const buyerTotals = {};
-  buyerTransactions.forEach((t) => {
-    const name = t.buyer_name;
-    buyerTotals[name] = (buyerTotals[name] || 0) + Number(t.deposit_amount || 0);
-  });
+  // Fetch buyer data
+  useEffect(() => {
+    const fetchBuyer = async () => {
+      try {
+        const token = localStorage.getItem("access_token");
+        const response = await fetch(BUYER_API_URL, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        });
+        const data = await response.json();
+        // Group and sum by buyer_name
+        const buyerMap = {};
+        data.forEach(item => {
+          const name = item.buyer_name;
+          const amount = parseFloat(item.amount);
+          if (!buyerMap[name]) buyerMap[name] = 0;
+          buyerMap[name] += amount;
+        });
+        const buyerArr = Object.entries(buyerMap);
+        setBuyer(buyerArr);
+        setBuyerTotal(buyerArr.reduce((sum, [, amt]) => sum + amt, 0));
+      } catch (error) {
+        setBuyer([]);
+        setBuyerTotal(0);
+      }
+    };
+    fetchBuyer();
+  }, []);
 
-  const invoiceTotals = {};
-  invoices.forEach((invoice) => {
-    const name = invoice.buyer_name;
-    invoiceTotals[name] = (invoiceTotals[name] || 0) + Number(invoice.total_with_gst || 0);
-  });
+  // Fetch invoice data for debit side
+  useEffect(() => {
+    const fetchInvoices = async () => {
+      try {
+        const token = localStorage.getItem("access_token");
+        const response = await fetch(INVOICE_API_URL, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        });
+        const data = await response.json();
+        // Only keep buyer_name and base_amount, and only if base_amount > 0
+        const filtered = data
+          .filter(item => item.buyer_name && item.base_amount > 0)
+          .map(item => [item.buyer_name, item.base_amount]);
+        setInvoiceDebits(filtered);
+        // Aggregate invoice totals by buyer_name
+        const totals = {};
+        filtered.forEach(([name, amt]) => {
+          if (!totals[name]) totals[name] = 0;
+          totals[name] += amt;
+        });
+        setInvoiceTotalsByCompany(totals);
+      } catch (error) {
+        setInvoiceDebits([]);
+        setInvoiceTotalsByCompany({});
+      }
+    };
+    fetchInvoices();
+  }, []);
 
-  const remainingBalances = {};
-  const allBuyerNames = new Set([...Object.keys(buyerTotals), ...Object.keys(invoiceTotals)]);
-  allBuyerNames.forEach((buyerName) => {
-    const invoiceAmount = invoiceTotals[buyerName] || 0;
-    const depositAmount = buyerTotals[buyerName] || 0;
-    const remaining = invoiceAmount - depositAmount;
-    remainingBalances[buyerName] = remaining;
-  });
+  // Fetch company data for credit and debit side
+  useEffect(() => {
+    const fetchCompany = async () => {
+      try {
+        const token = localStorage.getItem("access_token");
+        const response = await fetch(COMPANY_API_URL, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        });
+        const data = await response.json();
+        // Aggregate company amounts by company_name
+        const amounts = {};
+        data.forEach(item => {
+          if (item.company_name) {
+            const amt = parseFloat(item.amount);
+            if (!amounts[item.company_name]) amounts[item.company_name] = 0;
+            amounts[item.company_name] += amt;
+          }
+        });
+        setCompanyAmounts(amounts);
+      } catch (error) {
+        setCompanyAmounts({});
+      }
+    };
+    fetchCompany();
+  }, []);
 
-  const creditOthers = otherTransactions.filter(t => t.transaction_type === "credit");
-  const debitOthers = otherTransactions.filter(t => t.transaction_type === "debit");
-  const creditCompanies = companyTransactions.filter(t => t.transaction_type === "credit");
-  const debitCompanies = companyTransactions.filter(t => t.transaction_type === "debit");
+  // Calculate company credit and debit based on invoice totals
+  useEffect(() => {
+    // Only run if both invoiceTotalsByCompany and companyAmounts are loaded
+    if (Object.keys(invoiceTotalsByCompany).length === 0 && Object.keys(companyAmounts).length === 0) return;
+    const credit = [];
+    const debit = [];
+    Object.entries(companyAmounts).forEach(([company, amount]) => {
+      const invoiceTotal = invoiceTotalsByCompany[company] || 0;
+      const diff = amount - invoiceTotal;
+      if (diff > 0) {
+        credit.push([company, diff]);
+      } else if (diff < 0) {
+        debit.push([company, Math.abs(diff)]);
+      }
+      // If diff === 0, show nothing
+    });
+    setCompanyCredit(credit);
+    setCompanyDebit(debit);
+  }, [invoiceTotalsByCompany, companyAmounts]);
 
-  if (loading) {
-    return <div className="p-6">Loading...</div>;
-  }
+  // Calculate remaining invoice debits (invoice total - company amount)
+  const invoiceDebitsRemaining = Object.entries(invoiceTotalsByCompany)
+    .map(([name, invoiceTotal]) => {
+      const paid = companyAmounts[name] || 0;
+      const remaining = invoiceTotal - paid;
+      return [name, remaining];
+    })
+    .filter(([_, remaining]) => remaining > 0);
 
-  if (error) {
-    return <div className="p-6 text-red-500">Error: {error}</div>;
-  }
+  // Calculate totals
+  const capitalTotal = capital.reduce((sum, [, amt]) => sum + amt, 0);
+  const loanTotal = loan.reduce((sum, [, amt]) => sum + amt, 0);
+  const loanCreditTotal = loanCredit.reduce((sum, [, amt]) => sum + amt, 0);
+  const loanDebitTotal = loanDebit.reduce((sum, [, amt]) => sum + amt, 0);
+  const fixedAssetsTotal = fixedAssets.reduce((sum, [, amt]) => sum + amt, 0);
+
+  if (loading) return <div>Loading...</div>;
 
   return (
-    <div className="p-6 md:pl-24" style={{ paddingLeft: "100px" }}>
-      <h1 className="text-2xl font-bold mb-6">Balance Sheet</h1>
-
-      {/* Total Deposits */}
-      <div className="mb-6 p-4 bg-green-100 border border-green-400 rounded">
-        <h2 className="text-lg font-semibold">Total Deposits:</h2>
-        <p className="text-xl font-mono">₹ {totalDepositAmount.toFixed(2)}</p>
-      </div>
-
-      <div className="d-flex flex-row mb-6">
-        {/* Left Side: Buyer Deposits + Other + Company Credits */}
-        <div className="w-50 pr-4">
-          <h2 className="text-lg font-semibold mb-2">Deposits / Credits</h2>
-          <table className="w-100 bg-white border border-gray-200">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="py-3 px-4 border-b text-left">Name</th>
-               
-                <th className="py-3 px-4 border-b text-right">Amount (₹)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {/* Buyer Deposits */}
-              {buyerTransactions
-                .filter(b => remainingBalances[b.buyer_name] !== 0)
-                .map(buyer => (
-                  <tr key={`buyer-${buyer.id}`} className="hover:bg-gray-50">
-                    <td className="py-3 px-4 border-b">{buyer.buyer_name}</td>
-                  
-                    <td className="py-3 px-4 border-b text-right font-mono">
-                      ₹ {Math.abs(Number(buyer.deposit_amount || 0)).toFixed(2)}
-                    </td>
+    <div className="balance-sheet-container">
+      <h1 style={{ textAlign: 'center', marginBottom: '20px', color: 'black' }}>
+        Balance Sheet
+      </h1>
+      <div className="balance-sheet-sections">
+        {/* LEFT: Capital and Loan Credit */}
+        <div className="left">
+          <div className="balance-sheet-box-left">
+            <h4 style={{ textAlign: 'left', borderBottom: '1px solid #aaa' }}>Capital</h4>
+            <table className="balance-sheet-table" style={{ width: '100%' }}>
+              <tbody>
+                {capital.map(([name, amt]) => (
+                  <tr key={name}>
+                    <td style={{ textAlign: 'center', width: '50%' }}>{amt}</td>
+                    <td style={{ textAlign: 'center', width: '50%' }}>{name}</td>
                   </tr>
                 ))}
-
-              {/* Other Credit Transactions */}
-              {creditOthers.map((item) => (
-                <tr key={`other-credit-${item.id}`} className="hover:bg-gray-50">
-                  <td className="py-3 px-4 border-b">{item.other_type}</td>
-                  <td className="py-3 px-4 border-b text-right font-mono">
-                    ₹ {Number(item.other_amount).toFixed(2)}
-                  </td>
+                <tr className="balance-sheet-total">
+                  <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>{capitalTotal}</td>
+                  <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>Total</td>
                 </tr>
-              ))}
-
-              {/* Company Credit Transactions */}
-              {creditCompanies.map((item) => (
-                <tr key={`company-credit-${item.id}`} className="hover:bg-gray-50">
-                  <td className="py-3 px-4 border-b">{item.company_name}</td>
-                  <td className="py-3 px-4 border-b text-right font-mono">
-                    ₹ {Number(item.amount).toFixed(2)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
+          {/* Loan (Credit) section: only show if there are entries */}
+          {loanCredit.length > 0 && (
+            <div className="balance-sheet-box-left" style={{ marginTop: '30px' }}>
+              <h4 style={{ textAlign: 'left', borderBottom: '1px solid #aaa' }}>Loan (Credit)</h4>
+              <table className="balance-sheet-table" style={{ width: '100%' }}>
+                <tbody>
+                  {loanCredit.map(([name, amt]) => (
+                    <tr key={name}>
+                      <td style={{ textAlign: 'center', width: '50%' }}>{amt}</td>
+                      <td style={{ textAlign: 'center', width: '50%' }}>{name}</td>
+                    </tr>
+                  ))}
+                  <tr className="balance-sheet-total">
+                    <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>{loanCredit.reduce((sum, [, amt]) => sum + amt, 0)}</td>
+                    <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>Total</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+          
+          {/* Custom Types Credit Sections */}
+          {Object.entries(customTypesCredit).map(([customType, entries]) => {
+            const total = entries.reduce((sum, [, amt]) => sum + amt, 0);
+            return (
+              <div key={customType} className="balance-sheet-box-left" style={{ marginTop: '30px' }}>
+                <h4 style={{ textAlign: 'left', borderBottom: '1px solid #aaa' }}>{customType} (Credit)</h4>
+                <table className="balance-sheet-table" style={{ width: '100%' }}>
+                  <tbody>
+                    {entries.map(([name, amt]) => (
+                      <tr key={name}>
+                        <td style={{ textAlign: 'center', width: '50%' }}>{amt}</td>
+                        <td style={{ textAlign: 'center', width: '50%' }}>{name}</td>
+                      </tr>
+                    ))}
+                    <tr className="balance-sheet-total">
+                      <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>{total}</td>
+                      <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>Total</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            );
+          })}
+          {/* Company Credit Section */}
+          {companyCredit.length > 0 && (
+            <div className="balance-sheet-box-left" style={{ marginBottom: '30px' }}>
+              <h4 style={{ textAlign: 'left', borderBottom: '1px solid #aaa' }}>Sundry Creditrts</h4>
+              <table className="balance-sheet-table" style={{ width: '100%' }}>
+                <tbody>
+                  {companyCredit.map(([name, amt]) => (
+                    <tr key={name}>
+                      <td style={{ textAlign: 'center', width: '50%' }}>{amt}</td>
+                      <td style={{ textAlign: 'center', width: '50%' }}>{name}</td>
+                    </tr>
+                  ))}
+                  <tr className="balance-sheet-total">
+                    <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>{companyCredit.reduce((sum, [, amt]) => sum + amt, 0)}</td>
+                    <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>Total</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
-        {/* Right Side: Invoices + Other + Company Debits */}
-        <div className="w-50 pl-4">
-          <h2 className="text-lg font-semibold mb-2">Invoices / Debits</h2>
-          <table className="w-100 bg-white border border-gray-200">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="py-3 px-4 border-b text-left">Name</th>
-              
-                <th className="py-3 px-4 border-b text-right">Amount (₹)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices
-                .filter(i => remainingBalances[i.buyer_name] > 0)
-                .map(invoice => (
-                  <tr key={`invoice-${invoice.id}`} className="hover:bg-gray-50">
-                    <td className="py-3 px-4 border-b">{invoice.buyer_name}</td>
-                    <td className="py-3 px-4 border-b text-right font-mono text-red-600 font-semibold">
-                      ₹ {remainingBalances[invoice.buyer_name].toFixed(2)}
-                    </td>
+        {/* RIGHT: Fixed Assets, Loan Debit, Salary, and Buyer */}
+        <div className="right">
+          <div className="balance-sheet-box-right">
+            <h4 style={{ textAlign: 'left', borderBottom: '1px solid #aaa' }}>Fixed Assets</h4>
+            <table className="balance-sheet-table" style={{ width: '100%' }}>
+              <tbody>
+                {fixedAssets.map(([name, amt]) => (
+                  <tr key={name}>
+                    <td style={{ textAlign: 'center', width: '50%' }}>{amt}</td>
+                    <td style={{ textAlign: 'center', width: '50%' }}>{name}</td>
                   </tr>
                 ))}
-
-              {/* Other Debit Transactions */}
-              {debitOthers.map((item) => (
-                <tr key={`other-debit-${item.id}`} className="hover:bg-gray-50">
-                  <td className="py-3 px-4 border-b">{item.other_type}</td>
-                 
-                  <td className="py-3 px-4 border-b text-right font-mono text-red-600 font-semibold">
-                    ₹ {Number(item.other_amount).toFixed(2)}
-                  </td>
+                <tr className="balance-sheet-total">
+                  <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>{fixedAssetsTotal}</td>
+                  <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>Total</td>
                 </tr>
-              ))}
-
-              {/* Company Debit Transactions */}
-              {debitCompanies.map((item) => (
-                <tr key={`company-debit-${item.id}`} className="hover:bg-gray-50">
-                  <td className="py-3 px-4 border-b">{item.company_name}</td>
-                  <td className="py-3 px-4 border-b text-right font-mono text-red-600 font-semibold">
-                    ₹ {Number(item.amount).toFixed(2)}
-                  </td>
+              </tbody>
+            </table>
+          </div>
+          {/* Loan (Debit) section: only show if there are entries */}
+          {loanDebit.length > 0 && (
+            <div className="balance-sheet-box-right" style={{ marginTop: '30px' }}>
+              <h4 style={{ textAlign: 'left', borderBottom: '1px solid #aaa' }}>Loan (Debit)</h4>
+              <table className="balance-sheet-table" style={{ width: '100%' }}>
+                <tbody>
+                  {loanDebit.map(([name, amt]) => (
+                    <tr key={name}>
+                      <td style={{ textAlign: 'center', width: '50%' }}>{amt}</td>
+                      <td style={{ textAlign: 'center', width: '50%' }}>{name}</td>
+                    </tr>
+                  ))}
+                  <tr className="balance-sheet-total">
+                    <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>{loanDebit.reduce((sum, [, amt]) => sum + amt, 0)}</td>
+                    <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>Total</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className="balance-sheet-box-right" style={{ marginTop: '30px' }}>
+            <h4 style={{ textAlign: 'left', borderBottom: '1px solid #aaa' }}>Salary</h4>
+            <table className="balance-sheet-table" style={{ width: '100%' }}>
+              <tbody>
+                {salary.map(([name, amt]) => (
+                  <tr key={name}>
+                    <td style={{ textAlign: 'center', width: '50%' }}>{amt}</td>
+                    <td style={{ textAlign: 'center', width: '50%' }}>{name}</td>
+                  </tr>
+                ))}
+                <tr className="balance-sheet-total">
+                  <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>{salaryTotal}</td>
+                  <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>Total</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
+          <div className="balance-sheet-box-right" style={{ marginTop: '30px' }}>
+            <h4 style={{ textAlign: 'left', borderBottom: '1px solid #aaa' }}>Buyer</h4>
+            <table className="balance-sheet-table" style={{ width: '100%' }}>
+              <tbody>
+                {buyer.map(([name, amt]) => (
+                  <tr key={name}>
+                    <td style={{ textAlign: 'center', width: '50%' }}>{amt}</td>
+                    <td style={{ textAlign: 'center', width: '50%' }}>{name}</td>
+                  </tr>
+                ))}
+                <tr className="balance-sheet-total">
+                  <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>{buyerTotal}</td>
+                  <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>Total</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          
+          {/* Custom Types Debit Sections */}
+          {Object.entries(customTypesDebit).map(([customType, entries]) => {
+            const total = entries.reduce((sum, [, amt]) => sum + amt, 0);
+            return (
+              <div key={customType} className="balance-sheet-box-right" style={{ marginTop: '30px' }}>
+                <h4 style={{ textAlign: 'left', borderBottom: '1px solid #aaa' }}>{customType} (Debit)</h4>
+                <table className="balance-sheet-table" style={{ width: '100%' }}>
+                  <tbody>
+                    {entries.map(([name, amt]) => (
+                      <tr key={name}>
+                        <td style={{ textAlign: 'center', width: '50%' }}>{amt}</td>
+                        <td style={{ textAlign: 'center', width: '50%' }}>{name}</td>
+                      </tr>
+                    ))}
+                    <tr className="balance-sheet-total">
+                      <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>{total}</td>
+                      <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>Total</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            );
+          })}
+          {/* Invoice Debit Section */}
+          {invoiceDebitsRemaining.length > 0 && (
+            <div className="balance-sheet-box-right" style={{ marginBottom: '30px' }}>
+              <h4 style={{ textAlign: 'left', borderBottom: '1px solid #aaa' }}>Sundry Debitorts</h4>
+              <table className="balance-sheet-table" style={{ width: '100%' }}>
+                <tbody>
+                  {invoiceDebitsRemaining.map(([name, amt]) => (
+                    <tr key={name}>
+                      <td style={{ textAlign: 'center', width: '50%' }}>{amt}</td>
+                      <td style={{ textAlign: 'center', width: '50%' }}>{name}</td>
+                    </tr>
+                  ))}
+                  <tr className="balance-sheet-total">
+                    <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>{invoiceDebitsRemaining.reduce((sum, [, amt]) => sum + amt, 0)}</td>
+                    <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>Total</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
+
       </div>
     </div>
   );
