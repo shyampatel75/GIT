@@ -361,15 +361,7 @@ const Address = () => {
         >
           <i className="bi bi-plus-lg"></i> {loading ? "Loading..." : "New Bills"}
         </button>
-        {/* Add the conversion toggle button here */}
-        {selectedInvoice?.currency === "USD" && (
-          <button
-            onClick={() => setShowConversion(!showConversion)}
-            className="conversion-toggle-btn"
-          >
-            {showConversion ? "Hide INR Conversion" : "Show INR Conversion"}
-          </button>
-        )}
+       
       </div>
 
 

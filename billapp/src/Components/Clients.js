@@ -240,12 +240,38 @@ const Clients = () => {
   };
 
   const handleNewBill = (group) => {
+    // Get the most recent invoice from the group to extract country and state
+    const mostRecentInvoice = group.invoices[0]; // Assuming invoices are sorted by date desc
+    
+    // Extract country and state information
+    const country = mostRecentInvoice.country || "India";
+    const state = mostRecentInvoice.state || "";
+    const currency = mostRecentInvoice.currency || "INR";
+    
+    // Determine currency symbol based on currency code
+    const currencySymbols = {
+      INR: "₹",
+      USD: "$",
+      EUR: "€",
+      GBP: "£",
+      JPY: "¥",
+    };
+    
+    const currencySymbol = currencySymbols[currency] || "₹";
+    
     navigate('/tax-invoice', {
       state: {
         buyerData: {
           buyer_name: group.buyer_name || '',
           buyer_address: group.buyer_address || '',
           buyer_gst: group.buyer_gst || '',
+        },
+        // Pass country and state information for pre-selection
+        countryData: {
+          country: country,
+          state: state,
+          currency: currency,
+          currencySymbol: currencySymbol
         }
       }
     });
@@ -328,14 +354,14 @@ const Clients = () => {
         autoClose={3000}
         limit={1}
       />
-
+{/* 
       {loading && (
         <div className="text-center mt-3">
           <div className="spinner-border" role="status">
             <span className="visually-hidden">Loading...</span>
           </div>
         </div>
-      )}
+      )} */}
 
       <div className="header-bar">
         <button

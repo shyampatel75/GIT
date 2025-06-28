@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import "./Taxinvoice.css";
 
 const Clientinvoices = () => {
   const { state } = useLocation();
@@ -11,8 +14,8 @@ const Clientinvoices = () => {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [logoLoaded, setLogoLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState(null);
   const printRef = useRef();
 
   const displayInvoices = client ? client.invoices : invoices;
@@ -20,7 +23,6 @@ const Clientinvoices = () => {
   const fetchInvoices = useCallback(async () => {
     try {
       setLoading(true);
-      setError("");
       const token = localStorage.getItem("access_token");
       if (!token) {
         navigate("/login");
@@ -42,7 +44,6 @@ const Clientinvoices = () => {
       setInvoices(data);
     } catch (err) {
       console.error("Error fetching invoices:", err);
-      setError(err.message || "Failed to load invoices");
     } finally {
       setLoading(false);
     }
@@ -57,7 +58,6 @@ const Clientinvoices = () => {
   const handleDownload = async (invoice) => {
     try {
       setLoading(true);
-      setError("");
       const token = localStorage.getItem("access_token");
       if (!token) {
         navigate("/login");
@@ -123,7 +123,6 @@ const Clientinvoices = () => {
       }
     } catch (err) {
       console.error("Download error:", err);
-      setError(err.message || "Failed to prepare invoice for download");
       setLoading(false);
     }
   };
@@ -162,11 +161,8 @@ const Clientinvoices = () => {
 
         pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
         pdf.save(`Invoice_${selectedInvoice.invoice_number}.pdf`);
-
-        setSuccess("Invoice downloaded successfully!");
       } catch (err) {
         console.error("PDF generation error:", err);
-        setError("Failed to generate PDF");
       } finally {
         setSelectedInvoice(null);
         setLogoLoaded(false);
@@ -182,50 +178,72 @@ const Clientinvoices = () => {
   }, [selectedInvoice, logoLoaded]);
 
   const handleDelete = async (invoiceId) => {
-    if (window.confirm("Are you sure you want to delete this invoice?")) {
-      try {
-        setLoading(true);
-        setError("");
-        const token = localStorage.getItem("access_token");
-        if (!token) {
-          navigate("/login");
-          return;
-        }
+    setInvoiceToDelete(invoiceId);
+    setShowDeleteModal(true);
+  };
 
-        const res = await fetch(
-          `http://localhost:8000/api/delete/${invoiceId}/`,
-          {
-            method: "DELETE",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        if (res.ok) {
-          setInvoices((prevInvoices) =>
-            prevInvoices.filter((invoice) => invoice.id !== invoiceId)
-          );
-          setSuccess("Invoice deleted successfully!");
-        } else {
-          const errorData = await res.json();
-          throw new Error(errorData.message || "Failed to delete invoice");
-        }
-      } catch (err) {
-        console.error("Error deleting invoice:", err);
-        setError(err.message || "An error occurred while deleting the invoice");
-      } finally {
-        setLoading(false);
+  const confirmDelete = async () => {
+    if (!invoiceToDelete) return;
+    
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        navigate("/login");
+        return;
       }
+
+      const res = await fetch(
+        `http://localhost:8000/api/delete/${invoiceToDelete}/`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (res.ok) {
+        setInvoices((prevInvoices) =>
+          prevInvoices.filter((invoice) => invoice.id !== invoiceToDelete)
+        );
+        toast.success("Invoice deleted successfully!", {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+      } else {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to delete invoice");
+      }
+    } catch (err) {
+      console.error("Error deleting invoice:", err);
+      toast.error(err.message || "An error occurred while deleting the invoice", {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+    } finally {
+      setLoading(false);
+      setShowDeleteModal(false);
+      setInvoiceToDelete(null);
     }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setInvoiceToDelete(null);
   };
 
   return (
     <div className="year_container">
-      {error && <div className="alert alert-danger">{error}</div>}
-      {success && <div className="alert alert-success">{success}</div>}
-
       <h2>
         {client ? `${client.buyer_name} - ${client.buyer_gst}` : "All Invoices"}
       </h2>
@@ -711,6 +729,56 @@ const Clientinvoices = () => {
               <p className="text-center">
                 This is a Computer Generated Invoice
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Container */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="delete-modal-overlay">
+          <div className="delete-modal-content">
+            <div className="delete-modal-header">
+              <h5 className="modal-title">Confirm Delete</h5>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={cancelDelete}
+                aria-label="Close"
+              ></button>
+            </div>
+            <div className="delete-modal-body">
+              Are you sure you want to delete this invoice? This action cannot be undone.
+            </div>
+            <div className="delete-modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={cancelDelete}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={confirmDelete}
+                disabled={loading}
+              >
+                {loading ? "Deleting..." : "Delete"}
+              </button>
             </div>
           </div>
         </div>

@@ -207,14 +207,22 @@ const Profile = () => {
                             disabled={loading}
                         />
                     </div>
-                    <div className="d-flex justify-content-center">
-                    <button 
-                        onClick={() => setShowFileUpload(true)} 
-                        className="button-sumbit-banking btn-all text-center"
-                        disabled={loading}
-                    >
-                        {loading ? "Loading..." : "Next"}
-                    </button>
+                    <div className="d-flex justify-content-center gap-3">
+                        <button 
+                            type="button"
+                            className="action-btn back-btn"
+                            onClick={() => navigate(-1)}
+                            disabled={loading}
+                        >
+                            ← Back
+                        </button>
+                        <button 
+                            onClick={() => setShowFileUpload(true)} 
+                            className="button-sumbit-banking btn-all text-center"
+                            disabled={loading}
+                        >
+                            {loading ? "Loading..." : "Next"}
+                        </button>
                     </div>
                 </div>
             ) : (

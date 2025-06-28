@@ -40,8 +40,8 @@ const Taxinvoice = () => {
     delivery_note_date: "",
     destination: "",
     Terms_to_delivery: "",
-    country: "",
-    currency: "",
+    country: location.state?.countryData?.country || "",
+    currency: location.state?.countryData?.currency || "",
     Particulars: "",
     hsn_code: "998314",
     total_hours: "",
@@ -61,12 +61,12 @@ const Taxinvoice = () => {
   const [countries, setCountries] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedCountry, setSelectedCountry] = useState({
-    name: "India",
-    currency: "₹",
-    currencyCode: "INR",
+    name: location.state?.countryData?.country || "India",
+    currency: location.state?.countryData?.currencySymbol || "₹",
+    currencyCode: location.state?.countryData?.currency || "INR",
   });
   const [states, setStates] = useState([]);
-  const [selectedState, setSelectedState] = useState("");
+  const [selectedState, setSelectedState] = useState(location.state?.countryData?.state || "");
   const [isOpen, setIsOpen] = useState(false);
   const [invoiceYear, setInvoiceYear] = useState(getCurrentInvoiceYear());
   const [settingsData, setSettingsData] = useState({});
@@ -270,10 +270,10 @@ const Taxinvoice = () => {
   }, []);
 
   useEffect(() => {
-    if (selectedCountry.name === "India" && states.length > 0) {
+    if (selectedCountry.name === "India" && states.length > 0 && !selectedState) {
       setSelectedState("Gujarat");
     }
-  }, [selectedCountry, states]);
+  }, [selectedCountry, states, selectedState]);
 
   const filteredStates = states.filter((state) =>
     state.name.toLowerCase().includes(searchState.toLowerCase())
@@ -348,6 +348,20 @@ const Taxinvoice = () => {
       fetchExchangeRate(selectedCountry.currencyCode);
     }
   }, [selectedCountry, fetchExchangeRate]);
+
+  // Update selectedCountry when countries are loaded and there's country data from Clients
+  useEffect(() => {
+    if (countries.length > 0 && location.state?.countryData?.country) {
+      const countryData = countries.find(c => c.name === location.state.countryData.country);
+      if (countryData) {
+        setSelectedCountry({
+          name: countryData.name,
+          currency: countryData.currency,
+          currencyCode: countryData.currencyCode,
+        });
+      }
+    }
+  }, [countries, location.state?.countryData?.country]);
 
   // Handle clicking outside dropdowns to close them
   useEffect(() => {
