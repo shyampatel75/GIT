@@ -64,7 +64,6 @@ const Taxinvoice = () => {
     name: "India",
     currency: "₹",
     currencyCode: "INR",
-    flag: "https://flagcdn.com/in.svg",
   });
   const [states, setStates] = useState([]);
   const [selectedState, setSelectedState] = useState("");
@@ -220,7 +219,7 @@ const Taxinvoice = () => {
             name: country.name.common,
             currency: currencySymbol,
             currencyCode: currencyCode,
-            flag: country.flags?.svg || ""
+            
           };
         })
         .filter(country => country.currencyCode);
@@ -230,11 +229,11 @@ const Taxinvoice = () => {
       console.error("Error fetching countries:", error);
       // fallback to a few countries if API fails
       setCountries([
-        { name: "India", currency: "₹", currencyCode: "INR", flag: "https://flagcdn.com/in.svg" },
-        { name: "United States", currency: "$", currencyCode: "USD", flag: "https://flagcdn.com/us.svg" },
-        { name: "United Kingdom", currency: "£", currencyCode: "GBP", flag: "https://flagcdn.com/gb.svg" },
-        { name: "European Union", currency: "€", currencyCode: "EUR", flag: "https://flagcdn.com/eu.svg" },
-        { name: "Japan", currency: "¥", currencyCode: "JPY", flag: "https://flagcdn.com/jp.svg" }
+        { name: "India", currency: "₹", currencyCode: "INR" },
+        { name: "United States", currency: "$", currencyCode: "USD"},
+        { name: "United Kingdom", currency: "£", currencyCode: "GBP" },
+        { name: "European Union", currency: "€", currencyCode: "EUR" },
+        { name: "Japan", currency: "¥", currencyCode: "JPY" }
       ]);
     }
   }, []);
@@ -835,10 +834,10 @@ const Taxinvoice = () => {
   return (
     <div style={{ paddingLeft: "70px", fontFamily: "Arial, sans-serif" }} onSubmit={handleSubmit}>
       <ToastContainer />
-      <div style={{ paddingRight: "10px" }}>
+      <div style={{ paddingRight: "10px" }} ref={pdfRef}>
         <h2 className="text-center">TAX INVOICE</h2>
 
-        <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white" }} ref={pdfRef}>
+        <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white" }} >
           <div className="row date-tables">
             <div className="col-6">
               {/* Seller Info */}
@@ -1096,13 +1095,7 @@ const Taxinvoice = () => {
                         className="flex items-center"
                         style={{ height: "30px" }}
                       >
-                        {selectedCountry.flag && (
-                          <img
-                            src={selectedCountry.flag}
-                            alt={`${selectedCountry.name} flag`}
-                            style={{ width: "20px", marginRight: "8px" }}
-                          />
-                        )}
+                        
                         <span className="mr-2">
                           {selectedCountry.name} - {currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}
                         </span>

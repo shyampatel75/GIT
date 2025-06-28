@@ -573,6 +573,7 @@ const EditInvoice = () => {
 
   return (
     <div style={{paddingLeft:"80px"}}>
+      <h2 style={{ textAlign: 'center', marginBottom: '20px', fontWeight: 600 }}>TAX INVOICE</h2>
       <form onSubmit={handleSubmit}>
         {loading && <div className="text-center">Loading invoice data...</div>}
         
@@ -1238,7 +1239,7 @@ const EditInvoice = () => {
           left: "-9999px",
           fontFamily: "Arial, sans-serif",
           color: "#575757",
-          width: "200mm",
+          width: "80%",
           minHeight: "297mm",
           background: "white",
           boxSizing: "border-box",
