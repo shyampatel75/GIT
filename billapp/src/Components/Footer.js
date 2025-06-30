@@ -5,7 +5,7 @@ const Footer = () => {
   return (
     <footer className="auth-footer">
       <div className="footer-content">
-        <div className="footer-copyright">© 2025 YourCompany. All rights reserved.</div>
+        <div className="footer-copyright">© 2025 Gransolve Infotech. All rights reserved.</div>
         <div className="social-icons">
           <a href="#" className="social-link" aria-label="Facebook">
             <i className="fab fa-facebook-f"></i>
