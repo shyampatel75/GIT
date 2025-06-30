@@ -402,11 +402,66 @@ def get_invoices(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_next_invoice_number(request):
-    current_year = datetime.now().year
-    next_year = current_year + 1
-    financial_year = f"{current_year}/{next_year}"
+    # Financial year logic: March 1st to February end
+    current_date = datetime.now().date()
+    if current_date.month >= 3:  # March or later
+        financial_year_start = current_date.year
+    else:  # January or February
+        financial_year_start = current_date.year - 1
+    
+    financial_year_end = financial_year_start + 1
+    financial_year = f"{financial_year_start}/{financial_year_end}"
 
     # Only get the last invoice for this user and year
+    last_invoice = Invoice.objects.filter(
+        financial_year=financial_year,
+        user=request.user
+    ).order_by('-invoice_number').first()
+    
+    if last_invoice:
+        try:
+            num_part = last_invoice.invoice_number.split('-')[0]
+            next_num = int(num_part) + 1
+        except (ValueError, IndexError, AttributeError):
+            next_num = 1
+    else:
+        next_num = 1
+        
+    invoice_number = f"{next_num:02d}-{financial_year}"
+    
+    return Response({
+        'invoice_number': invoice_number,
+        'financial_year': financial_year
+    })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_next_invoice_number_by_year(request):
+    """
+    Generate next invoice number for a specific year
+    Query parameter: year (e.g., 2024, 2025)
+    Financial year logic: March 1st to February end
+    """
+    year = request.GET.get('year')
+    
+    if not year:
+        return Response({
+            'error': 'Year parameter is required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        year = int(year)
+        # Financial year logic: March 1st to February end
+        # The year parameter represents the start of the financial year
+        financial_year_start = year
+        financial_year_end = year + 1
+        financial_year = f"{financial_year_start}/{financial_year_end}"
+    except ValueError:
+        return Response({
+            'error': 'Invalid year format'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Get the last invoice for this user and specific year
     last_invoice = Invoice.objects.filter(
         financial_year=financial_year,
         user=request.user
@@ -1173,4 +1228,3 @@ def partner_detail(request, pk):
     elif request.method == 'DELETE':
         partner.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-    

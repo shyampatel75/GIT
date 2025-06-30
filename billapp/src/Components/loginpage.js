@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Eye, EyeSlash } from 'react-bootstrap-icons';
 import { Link } from "react-router-dom";
 import './Login.css'; // Custom CSS
+import Footer from "./Footer";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -97,15 +98,7 @@ const Login = () => {
         </div>
       </div>
 
-      <footer className="auth-footer">
-        <span>© 2025</span>
-        <div className="social-icons">
-          <a href="#!"><i className="fab fa-facebook-f"></i></a>
-          <a href="#!"><i className="fab fa-twitter"></i></a>
-          <a href="#!"><i className="fab fa-google"></i></a>
-          <a href="#!"><i className="fab fa-linkedin-in"></i></a>
-        </div>
-      </footer>
+      <Footer />
     </section>
   );
 };

@@ -20,6 +20,35 @@ const getCurrentInvoiceYear = () => {
   return `${year}/${year + 1}`;
 };
 
+// Helper function to calculate financial year based on March 1st to February end
+const getFinancialYearFromDate = (date) => {
+  const selectedDate = new Date(date);
+  const selectedYear = selectedDate.getFullYear();
+  const selectedMonth = selectedDate.getMonth() + 1; // getMonth() returns 0-11
+  
+  // Financial year logic: March 1st to February end
+  // If date is March (3) or later, financial year starts that year
+  // If date is January (1) or February (2), financial year started the previous year
+  if (selectedMonth >= 3) {
+    return `${selectedYear}/${selectedYear + 1}`;
+  } else {
+    return `${selectedYear - 1}/${selectedYear}`;
+  }
+};
+
+// Helper function to get the start year of financial year from a date
+const getFinancialYearStart = (date) => {
+  const selectedDate = new Date(date);
+  const selectedYear = selectedDate.getFullYear();
+  const selectedMonth = selectedDate.getMonth() + 1;
+  
+  if (selectedMonth >= 3) {
+    return selectedYear;
+  } else {
+    return selectedYear - 1;
+  }
+};
+
 const Taxinvoice = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -40,8 +69,8 @@ const Taxinvoice = () => {
     delivery_note_date: "",
     destination: "",
     Terms_to_delivery: "",
-    country: location.state?.countryData?.country || "",
-    currency: location.state?.countryData?.currency || "",
+    country: "",
+    currency: "",
     Particulars: "",
     hsn_code: "998314",
     total_hours: "",
@@ -61,12 +90,13 @@ const Taxinvoice = () => {
   const [countries, setCountries] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedCountry, setSelectedCountry] = useState({
-    name: location.state?.countryData?.country || "India",
-    currency: location.state?.countryData?.currencySymbol || "₹",
-    currencyCode: location.state?.countryData?.currency || "INR",
+    name: "India",
+    currency: "₹",
+    currencyCode: "INR",
+    flag: "https://flagcdn.com/in.svg",
   });
   const [states, setStates] = useState([]);
-  const [selectedState, setSelectedState] = useState(location.state?.countryData?.state || "");
+  const [selectedState, setSelectedState] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [invoiceYear, setInvoiceYear] = useState(getCurrentInvoiceYear());
   const [settingsData, setSettingsData] = useState({});
@@ -101,7 +131,7 @@ const Taxinvoice = () => {
 
   // Helper function to safely display numeric values
   const safeNumber = (value) => {
-    if (value === null || value === undefined || isNaN(value)) return 0;
+    if (value === null || value === undefined || isNaN(value) || value === 0) return "";
     return value;
   };
 
@@ -219,7 +249,7 @@ const Taxinvoice = () => {
             name: country.name.common,
             currency: currencySymbol,
             currencyCode: currencyCode,
-            
+            flag: country.flags?.svg || ""
           };
         })
         .filter(country => country.currencyCode);
@@ -229,11 +259,11 @@ const Taxinvoice = () => {
       console.error("Error fetching countries:", error);
       // fallback to a few countries if API fails
       setCountries([
-        { name: "India", currency: "₹", currencyCode: "INR" },
-        { name: "United States", currency: "$", currencyCode: "USD"},
-        { name: "United Kingdom", currency: "£", currencyCode: "GBP" },
-        { name: "European Union", currency: "€", currencyCode: "EUR" },
-        { name: "Japan", currency: "¥", currencyCode: "JPY" }
+        { name: "India", currency: "₹", currencyCode: "INR", flag: "https://flagcdn.com/in.svg" },
+        { name: "United States", currency: "$", currencyCode: "USD", flag: "https://flagcdn.com/us.svg" },
+        { name: "United Kingdom", currency: "£", currencyCode: "GBP", flag: "https://flagcdn.com/gb.svg" },
+        { name: "European Union", currency: "€", currencyCode: "EUR", flag: "https://flagcdn.com/eu.svg" },
+        { name: "Japan", currency: "¥", currencyCode: "JPY", flag: "https://flagcdn.com/jp.svg" }
       ]);
     }
   }, []);
@@ -270,10 +300,10 @@ const Taxinvoice = () => {
   }, []);
 
   useEffect(() => {
-    if (selectedCountry.name === "India" && states.length > 0 && !selectedState) {
+    if (selectedCountry.name === "India" && states.length > 0) {
       setSelectedState("Gujarat");
     }
-  }, [selectedCountry, states, selectedState]);
+  }, [selectedCountry, states]);
 
   const filteredStates = states.filter((state) =>
     state.name.toLowerCase().includes(searchState.toLowerCase())
@@ -302,9 +332,46 @@ const Taxinvoice = () => {
 
     } catch (error) {
       console.error("Error fetching next invoice number:", error);
-      const currentYear = new Date().getFullYear();
-      const nextYear = currentYear + 1;
-      const financialYear = `${currentYear}/${nextYear}`;
+      const currentDate = new Date();
+      const currentFinancialYearStart = getFinancialYearStart(currentDate);
+      const currentFinancialYearEnd = currentFinancialYearStart + 1;
+      const financialYear = `${currentFinancialYearStart}/${currentFinancialYearEnd}`;
+      const fallbackNumber = `01-${financialYear}`;
+
+      setNextInvoiceNumber(fallbackNumber);
+      setFormData(prev => ({
+        ...prev,
+        invoice_number: fallbackNumber,
+        financial_year: financialYear
+      }));
+    }
+  }, []);
+
+  const fetchNextInvoiceNumberByYear = useCallback(async (year) => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/get_next_invoice_number_by_year/?year=${year}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem("access_token")}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      setNextInvoiceNumber(data.invoice_number);
+      setFormData(prev => ({
+        ...prev,
+        invoice_number: data.invoice_number,
+        financial_year: data.financial_year
+      }));
+
+    } catch (error) {
+      console.error("Error fetching next invoice number for year:", error);
+      const financialYearEnd = year + 1;
+      const financialYear = `${year}/${financialYearEnd}`;
       const fallbackNumber = `01-${financialYear}`;
 
       setNextInvoiceNumber(fallbackNumber);
@@ -329,7 +396,7 @@ const Taxinvoice = () => {
     }, 1000 * 60 * 60 * 24);
 
     return () => clearInterval(interval);
-  }, [fetchNextInvoiceNumber, fetchCountries, fetchSettings, fetchExchangeRate]);
+  }, [fetchNextInvoiceNumber, fetchNextInvoiceNumberByYear, fetchCountries, fetchSettings, fetchExchangeRate]);
 
   useEffect(() => {
     setFormData(prev => ({
@@ -348,20 +415,6 @@ const Taxinvoice = () => {
       fetchExchangeRate(selectedCountry.currencyCode);
     }
   }, [selectedCountry, fetchExchangeRate]);
-
-  // Update selectedCountry when countries are loaded and there's country data from Clients
-  useEffect(() => {
-    if (countries.length > 0 && location.state?.countryData?.country) {
-      const countryData = countries.find(c => c.name === location.state.countryData.country);
-      if (countryData) {
-        setSelectedCountry({
-          name: countryData.name,
-          currency: countryData.currency,
-          currencyCode: countryData.currencyCode,
-        });
-      }
-    }
-  }, [countries, location.state?.countryData?.country]);
 
   // Handle clicking outside dropdowns to close them
   useEffect(() => {
@@ -409,6 +462,21 @@ const Taxinvoice = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // If the invoice date changes, update the invoice number based on the financial year
+    if (name === 'invoice_date' && value) {
+      const financialYearStart = getFinancialYearStart(value);
+      const currentDate = new Date();
+      const currentFinancialYearStart = getFinancialYearStart(currentDate);
+      
+      // Only update if the financial year is different from current financial year
+      if (financialYearStart !== currentFinancialYearStart) {
+        fetchNextInvoiceNumberByYear(financialYearStart);
+      } else {
+        // If it's the current financial year, use the default invoice number generation
+        fetchNextInvoiceNumber();
+      }
+    }
   };
 
   const numberToWords = (num) => {
@@ -454,13 +522,15 @@ const Taxinvoice = () => {
   const calculateTotal = useCallback(() => {
     const total_hours = parseFloat(formData.total_hours) || 0;
     const rate = parseFloat(formData.rate) || 0;
-    const base_amount = parseFloat(formData.base_amount);
+    const base_amount = parseFloat(formData.base_amount) || 0;
 
     let calculatedBaseAmount;
     if (total_hours > 0 && rate > 0) {
       calculatedBaseAmount = total_hours * rate;
-    } else {
+    } else if (base_amount > 0) {
       calculatedBaseAmount = base_amount;
+    } else {
+      calculatedBaseAmount = 0;
     }
 
     if (selectedCountry.name === "India") {
@@ -471,12 +541,12 @@ const Taxinvoice = () => {
 
         setFormData(prev => ({
           ...prev,
-          base_amount: calculatedBaseAmount,
-          cgst: tax,
-          sgst: tax,
-          igst: 0,
-          taxtotal: total_tax,
-          total_with_gst,
+          base_amount: calculatedBaseAmount || "",
+          cgst: tax || "",
+          sgst: tax || "",
+          igst: "",
+          taxtotal: total_tax || "",
+          total_with_gst: total_with_gst || "",
         }));
       } else {
         const igst = (calculatedBaseAmount * 18) / 100;
@@ -484,80 +554,43 @@ const Taxinvoice = () => {
 
         setFormData(prev => ({
           ...prev,
-          base_amount: calculatedBaseAmount,
-          cgst: 0,
-          sgst: 0,
-          igst: igst,
-          taxtotal: igst,
-          total_with_gst,
+          base_amount: calculatedBaseAmount || "",
+          cgst: "",
+          sgst: "",
+          igst: igst || "",
+          taxtotal: igst || "",
+          total_with_gst: total_with_gst || "",
         }));
       }
     } else {
       setFormData(prev => ({
         ...prev,
-        base_amount: calculatedBaseAmount,
-        cgst: 0,
-        sgst: 0,
-        igst: 0,
-        taxtotal: 0,
-        total_with_gst: Math.round(calculatedBaseAmount) || 0,
+        base_amount: calculatedBaseAmount || "",
+        cgst: "",
+        sgst: "",
+        igst: "",
+        taxtotal: "",
+        total_with_gst: Math.round(calculatedBaseAmount) || "",
       }));
     }
   }, [formData.total_hours, formData.rate, formData.base_amount, selectedCountry.name, selectedState]);
 
   const handleBaseAmountChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-      ...(name === "base_amount" && value && {
+    
+    // Clear hours and rate when amount is entered directly
+    if (name === "base_amount" && value) {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value,
         total_hours: "",
         rate: ""
-      })
-    }));
-
-    if (name === "base_amount") {
-      const base_amount = parseFloat(value);
-      if (selectedCountry.name === "India") {
-        if (selectedState === "Gujarat") {
-          const tax = (base_amount * 9) / 100;
-          const total_with_gst = Math.round(base_amount + 2 * tax);
-          const total_tax = tax * 2;
-
-          setFormData(prev => ({
-            ...prev,
-            base_amount,
-            cgst: tax,
-            sgst: tax,
-            igst: 0,
-            taxtotal: total_tax,
-            total_with_gst,
-          }));
-        } else {
-          const igst = (base_amount * 18) / 100;
-          const total_with_gst = Math.round(base_amount + igst);
-
-          setFormData(prev => ({
-            ...prev,
-            base_amount,
-            cgst: 0,
-            sgst: 0,
-            igst: igst,
-            taxtotal: igst,
-            total_with_gst,
-          }));
-        }
-      } else {
-        setFormData(prev => ({
-          ...prev,
-          base_amount,
-          cgst: 0,
-          sgst: 0,
-          igst: 0,
-          taxtotal: 0,
-          total_with_gst: Math.round(base_amount),
-        }));
-      }
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
     }
   };
 
@@ -1109,7 +1142,13 @@ const Taxinvoice = () => {
                         className="flex items-center"
                         style={{ height: "30px" }}
                       >
-                        
+                        {selectedCountry.flag && (
+                          <img
+                            src={selectedCountry.flag}
+                            alt={`${selectedCountry.name} flag`}
+                            style={{ width: "20px", marginRight: "8px" }}
+                          />
+                        )}
                         <span className="mr-2">
                           {selectedCountry.name} - {currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}
                         </span>
@@ -1280,7 +1319,6 @@ const Taxinvoice = () => {
                             ...prev,
                             base_amount: ""
                           }));
-                          calculateTotal();
                         }}
                         readOnly={isSubmitted}
                       />
@@ -1297,14 +1335,26 @@ const Taxinvoice = () => {
                             ...prev,
                             base_amount: ""
                           }));
-                          calculateTotal();
                         }}
                         readOnly={isSubmitted}
                       />
                     </td>
                     <td style={{ width: "200px" }}>
-                      <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
-                      {safeNumber(formData.base_amount)}
+                      <div style={{ display: "flex", alignItems: "center" }}>
+                        <span className="currency-sym" style={{ marginRight: "4px", fontSize: "18px" }}>
+                          {currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}
+                        </span>
+                        <input
+                          type="number"
+                          name="base_amount"
+                          value={safeNumber(formData.base_amount)}
+                          onChange={handleBaseAmountChange}
+                          readOnly={isSubmitted}
+                          className="amount-input"
+                          placeholder="Enter amount"
+                          style={{ flex: 1 }}
+                        />
+                      </div>
                     </td>
                   </tr>
 

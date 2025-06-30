@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Eye, EyeSlash } from "react-bootstrap-icons";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import Footer from "./Footer";
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -294,15 +295,7 @@ const Signup = () => {
         </div>
       </div>
 
-      <footer className="auth-footer">
-        <div>© 2025 YourCompany</div>
-        <div className="social-icons">
-          <a href="#"><i className="fab fa-facebook-f"></i></a>
-          <a href="#"><i className="fab fa-twitter"></i></a>
-          <a href="#"><i className="fab fa-google"></i></a>
-          <a href="#"><i className="fab fa-linkedin-in"></i></a>
-        </div>
-      </footer>
+      <Footer />
     </section>
   );
 };

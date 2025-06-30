@@ -19,6 +19,8 @@ const Address = () => {
   const isFirstRun = useRef(true);
   const [showConversion, setShowConversion] = useState(false);
   const [countryFlags, setCountryFlags] = useState({});
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState(null);
 
 
   const calculateInrEquivalent = (amount) => {
@@ -306,34 +308,39 @@ const Address = () => {
   };
 
   const handleDelete = async (invoiceId) => {
-    if (window.confirm("Are you sure you want to delete this invoice?")) {
-      // Optimistically remove the row from UI
-      setInvoices((prev) =>
-        prev
-          .map((group) => ({
-            ...group,
-            invoices: group.invoices.filter((inv) => inv.id !== invoiceId),
-          }))
-          .filter((group) => group.invoices.length > 0)
+    // Optimistically remove the row from UI
+    setInvoices((prev) =>
+      prev
+        .map((group) => ({
+          ...group,
+          invoices: group.invoices.filter((inv) => inv.id !== invoiceId),
+        }))
+        .filter((group) => group.invoices.length > 0)
+    );
+
+    try {
+      const response = await fetchWithAuth(
+        `http://localhost:8000/api/delete/${invoiceId}/`,
+        { method: "DELETE" }
       );
 
-      try {
-        const response = await fetchWithAuth(
-          `http://localhost:8000/api/delete/${invoiceId}/`,
-          { method: "DELETE" }
-        );
-
-        if (response) {
-          toast.success("Invoice deleted successfully");
-        } else {
-          toast.error("Failed to delete invoice from server");
-          fetchInvoices(); // rollback and re-fetch if failed
-        }
-      } catch (err) {
-        console.error("Error deleting invoice:", err);
-        toast.error(err.message || "Failed to delete invoice");
+      if (response) {
+        toast.success("Invoice deleted successfully!", {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+      } else {
+        toast.error("Failed to delete invoice from server");
         fetchInvoices(); // rollback and re-fetch if failed
       }
+    } catch (err) {
+      console.error("Error deleting invoice:", err);
+      toast.error(err.message || "Failed to delete invoice");
+      fetchInvoices(); // rollback and re-fetch if failed
     }
   };
 
@@ -448,7 +455,10 @@ const Address = () => {
                     <div className="tooltip-container">
                       <button
                         className="action-btn delete"
-                        onClick={() => handleDelete(invoice.id)}
+                        onClick={() => {
+                          setShowDeleteModal(true);
+                          setInvoiceToDelete(invoice.id);
+                        }}
                         disabled={loading}
                       >
                         <i className="fa-solid fa-trash"></i>
@@ -910,6 +920,20 @@ const Address = () => {
               </div>
               <p className="text-center" style={{ marginBottom: "0px" }}>This is a Computer Generated Invoice</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteModal && (
+        <div className="delete-modal">
+          <div className="delete-modal-content">
+            <span className="close-button" onClick={() => setShowDeleteModal(false)}>&times;</span>
+            <p>Are you sure you want to delete this invoice?</p>
+            <button onClick={() => {
+              handleDelete(invoiceToDelete);
+              setShowDeleteModal(false);
+            }}>Yes</button>
+            <button onClick={() => setShowDeleteModal(false)}>No</button>
           </div>
         </div>
       )}

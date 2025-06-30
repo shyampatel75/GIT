@@ -115,9 +115,28 @@ class Invoice(models.Model):
     def save(self, *args, **kwargs):
         # Only generate invoice number for new records
         if not self.pk:
-            current_year = datetime.now().year
-            next_year = current_year + 1
-            self.financial_year = f"{current_year}/{next_year}"
+            # Use invoice_date to determine financial year, fallback to current year
+            if self.invoice_date:
+                # Financial year logic: March 1st to February end
+                # If date is March 1st or later, financial year starts that year
+                # If date is before March 1st, financial year started the previous year
+                if self.invoice_date.month >= 3:  # March or later
+                    financial_year_start = self.invoice_date.year
+                else:  # January or February
+                    financial_year_start = self.invoice_date.year - 1
+                
+                financial_year_end = financial_year_start + 1
+                self.financial_year = f"{financial_year_start}/{financial_year_end}"
+            else:
+                # Fallback to current date logic
+                current_date = datetime.now().date()
+                if current_date.month >= 3:  # March or later
+                    financial_year_start = current_date.year
+                else:  # January or February
+                    financial_year_start = current_date.year - 1
+                
+                financial_year_end = financial_year_start + 1
+                self.financial_year = f"{financial_year_start}/{financial_year_end}"
             
             # Find the last invoice for this financial year and user
             last_invoice = Invoice.objects.filter(
