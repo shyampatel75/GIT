@@ -2,31 +2,54 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import "./Taxinvoice.css";
+
+const currencySymbols = {
+  INR: "₹",
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  JPY: "¥",
+};
+
+const getCurrentInvoiceYear = () => {
+  const year = new Date().getFullYear();
+  return `${year}/${year + 1}`;
+};
+
+const getFinancialYearFromDate = (date) => {
+  const selectedDate = new Date(date);
+  const selectedYear = selectedDate.getFullYear();
+  const selectedMonth = selectedDate.getMonth() + 1;
+  if (selectedMonth >= 3) {
+    return `${selectedYear}/${selectedYear + 1}`;
+  } else {
+    return `${selectedYear - 1}/${selectedYear}`;
+  }
+};
+
+const getFinancialYearStart = (date) => {
+  const selectedDate = new Date(date);
+  const selectedYear = selectedDate.getFullYear();
+  const selectedMonth = selectedDate.getMonth() + 1;
+  if (selectedMonth >= 3) {
+    return selectedYear;
+  } else {
+    return selectedYear - 1;
+  }
+};
 
 const EditInvoice = () => {
   const { invoiceId } = useParams();
   const navigate = useNavigate();
-  const invoiceRef = useRef();
-  const [selectedHsn, setSelectedHsn] = useState("9983");
-  const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [selectedCountry, setSelectedCountry] = useState({
-    name: "India",
-    currency: "₹",
-    currencyCode: "INR",
-  });
-  const [countries, setCountries] = useState([]);
-  const [filteredCountries, setFilteredCountries] = useState([]);
-  const [invoiceYear, setInvoiceYear] = useState(() => {
-    const year = new Date().getFullYear();
-    return `${year}/${year + 1}`;
-  });
+  const pdfRef = useRef(null);
+
   const [formData, setFormData] = useState({
     buyer_name: "",
     buyer_address: "",
     buyer_gst: "",
-    total_with_gst: "",
-    currency: "INR",
     consignee_name: "",
     consignee_address: "",
     consignee_gst: "",
@@ -37,131 +60,116 @@ const EditInvoice = () => {
     delivery_note_date: "",
     destination: "",
     Terms_to_delivery: "",
+    country: "",
+    currency: "",
     Particulars: "",
-    hsn_code: "9983",
-    total_hours: 0,
-    rate: 0,
-    base_amount: 0,
-    cgst: 0,
-    sgst: 0,
-    taxtotal: 0,
+    hsn_code: "998314",
+    total_hours: "",
+    rate: "",
+    base_amount: "",
+    cgst: "",
+    sgst: "",
+    igst: "",
+    total_with_gst: "",
+    taxtotal: "",
     remark: "",
+    totalWithGst: "",
+    financial_year: getCurrentInvoiceYear(),
   });
-  const [settingsData, setSettingsData] = useState(null);
+
+  const [selectedHsn, setSelectedHsn] = useState("");
+  const [countries, setCountries] = useState([]);
+  const [search, setSearch] = useState("");
+  const [selectedCountry, setSelectedCountry] = useState({
+    name: "India",
+    currency: "₹",
+    currencyCode: "INR",
+    flag: "https://flagcdn.com/in.svg",
+  });
+  const [states, setStates] = useState([]);
+  const [selectedState, setSelectedState] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const [invoiceYear, setInvoiceYear] = useState(getCurrentInvoiceYear());
+  const [settingsData, setSettingsData] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const [selectedState, setSelectedState] = useState("");
-  const [states, setStates] = useState([]);
+  const [isOpenCountry, setIsOpenCountry] = useState(false);
+  const [searchCountry, setSearchCountry] = useState("");
+  const [isOpenState, setIsOpenState] = useState(false);
+  const [searchState, setSearchState] = useState("");
+  const [exchangeRate, setExchangeRate] = useState(1);
+  const [showConversion, setShowConversion] = useState(false);
 
-  const fetchCountries = useCallback(async () => {
+  const countryDropdownRef = useRef(null);
+  const stateDropdownRef = useRef(null);
+
+  const formatToISO = (dateStr) => {
+    if (!dateStr) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+    const parts = dateStr.split(/[-/]/);
+    if (parts.length === 3) {
+      const [day, month, year] = parts;
+      return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+    }
+    return null;
+  };
+
+  const safeNumber = (value) => {
+    if (value === null || value === undefined || isNaN(value) || value === 0) return "";
+    return value;
+  };
+
+  const copyBillToShip = () => {
+    setFormData(prev => ({
+      ...prev,
+      consignee_name: prev.buyer_name,
+      consignee_address: prev.buyer_address,
+      consignee_gst: prev.buyer_gst,
+    }));
+  };
+
+  const fetchExchangeRate = useCallback(async (currencyCode) => {
+    if (currencyCode === 'INR') {
+      setExchangeRate(1);
+      setShowConversion(false);
+      return;
+    }
     try {
-      const response = await fetch("https://restcountries.com/v3.1/all");
-      if (!response.ok) throw new Error("Network response was not ok");
+      const response = await fetch(`https://api.exchangerate-api.com/v4/latest/INR`);
       const data = await response.json();
-      const countryList = data
-        .map((country) => {
-          const currencyCode = country.currencies
-            ? Object.keys(country.currencies)[0]
-            : "";
-          const currencySymbol =
-            country.currencies?.[currencyCode]?.symbol || "";
-          return {
-            name: country.name.common,
-            currency: currencySymbol,
-            currencyCode: currencyCode,
-            flag: country.flags?.svg,
-          };
-        })
-        .filter((country) => country.currencyCode);
-
-      countryList.sort((a, b) => a.name.localeCompare(b.name));
-      setCountries(countryList);
-      setFilteredCountries(countryList);
+      const rate = data.rates[currencyCode];
+      if (rate) {
+        setExchangeRate(1 / rate);
+        setShowConversion(true);
+      } else {
+        setExchangeRate(1);
+        setShowConversion(false);
+      }
     } catch (error) {
-      console.error("Error fetching countries:", error);
-      const fallbackCountries = [
-        { name: "India", currency: "₹", currencyCode: "INR" },
-        { name: "United States", currency: "$", currencyCode: "USD" },
-        { name: "United Kingdom", currency: "£", currencyCode: "GBP" },
-        { name: "European Union", currency: "€", currencyCode: "EUR" },
-        { name: "Japan", currency: "¥", currencyCode: "JPY" },
-      ];
-      setCountries(fallbackCountries);
-      setFilteredCountries(fallbackCountries);
+      setExchangeRate(1);
+      setShowConversion(false);
     }
   }, []);
 
-  const fetchInvoice = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError("");
-      const token = localStorage.getItem("access_token");
-      if (!token) {
-        navigate("/login");
-        return;
-      }
+  const calculateInrEquivalent = (amount) => {
+    const adjustment = 1;
+    if (!amount || isNaN(amount)) return 0;
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount)) return 0;
+    const converted = numAmount * exchangeRate;
+    const adjusted = converted - adjustment;
+    return adjusted;
+  };
 
-      const response = await fetch(
-        `http://localhost:8000/api/invoices/${invoiceId}/`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch invoice");
-      }
-
-      const data = await response.json();
-      setFormData((prev) => ({
+  useEffect(() => {
+    if (settingsData?.HSN_codes?.length > 0 && (!formData.hsn_code || formData.hsn_code === "998314")) {
+      setFormData(prev => ({
         ...prev,
-        buyer_name: data.buyer_name || "",
-        buyer_address: data.buyer_address || "",
-        buyer_gst: data.buyer_gst || "",
-        total_with_gst: data.total_with_gst || "",
-        currency: data.currency || "INR",
-        consignee_name: data.consignee_name || "",
-        consignee_address: data.consignee_address || "",
-        consignee_gst: data.consignee_gst || "",
-        invoice_number: data.invoice_number || "",
-        invoice_date: data.invoice_date || "",
-        delivery_note: data.delivery_note || "",
-        payment_mode: data.payment_mode || "",
-        delivery_note_date: data.delivery_note_date || "",
-        destination: data.destination || "",
-        Terms_to_delivery: data.Terms_to_delivery || "",
-        Particulars: data.Particulars || "",
-        hsn_code: data.hsn_code || "9983",
-        total_hours: data.total_hours || 0,
-        rate: data.rate || 0,
-        base_amount: data.base_amount || 0,
-        cgst: data.cgst || 0,
-        sgst: data.sgst || 0,
-        taxtotal: data.taxtotal || 0,
-        remark: data.remark || "",
+        hsn_code: settingsData.HSN_codes[0],
       }));
-
-      const foundCountry = countries.find(
-        (c) => c.currencyCode === data.currency
-      ) || { name: "India", currency: "₹", currencyCode: "INR" };
-      setSelectedCountry(foundCountry);
-
-      if (data.state) {
-        setSelectedState(data.state);
-      } else {
-        setSelectedState('Gujarat');
-      }
-    } catch (err) {
-      console.error("Failed to fetch invoice:", err);
-      setError(err.message || "Failed to load invoice data");
-    } finally {
-      setLoading(false);
     }
-  }, [invoiceId, countries, navigate]);
+  }, [settingsData, formData.hsn_code]);
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -172,121 +180,376 @@ const EditInvoice = () => {
         navigate("/login");
         return;
       }
-
-      const response = await fetch("http://localhost:8000/api/settings/", {
+      const response = await fetch("http://127.0.0.1:8000/api/settings/", {
         headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
-
       if (!response.ok) {
-        throw new Error("Failed to fetch settings");
+        throw new Error('Failed to fetch settings');
       }
-
       const data = await response.json();
-      const setting = Array.isArray(data) ? (data.length > 0 ? data[0] : {}) : data;
-
-      if (setting?.logo) {
-        const base64Logo = await toBase64(
-          `http://localhost:8000${setting.logo}`
-        );
-        setSettingsData({ ...setting, logoBase64: base64Logo });
-      } else {
-        setSettingsData(setting);
+      if (data) {
+        setSettingsData(data);
       }
     } catch (err) {
-      console.error("Error fetching settings:", err);
       setError(err.message || "Failed to load company settings");
     } finally {
       setLoading(false);
     }
   }, [navigate]);
 
+  const fetchCountries = useCallback(async () => {
+    try {
+      const response = await fetch("https://restcountries.com/v3.1/all");
+      if (!response.ok) throw new Error("Network response was not ok");
+      const data = await response.json();
+      const countryList = data
+        .filter(country => country.currencies && country.name?.common)
+        .map((country) => {
+          const currencyCode = Object.keys(country.currencies)[0];
+          const currencySymbol = country.currencies[currencyCode]?.symbol || "";
+          return {
+            name: country.name.common,
+            currency: currencySymbol,
+            currencyCode: currencyCode,
+            flag: country.flags?.svg || ""
+          };
+        })
+        .filter(country => country.currencyCode);
+      countryList.sort((a, b) => a.name.localeCompare(b.name));
+      setCountries(countryList);
+    } catch (error) {
+      setCountries([
+        { name: "India", currency: "₹", currencyCode: "INR", flag: "https://flagcdn.com/in.svg" },
+        { name: "United States", currency: "$", currencyCode: "USD", flag: "https://flagcdn.com/us.svg" },
+        { name: "United Kingdom", currency: "£", currencyCode: "GBP", flag: "https://flagcdn.com/gb.svg" },
+        { name: "European Union", currency: "€", currencyCode: "EUR", flag: "https://flagcdn.com/eu.svg" },
+        { name: "Japan", currency: "¥", currencyCode: "JPY", flag: "https://flagcdn.com/jp.svg" }
+      ]);
+    }
+  }, []);
+
+  useEffect(() => {
+    const fetchIndianStates = async () => {
+      try {
+        const response = await fetch("https://countriesnow.space/api/v0.1/countries/states", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            country: "India",
+          }),
+        });
+        const data = await response.json();
+        if (data.error) {
+          throw new Error("Failed to fetch states");
+        }
+        setStates(data.data.states);
+      } catch (error) {
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchIndianStates();
+  }, []);
+
+  useEffect(() => {
+    if (selectedCountry.name === "India" && states.length > 0) {
+      setSelectedState(formData.state || "Gujarat");
+    }
+  }, [selectedCountry, states, formData.state]);
+
+  const filteredStates = states.filter((state) =>
+    state.name.toLowerCase().includes(searchState.toLowerCase())
+  );
+
   useEffect(() => {
     fetchCountries();
-  }, [fetchCountries]);
-
-  useEffect(() => {
-    if (filteredCountries.length > 0) {
-      fetchInvoice();
-    }
-  }, [fetchInvoice, filteredCountries]);
-
-  useEffect(() => {
-    if (formData && formData.state) {
-      setSelectedState(formData.state);
-    } else {
-      setSelectedState('Gujarat');
-    }
-  }, [formData.state]);
-
-  useEffect(() => {
     fetchSettings();
-  }, [fetchSettings]);
-
-  useEffect(() => {
-    if (search) {
-      const filtered = countries.filter(
-        (country) =>
-          country.name.toLowerCase().includes(search.toLowerCase()) ||
-          country.currencyCode.toLowerCase().includes(search.toLowerCase())
-      );
-      setFilteredCountries(filtered);
-    } else {
-      setFilteredCountries(countries);
-    }
-  }, [search, countries]);
+  }, [fetchCountries, fetchSettings]);
 
   useEffect(() => {
     setFormData(prev => ({
       ...prev,
-      state: selectedState
+      financial_year: invoiceYear,
     }));
-  }, [selectedState]);
+  }, [invoiceYear]);
 
   useEffect(() => {
-    if (selectedCountry.name === "India") {
-      fetch("https://countriesnow.space/api/v0.1/countries/states", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ country: "India" }),
-      })
-        .then(res => res.json())
-        .then(data => setStates(data.data.states || []));
-    } else {
-      setStates([]);
+    if (selectedCountry) {
+      setFormData(prev => ({
+        ...prev,
+        country: selectedCountry.name,
+        currency: selectedCountry.currencyCode,
+      }));
+      fetchExchangeRate(selectedCountry.currencyCode);
     }
-  }, [selectedCountry]);
+  }, [selectedCountry, fetchExchangeRate]);
 
-  const handleChange = (e) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
-  };
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (countryDropdownRef.current && !countryDropdownRef.current.contains(event.target)) {
+        setIsOpenCountry(false);
+      }
+      if (stateDropdownRef.current && !stateDropdownRef.current.contains(event.target)) {
+        setIsOpenState(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const filteredCountries = countries.filter((country) =>
+    country.name.toLowerCase().includes(searchCountry.toLowerCase())
+  );
+
   const formatDisplayDate = (dateStr) => {
     if (!dateStr) return "";
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return dateStr;
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
     return `${day}-${month}-${year}`;
   };
 
-  // Add this function to your component (near the other utility functions)
-  const formatDate = (dateString) => {
-    if (!dateString) return "";
+  const handleSelectChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
 
-    try {
-      const date = new Date(dateString);
-      // Format as YYYY-MM-DD for date input
-      return date.toISOString().split("T")[0];
-    } catch (e) {
-      console.error("Error formatting date:", e);
-      return "";
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const numberToWords = (num) => {
+    const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
+    const teens = ["Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+    const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+    const thousandUnits = ["", "Thousand", "Lakh", "Crore"];
+    if (num === 0) return "Zero";
+    let words = "";
+    let unitIndex = 0;
+    let integerPart = Math.floor(num);
+    while (integerPart > 0) {
+      let chunk = integerPart % 1000;
+      if (chunk) {
+        let chunkWords = "";
+        if (chunk >= 100) {
+          chunkWords += ones[Math.floor(chunk / 100)] + " Hundred ";
+          chunk %= 100;
+        }
+        if (chunk < 10) {
+          chunkWords += ones[chunk];
+        } else if (chunk < 20) {
+          chunkWords += teens[chunk - 10];
+        } else {
+          chunkWords += tens[Math.floor(chunk / 10)] + (chunk % 10 !== 0 ? " " + ones[chunk % 10] : "");
+        }
+        words = chunkWords.trim() + " " + thousandUnits[unitIndex] + " " + words;
+      }
+      integerPart = Math.floor(integerPart / 1000);
+      unitIndex++;
     }
+    let decimalPart = Math.round((num - Math.floor(num)) * 100);
+    if (decimalPart > 0) {
+      words += " and " + numberToWords(decimalPart) + " Paisa";
+    }
+    return words.trim();
+  };
+
+  const calculateTotal = useCallback(() => {
+    const total_hours = parseFloat(formData.total_hours) || 0;
+    const rate = parseFloat(formData.rate) || 0;
+    const base_amount = parseFloat(formData.base_amount) || 0;
+    let calculatedBaseAmount;
+    if (total_hours > 0 && rate > 0) {
+      calculatedBaseAmount = total_hours * rate;
+    } else if (base_amount > 0) {
+      calculatedBaseAmount = base_amount;
+    } else {
+      calculatedBaseAmount = 0;
+    }
+    if (selectedCountry.name === "India") {
+      if (selectedState === "Gujarat") {
+        const tax = (calculatedBaseAmount * 9) / 100;
+        const total_with_gst = Math.round(calculatedBaseAmount + 2 * tax);
+        const total_tax = tax * 2;
+        setFormData(prev => ({
+          ...prev,
+          base_amount: calculatedBaseAmount || "",
+          cgst: tax || "",
+          sgst: tax || "",
+          igst: "",
+          taxtotal: total_tax || "",
+          total_with_gst: total_with_gst || "",
+        }));
+      } else {
+        const igst = (calculatedBaseAmount * 18) / 100;
+        const total_with_gst = Math.round(calculatedBaseAmount + igst);
+        setFormData(prev => ({
+          ...prev,
+          base_amount: calculatedBaseAmount || "",
+          cgst: "",
+          sgst: "",
+          igst: igst || "",
+          taxtotal: igst || "",
+          total_with_gst: total_with_gst || "",
+        }));
+      }
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        base_amount: calculatedBaseAmount || "",
+        cgst: "",
+        sgst: "",
+        igst: "",
+        taxtotal: "",
+        total_with_gst: Math.round(calculatedBaseAmount) || "",
+      }));
+    }
+  }, [formData.total_hours, formData.rate, formData.base_amount, selectedCountry.name, selectedState]);
+
+  const handleBaseAmountChange = (e) => {
+    const { name, value } = e.target;
+    if (name === "base_amount" && value) {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value,
+        total_hours: "",
+        rate: ""
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+  };
+
+  useEffect(() => {
+    calculateTotal();
+  }, [calculateTotal]);
+
+  useEffect(() => {
+    const fetchInvoice = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const token = localStorage.getItem("access_token");
+        if (!token) {
+          navigate("/login");
+          return;
+        }
+        const response = await fetch(
+          `http://localhost:8000/api/invoices/${invoiceId}/`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        if (!response.ok) {
+          throw new Error("Failed to fetch invoice");
+        }
+        const data = await response.json();
+        setFormData(prev => ({
+          ...prev,
+          ...data,
+          invoice_date: data.invoice_date || "",
+          delivery_note_date: data.delivery_note_date || "",
+          hsn_code: data.hsn_code || "998314",
+          total_hours: data.total_hours || "",
+          rate: data.rate || "",
+          base_amount: data.base_amount || "",
+          cgst: data.cgst || "",
+          sgst: data.sgst || "",
+          igst: data.igst || "",
+          taxtotal: data.taxtotal || "",
+          total_with_gst: data.total_with_gst || "",
+          remark: data.remark || "",
+          financial_year: data.financial_year || getCurrentInvoiceYear(),
+        }));
+        if (data.country && data.currency) {
+          setSelectedCountry({
+            name: data.country,
+            currency: currencySymbols[data.currency] || data.currency,
+            currencyCode: data.currency,
+            flag: countries.find(c => c.currencyCode === data.currency)?.flag || ""
+          });
+        }
+        if (data.state) {
+          setSelectedState(data.state);
+        } else {
+          setSelectedState('Gujarat');
+        }
+      } catch (err) {
+        setError(err.message || "Failed to load invoice data");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchInvoice();
+  }, [invoiceId, countries, navigate]);
+
+  const validateForm = () => {
+    const requiredFields = [
+      'buyer_name', 'buyer_address', 'invoice_date',
+    ];
+    const missingFields = requiredFields.filter(field => !formData[field] || formData[field].trim() === "");
+    if (missingFields.length > 0) {
+      missingFields.forEach(field => {
+        const fieldName = field.replace(/_/g, ' ');
+        toast.error(`Please fill in the ${fieldName} field`, {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+      });
+      return false;
+    }
+    if (selectedCountry.name === "India") {
+      const hasBuyerGst = formData.buyer_gst && formData.buyer_gst.trim() !== "";
+      const hasConsigneeGst = formData.consignee_gst && formData.consignee_gst.trim() !== "";
+      const hasHoursRate = formData.total_hours && formData.rate;
+      const hasBaseAmount = formData.base_amount;
+      if (!hasHoursRate && !hasBaseAmount) {
+        toast.error('Please provide either Hours and Rate or Base Amount', {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+        return false;
+      }
+      if (!hasBaseAmount && (!formData.total_hours || !formData.rate)) {
+        toast.error('Both Hours and Rate must be entered', {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+        return false;
+      }
+    }
+    return true;
   };
 
   const handleSubmit = async (e) => {
@@ -295,347 +558,208 @@ const EditInvoice = () => {
       setLoading(true);
       setError("");
       setSuccess(false);
-
+      if (!validateForm()) {
+        setLoading(false);
+        return;
+      }
       const token = localStorage.getItem("access_token");
       if (!token) {
         navigate("/login");
         return;
       }
-
-      const updatedFormData = {
-        ...formData,
-        currency: selectedCountry.currencyCode,
-        country: selectedCountry.name,
-        state: selectedState || "Gujarat",
-        hsn_code: formData.hsn_code,
-        delivery_note_date: formData.delivery_note_date || null,
-      };
-      delete updatedFormData.hsn_code;
-
-      const response = await fetch(
-        `http://localhost:8000/api/update/${invoiceId}/`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(updatedFormData),
-        }
-      );
-
-      if (!response.ok) {
-        let errorData;
-        try {
-          errorData = await response.json();
-        } catch (jsonErr) {
-          errorData = { message: await response.text() };
-        }
-        console.error("Backend error details:", errorData);
-        throw new Error(
-          errorData.message ||
-          (typeof errorData === 'object' ? Object.values(errorData).flat().join(", ") : errorData) ||
-          "Failed to update invoice"
-        );
+      const formattedInvoiceDate = formatToISO(formData.invoice_date);
+      const formattedDeliveryDate = formData.delivery_note_date
+        ? formatToISO(formData.delivery_note_date)
+        : null;
+      if (!formattedInvoiceDate) {
+        throw new Error("Please enter a valid invoice date in DD-MM-YYYY or YYYY-MM-DD format.");
       }
-
-      setSuccess("Invoice updated successfully!");
-      generatePDF();
+      if (!formData.hsn_code || formData.hsn_code.trim() === "") {
+        throw new Error("HSN/SAC code is required. Please select a valid HSN code.");
+      }
+      const prepareNumericField = (value) => {
+        const num = parseFloat(value);
+        return isNaN(num) ? null : num;
+      };
+      let base_amount;
+      if (formData.total_hours && formData.rate) {
+        base_amount = parseFloat(formData.total_hours) * parseFloat(formData.rate);
+      } else if (formData.base_amount) {
+        base_amount = parseFloat(formData.base_amount);
+      } else {
+        throw new Error("Please provide either (total hours + rate) OR base amount");
+      }
+      const inrEquivalent = calculateInrEquivalent(formData.total_with_gst);
+      const payload = {
+        buyer_name: formData.buyer_name,
+        buyer_address: formData.buyer_address,
+        buyer_gst: formData.buyer_gst || null,
+        consignee_name: formData.consignee_name,
+        consignee_address: formData.consignee_address,
+        consignee_gst: formData.consignee_gst,
+        invoice_number: formData.invoice_number,
+        invoice_date: formattedInvoiceDate,
+        delivery_note: formData.delivery_note,
+        payment_mode: formData.payment_mode,
+        delivery_note_date: formattedDeliveryDate,
+        destination: formData.destination,
+        country: selectedCountry.name,
+        state: selectedState,
+        currency: selectedCountry.currencyCode,
+        Particulars: formData.Particulars,
+        hsn_sac_code: formData.hsn_code,
+        total_hours: prepareNumericField(formData.total_hours),
+        rate: prepareNumericField(formData.rate),
+        base_amount,
+        cgst: prepareNumericField(formData.cgst),
+        sgst: prepareNumericField(formData.sgst),
+        taxtotal: prepareNumericField(formData.taxtotal),
+        total_with_gst: prepareNumericField(formData.total_with_gst),
+        remark: formData.remark,
+        financial_year: formData.financial_year,
+        exchange_rate: exchangeRate,
+        inr_equivalent: inrEquivalent,
+      };
+      const response = await fetch(`http://localhost:8000/api/update/${invoiceId}/`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const responseData = await response.json();
+      if (!response.ok) {
+        const errorMessages = Object.values(responseData.errors || {}).flat().join(", ");
+        throw new Error(errorMessages || "Failed to update invoice");
+      }
+      setSuccess(true);
+      setFormData(prev => ({
+        ...prev,
+        invoice_number: responseData.invoice_number || prev.invoice_number
+      }));
+      await generatePDF(formData.invoice_number);
+      toast.success('Invoice updated & PDF downloaded successfully!', {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
     } catch (err) {
-      console.error("Update error:", err);
-      setError(err.message || "An error occurred while updating the invoice");
+      toast.error(err.message || "An error occurred", {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const generatePDF = () => {
-    const input = invoiceRef.current;
-    html2canvas(input, {
-      scale: 2,
-      useCORS: true,
-    }).then((canvas) => {
+  const generatePDF = async (invoiceNumber) => {
+    const input = pdfRef.current;
+    if (!input) {
+      toast.error("PDF content not found.", {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+      return;
+    }
+    try {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const canvas = await html2canvas(input, {
+        useCORS: true,
+        allowTaint: true,
+        scale: 2,
+        scrollY: -window.scrollY,
+      });
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF("p", "mm", "a4");
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const margin = 2;
-
-      const usableWidth = pdfWidth - margin * 2;
-      const usableHeight = pdfHeight - margin * 2;
-
-      const imgProps = pdf.getImageProperties(imgData);
-      let imgWidth = usableWidth;
-      let imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-
-      if (imgHeight > usableHeight) {
-        imgHeight = usableHeight;
-        imgWidth = (imgProps.width * imgHeight) / imgProps.height;
+      const margin = 10;
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const maxWidth = pageWidth - 2 * margin;
+      const maxHeight = pageHeight - 2 * margin;
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const imgAspectRatio = imgWidth / imgHeight;
+      let renderWidth = maxWidth;
+      let renderHeight = maxWidth / imgAspectRatio;
+      if (renderHeight > maxHeight) {
+        renderHeight = maxHeight;
+        renderWidth = maxHeight * imgAspectRatio;
       }
-
-      const x = margin + (usableWidth - imgWidth) / 2;
-      const y = margin + (usableHeight - imgHeight) / 2;
-
-      pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
-      pdf.save(`Invoice_${invoiceId}.pdf`);
-    });
-  };
-
-  const copyBillToShip = (e) => {
-    e.preventDefault();
-    setFormData((prev) => ({
-      ...prev,
-      consignee_name: prev.buyer_name,
-      consignee_address: prev.buyer_address,
-      consignee_gst: prev.buyer_gst,
-    }));
-  };
-
-  const handleSelectChange = (event) => {
-    const selectedValue = event.target.value;
-    setSelectedHsn(selectedValue);
-    setFormData((prev) => ({
-      ...prev,
-      hsn_code: selectedValue,
-    }));
-  };
-
-  useEffect(() => {
-    calculateTotal();
-  }, [formData.total_hours, formData.rate, formData.base_amount, formData.hsn_code, selectedCountry.name, selectedState]);
-
-  const totalTax = (cgstValue, sgstValue) => {
-    return cgstValue + sgstValue;
-  };
-
-  const calculateTotal = () => {
-    const total_hours = parseFloat(formData.total_hours) || 0;
-    const rate = parseFloat(formData.rate) || 0;
-    const base_amount = total_hours * rate;
-
-    if (selectedCountry.name === "India" && base_amount > 0) {
-      if ((selectedState || "").trim().toLowerCase() === "gujarat") {
-        // Gujarat: CGST + SGST
-        const tax = (base_amount * 9) / 100;
-        const total_with_gst = Math.round(base_amount + 2 * tax);
-        setFormData((prev) => ({
-          ...prev,
-          base_amount,
-          cgst: tax,
-          sgst: tax,
-          igst: 0,
-          taxtotal: 2 * tax,
-          total_with_gst,
-        }));
-      } else {
-        // Other states: IGST
-        const igst = (base_amount * 18) / 100;
-        const total_with_gst = Math.round(base_amount + igst);
-        setFormData((prev) => ({
-          ...prev,
-          base_amount,
-          cgst: 0,
-          sgst: 0,
-          igst,
-          taxtotal: igst,
-          total_with_gst,
-        }));
-      }
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        base_amount,
-        cgst: 0,
-        sgst: 0,
-        igst: 0,
-        taxtotal: 0,
-        total_with_gst: Math.round(base_amount),
-      }));
-    }
-  };
-
-  const numberToWords = (num) => {
-    const ones = [
-      "",
-      "One",
-      "Two",
-      "Three",
-      "Four",
-      "Five",
-      "Six",
-      "Seven",
-      "Eight",
-      "Nine",
-      "Ten",
-      "Eleven",
-      "Twelve",
-      "Thirteen",
-      "Fourteen",
-      "Fifteen",
-      "Sixteen",
-      "Seventeen",
-      "Eighteen",
-      "Nineteen",
-    ];
-    const tens = [
-      "",
-      "",
-      "Twenty",
-      "Thirty",
-      "Forty",
-      "Fifty",
-      "Sixty",
-      "Seventy",
-      "Eighty",
-      "Ninety",
-    ];
-
-    const getWords = (n) => {
-      if (n < 20) return ones[n];
-      if (n < 100)
-        return tens[Math.floor(n / 10)] + (n % 10 ? " " + ones[n % 10] : "");
-      if (n < 1000)
-        return (
-          ones[Math.floor(n / 100)] +
-          " Hundred" +
-          (n % 100 ? " " + getWords(n % 100) : "")
-        );
-      if (n < 100000)
-        return (
-          getWords(Math.floor(n / 1000)) +
-          " Thousand" +
-          (n % 1000 ? " " + getWords(n % 1000) : "")
-        );
-      if (n < 10000000)
-        return (
-          getWords(Math.floor(n / 100000)) +
-          " Lakh" +
-          (n % 100000 ? " " + getWords(n % 100000) : "")
-        );
-      return (
-        getWords(Math.floor(n / 10000000)) +
-        " Crore" +
-        (n % 10000000 ? " " + getWords(n % 10000000) : "")
-      );
-    };
-
-    if (num === 0) return "Zero Rupees Only";
-
-    const integerPart = Math.floor(num);
-    const decimalPart = Math.round((num - integerPart) * 100);
-
-    let result = getWords(integerPart);
-
-    if (decimalPart > 0) {
-      result += " and " + getWords(decimalPart) + "";
-    }
-    return result + " Only";
-  };
-
-  const toBase64 = (url) =>
-    fetch(url)
-      .then((response) => response.blob())
-      .then((blob) => {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
+      const x = (pageWidth - renderWidth) / 2;
+      const y = (pageHeight - renderHeight) / 2;
+      pdf.addImage(imgData, "PNG", x, y, renderWidth, renderHeight);
+      pdf.save(`${formData.buyer_name}-${invoiceNumber}.pdf`);
+    } catch (error) {
+      toast.error("Failed to generate PDF", {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
       });
-
-  const renderInvoiceForPDF = () => (
-    <div style={{
-      width: "250mm",
-      minHeight: "297mm",
-      background: "white",
-      boxSizing: "border-box",
-      padding: 0,
-      margin: 0,
-      fontSize: "20px",
-      lineHeight: "1.6"
-    }}>
-      <h2 className="text-center" style={{ fontWeight: "bold", margin: "20px 0 10px 0", fontSize: "2.2em" }}>TAX INVOICE</h2>
-      {/* ...rest of your invoice markup... */}
-      {/* For each <table> and <td>, add padding: 10px for better readability */}
-      {/* Example for a table cell: <td style={{ border: ..., padding: "10px" }}> ... */}
-      {/* You can also increase the font size for table headers if needed */}
-      {/* ...existing code continues... */}
-    </div>
-  );
-
-  const handleLogout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    navigate("/", { replace: true }); // Redirect to login page
+    }
   };
+
+  if (!settingsData) return <p className="text-center mt-4">Loading settings...</p>;
 
   return (
-    <div style={{paddingLeft:"80px"}}>
-      <h2 style={{ textAlign: 'center', marginBottom: '20px', fontWeight: 600 }}>TAX INVOICE</h2>
+    <div style={{ paddingLeft: "70px", fontFamily: "Arial, sans-serif" }}>
+      <ToastContainer />
       <form onSubmit={handleSubmit}>
-        {loading && <div className="text-center">Loading invoice data...</div>}
-        
-        <div
-          style={{
-            border: "2px solid",
-            backgroundColor: "white",
-            padding: "35px",
-          }}
-        >
-          
-          <div className="row date-tables" style={{ width: "100%", display: "flex" }}>
-
-            {/* Left column - Seller, Buyer, Consignee info */}
-            <div className="col-6" style={{ width: "50%", display: "flex", flexDirection: "column" }}>
-              {/* Seller info table */}
-              
-              <table className="table black-bordered" style={{ width: "100%" }}>
-                <tbody style={{ borderBottom: "2px solid" }}>
+        <div style={{ paddingRight: "10px" }} ref={pdfRef}>
+          <h2 className="text-center">TAX INVOICE</h2>
+          <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white" }} >
+            {/* ... copy the entire JSX from TaxInvoice.js, but remove all and make all fields editable ... */}
+            {/* For all input/textarea/select fields, remove and  */}
+            {/* The rest of the JSX is identical to TaxInvoice.js, except all fields are editable ... */}
+            <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white" }} >
+          <div className="row date-tables">
+            <div className="col-6">
+              {/* Seller Info */}
+              <table className="table table-bordered black-bordered">
+                <tbody>
                   <tr>
                     <td className="gray-background">
-                      <strong
-                        style={{
-                          fontSize: "15px",
-                          fontFamily: "Arial, sans-serif",
-                        }}
-                      >
-                        {settingsData?.company_name}:
+                      <strong style={{ fontSize: "15px", fontfamily: "Arial, sans-serif" }}>
+                        {settingsData.company_name}
                       </strong>
                     </td>
                   </tr>
-                  {settingsData && (
-                    <>
-                      <tr>
-                        <td
-                          style={{
-                            padding: "10px",
-                            fontFamily: "Arial, sans-serif",
-                          }}
-                        >
-                          {settingsData.seller_address}
-                          <br />
-                          Email: {settingsData.seller_email}
-                          <br />
-                          PAN: {settingsData.seller_pan}
-                          <br />
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="gray-background">
-                          <strong>GSTIN/UIN:</strong>{" "}
-                          {settingsData.seller_gstin}
-                        </td>
-                      </tr>
-                    </>
-                  )}
+                  <tr>
+                    <td style={{ padding: "10px", fontFamily: "Arial, sans-serif" }}>
+                      {settingsData.seller_address}
+                      <br />
+                      Email: {settingsData.seller_email}
+                      <br />
+                      PAN: {settingsData.seller_pan}
+                      <br />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="gray-background">
+                      <strong>GSTIN/UIN:</strong>{settingsData.seller_gstin}
+                    </td>
+                  </tr>
                 </tbody>
               </table>
 
-              {/* Buyer info table */}
-              <table className="table black-bordered" style={{ width: "100%" }}>
-                <tbody style={{ borderBottom: "2px solid" }}>
+              {/* Buyer Info */}
+              <table className="table table-bordered black-bordered">
+                <tbody>
                   <tr>
                     <td className="gray-background">
                       <strong>Buyer (Bill to):</strong>
@@ -643,45 +767,56 @@ const EditInvoice = () => {
                   </tr>
                   <tr>
                     <td>
-                      Name:
+                      Name:{" "}
                       <input
                         type="text"
                         name="buyer_name"
                         className="billToTitle"
                         value={formData.buyer_name}
                         onChange={handleChange}
+                        required
+                       
                       />
                       <br />
                       Address:
                       <textarea
+                        type="text"
                         name="buyer_address"
                         className="billToAddress"
                         style={{ width: "100%", height: "100px" }}
                         value={formData.buyer_address}
                         onChange={handleChange}
+                       
                       />
                       <br />
-                      GSTIN/UIN:
+                      GSTIN/UIN:{" "}
                       <input
                         type="text"
                         name="buyer_gst"
                         className="billToGST"
                         value={formData.buyer_gst}
                         onChange={handleChange}
+                        title="15 digit GST number required"
+                       
                       />
+                      {error && (
+                        <div className="toast-error">
+                          {error}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 </tbody>
               </table>
 
-              {/* Consignee info table */}
-              <table className="table black-bordered" style={{ width: "100%" }}>
-                <tbody style={{ borderBottom: "2px solid" }}>
+              {/* Consignee Info */}
+              <table className="table table-bordered black-bordered">
+                <tbody>
                   <tr>
                     <td className="gray-background">
                       <strong>Consignee (Ship to):</strong>
                       <button
-                        className="copybutton btn btn-sm btn-secondary"
+                        className="copybutton"
                         style={{ float: "right" }}
                         onClick={copyBillToShip}
                       >
@@ -691,13 +826,14 @@ const EditInvoice = () => {
                   </tr>
                   <tr>
                     <td>
-                      Name:
+                      Name:{" "}
                       <input
                         type="text"
                         name="consignee_name"
                         className="shipToTitle"
                         value={formData.consignee_name}
                         onChange={handleChange}
+                       
                       />
                       <br />
                       Address:
@@ -707,15 +843,18 @@ const EditInvoice = () => {
                         style={{ width: "100%", height: "100px" }}
                         value={formData.consignee_address}
                         onChange={handleChange}
+                       
                       />
                       <br />
-                      GSTIN/UIN:
+                      GSTIN/UIN:{" "}
                       <input
                         type="text"
                         name="consignee_gst"
                         className="shipToGST"
                         value={formData.consignee_gst}
                         onChange={handleChange}
+                        title="15 digit GST number required"
+                       
                       />
                     </td>
                   </tr>
@@ -723,11 +862,9 @@ const EditInvoice = () => {
               </table>
             </div>
 
-            {/* Right column - Invoice details */}
-            <div className="col-6" style={{ width: "50%", display: "flex", flexDirection: "column" }}>
-              {/* Invoice details table */}
-              <table className="table black-bordered" style={{ width: "100%" }}>
-                <tbody style={{ borderBottom: "2px solid" }}>
+            <div className="col-6">
+              <table className="table table-bordered black-bordered">
+                <tbody>
                   <tr>
                     <td style={{ width: "50%" }}>Invoice No.</td>
                     <td className="invoice-no-td">
@@ -735,8 +872,8 @@ const EditInvoice = () => {
                         type="text"
                         style={{ width: "75%", margin: "1px 5px 1px 5px" }}
                         name="invoice_number"
-                        className="invoice_number"
-                        value={formData.invoice_number}
+                        className="invoice_Number"
+                        value={formData.invoice_number || "Will be generated"}
                         readOnly
                       />
                     </td>
@@ -747,14 +884,10 @@ const EditInvoice = () => {
                       <input
                         type="date"
                         id="datePicker"
-                        value={formatDate(formData.invoice_date)}
-                        onChange={(e) => {
-                          setFormData((prev) => ({
-                            ...prev,
-                            invoice_date: e.target.value,
-                          }));
-                        }}
+                        value={formData.invoice_date}
+                        onChange={handleChange}
                         name="invoice_date"
+                       
                       />
                     </td>
                   </tr>
@@ -767,6 +900,7 @@ const EditInvoice = () => {
                         value={formData.delivery_note}
                         onChange={handleChange}
                         name="delivery_note"
+                       
                       />
                     </td>
                   </tr>
@@ -779,6 +913,7 @@ const EditInvoice = () => {
                         value={formData.payment_mode}
                         onChange={handleChange}
                         name="payment_mode"
+                       
                       />
                     </td>
                   </tr>
@@ -789,16 +924,13 @@ const EditInvoice = () => {
                         type="date"
                         name="delivery_note_date"
                         className="deliveryNote"
-                        value={formData.delivery_note_date ? formatDate(formData.delivery_note_date) : ""}
-                        onChange={(e) => {
-                          setFormData((prev) => ({
-                            ...prev,
-                            delivery_note_date: e.target.value || null,
-                          }));
-                        }}
+                        value={formData.delivery_note_date}
+                        onChange={handleChange}
+                       
                       />
                     </td>
                   </tr>
+
                   <tr>
                     <td>Destination</td>
                     <td>
@@ -808,15 +940,15 @@ const EditInvoice = () => {
                         className="deliveryNote"
                         value={formData.destination}
                         onChange={handleChange}
+                       
                       />
                     </td>
                   </tr>
                 </tbody>
               </table>
 
-              {/* Terms to Delivery section - placed after Destination, before country/currency/state selector */}
-              <table className="table black-bordered" style={{ width: "100%" }}>
-                <tbody style={{ borderBottom: "2px solid" }}>
+              <table className="table table-bordered black-bordered">
+                <tbody>
                   <tr>
                     <td className="gray-background">
                       <strong>Terms to Delivery:</strong>
@@ -830,128 +962,140 @@ const EditInvoice = () => {
                         style={{ width: "100%", height: "100px" }}
                         value={formData.Terms_to_delivery}
                         onChange={handleChange}
+                       
                       />
                     </td>
                   </tr>
                 </tbody>
               </table>
 
-              {/* Country and currency dropdown, then state selector for India */}
-              <div className="relative w-72" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div>
-                  <p>
-                    <strong>Country and currency:</strong>
-                  </p>
-                  <div
-                    className="border border-gray-300 p-2 rounded flex items-center justify-between cursor-pointer bg-white"
-                    onClick={() => setIsOpen(!isOpen)}
-                  >
-                    <div className="flex items-center">
-                      {selectedCountry.flag && (
-                        <img
-                          src={selectedCountry.flag}
-                          alt={`${selectedCountry.name} flag`}
-                          style={{ width: "20px", marginRight: "8px" }}
-                        />
-                      )}
-                      <span className="mr-2">
-                        {selectedCountry.name} - {selectedCountry.currency} (
-                        {selectedCountry.currencyCode})
-                      </span>
+              <div className="relative w-72">
+                <div className="d-flex gap-4">
+                  {/* Country Selector */}
+                  <div style={{ position: "relative", width: "300px" }} ref={countryDropdownRef}>
+                    <p><strong>Country and currency:</strong></p>
+                    <div
+                      className="border border-gray-300 p-2 rounded flex items-center justify-between cursor-pointer bg-white"
+                      onClick={() => setIsOpenCountry(!isOpenCountry)}
+                      style={{ cursor: 'pointer', height: "40px" }}
+                    >
+                      <div
+                        className="flex items-center"
+                        style={{ height: "30px" }}
+                      >
+                       
+                        <span className="mr-2">
+                          {selectedCountry.name} - {currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}
+                        </span>
+                      </div>
                     </div>
+
+                    {/* Dropdown Menu */}
+                    {isOpenCountry && (
+                      <div className="absolute bg-white border border-gray-300 w-full mt-1 rounded shadow-lg z-10">
+                        <input
+                          type="text"
+                          className="w-full p-2 border-b border-gray-200 focus:outline-none"
+                          placeholder="Search country..."
+                          value={searchCountry}
+                          onChange={(e) => setSearchCountry(e.target.value)}
+                        />
+
+                        {/* Country List */}
+                        <ul
+                          className="overflow-y-auto list-group"
+                          style={{ height: "200px" }}
+                        >
+                          {filteredCountries.map((country, index) => (
+                            <li
+                              key={index}
+                              className="p-2 flex items-center hover:bg-gray-100 cursor-pointer"
+                              onClick={() => {
+                                setSelectedCountry(country);
+                                setIsOpenCountry(false);
+                                setSearchCountry(""); // Clear search after selection
+                              }}
+                            >
+                             
+                              {country.name} - {currencySymbols[country.currencyCode] || country.currency || country.currencyCode}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
 
-                  {isOpen && (
-                    <div className="absolute bg-white border border-gray-300 w-full mt-1 rounded shadow-lg z-10">
-                      <input
-                        type="text"
-                        className="w-full p-2 border-b border-gray-200 focus:outline-none"
-                        placeholder="Search country or currency..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                      />
-
-                      <ul
-                        className="overflow-y-auto list-group"
-                        style={{ height: "200px" }}
+                  {/* Show State Selector only if selected country is India */}
+                  {selectedCountry.name === "India" && (
+                    <div style={{ position: "relative", width: "300px" }} ref={stateDropdownRef}>
+                      <p><strong>Select State:</strong></p>
+                      <div
+                        className="border border-gray-300 p-2 rounded bg-white cursor-pointer states"
+                        onClick={() => setIsOpenState(!isOpenState)}
                       >
-                        {filteredCountries.map((country, index) => (
-                          <li
-                            key={index}
-                            className="p-2 flex items-center hover:bg-gray-100 cursor-pointer"
-                            onClick={() => {
-                              setSelectedCountry(country);
-                              setIsOpen(false);
-                              setSearch("");
-                            }}
-                          >
-                            {country.flag && (
-                              <img
-                                src={country.flag}
-                                alt={`${country.name} flag`}
-                                style={{ width: "20px", marginRight: "8px" }}
-                              />
-                            )}
-                            {country.name} - {country.currency} (
-                            {country.currencyCode})
-                          </li>
-                        ))}
-                      </ul>
+                        {selectedState || "-- Select State --"}
+                      </div>
+
+                      {isOpenState && (
+                        <div className="absolute bg-white border border-gray-300 w-full mt-1 rounded shadow-lg z-10">
+                          <input
+                            type="text"
+                            className="w-full p-2 border-b border-gray-200 focus:outline-none"
+                            placeholder="Search state..."
+                            value={searchState}
+                            onChange={(e) => setSearchState(e.target.value)}
+                          />
+                          <ul className="overflow-y-auto" style={{ maxHeight: "200px" }}>
+                            {filteredStates.map((state, index) => (
+                              <li
+                                key={index}
+                                className="p-2 hover:bg-gray-100 cursor-pointer"
+                                onClick={() => {
+                                  setSelectedState(state.name);
+                                  setIsOpenState(false);
+                                  setSearchState("");
+                                }}
+                              >
+                                {state.name}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-                {/* State selector next to country selector, only for India */}
-                {selectedCountry.name === "India" && (
-                  <div>
-                    <label style={{ fontWeight: 600 }}>State:</label>
-                    <select
-                      name="state"
-                      value={selectedState}
-                      onChange={e => setSelectedState(e.target.value)}
-                      required
-                      style={{ marginLeft: 8 }}
-                    >
-                      <option value="">Select State</option>
-                      {states.map((state, idx) => (
-                        <option key={idx} value={state.name}>{state.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
               </div>
 
-              {/* LUT declaration for non-India invoices */}
               <div className="mt-4">
                 {selectedCountry.name !== "India" && (
                   <>
                     <div className="lut">
                       <p style={{ margin: "0px" }}>Declare under LUT</p>
                     </div>
-                    {settingsData && (
-                      <div className="lut mt-3">
-                        <p style={{ margin: "0px" }}>{settingsData.company_code}</p>
-                      </div>
-                    )}
+                    <div className="lut mt-3">
+                      <p style={{ margin: "0px" }}>{settingsData.company_code}</p>
+                    </div>
                   </>
                 )}
               </div>
 
-              <input
-                type="hidden"
-                id="currencyTitle"
-                value={selectedCountry.currencyCode}
-              />
-              <input
-                type="hidden"
-                id="currencySymbol"
-                value={selectedCountry.currency}
-              />
+              {showConversion && (
+                <div className="exchange-rate-note mt-2">
+                  <p>
+                    <strong>Note:</strong> Conversion rate used: 1 {selectedCountry.currencyCode} = ₹{exchangeRate.toFixed(4)}
+                  </p>
+                </div>
+              )}
+
+              <input type="hidden" id="currencyTitle" value="INR" />
+              <input type="hidden" id="currencySymbol" value="₹" />
             </div>
           </div>
 
-          <div className="row">
+          <div className="row" style={{ marginTop: "20px" }}>
             <div className="col-xs-12">
-              <table className="table black-bordered" style={{ width: "100%" }}>
+              <table className="table table-bordered black-bordered" style={{ textAlign: "center" }}>
                 <thead>
                   <tr className="trbody">
                     <th style={{ backgroundColor: "#f1f3f4" }}>SI No.</th>
@@ -962,7 +1106,7 @@ const EditInvoice = () => {
                     <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
                   </tr>
                 </thead>
-                <tbody style={{ borderBottom: "2px solid" }}>
+                <tbody>
                   <tr style={{ height: "111px" }}>
                     <td>1</td>
                     <td>
@@ -972,28 +1116,39 @@ const EditInvoice = () => {
                         value={formData.Particulars}
                         onChange={handleChange}
                         type="text"
+                       
                       />
                     </td>
-                    <td style={{ width: "130px" }}>
+                    <td style={{ width: "130px", paddingTop: "16px" }}>
                       <select
                         name="hsn_code"
                         id="hns_select"
                         onChange={handleSelectChange}
-                        value={formData.hsn_code}
+                        value={formData.hsn_code || ""}
+                        style={{ height: "46px" }}
+                       
+                        required
                       >
-                        <option value="9983">9983</option>
-                        <option value="8523">8523</option>
+                        <option value="">Select</option>
+                        {settingsData?.HSN_codes?.map((code, index) => (
+                          <option key={index} value={code}>{code}</option>
+                        ))}
                       </select>
                     </td>
+
                     <td style={{ width: "10%" }}>
                       <input
                         type="number"
                         name="total_hours"
-                        value={formData.total_hours}
+                        value={safeNumber(formData.total_hours)}
                         onChange={(e) => {
                           handleChange(e);
-                          calculateTotal();
+                          setFormData(prev => ({
+                            ...prev,
+                            base_amount: ""
+                          }));
                         }}
+                       
                       />
                     </td>
 
@@ -1001,423 +1156,112 @@ const EditInvoice = () => {
                       <input
                         type="number"
                         name="rate"
-                        value={formData.rate}
+                        value={safeNumber(formData.rate)}
                         onChange={(e) => {
                           handleChange(e);
-                          calculateTotal();
+                          setFormData(prev => ({
+                            ...prev,
+                            base_amount: ""
+                          }));
                         }}
+                       
                       />
                     </td>
-
                     <td style={{ width: "200px" }}>
-                      <span className="currency-sym">
-                        {selectedCountry.currency}
-                      </span>
-                      <input
-                        style={{ width: "90%" }}
-                        id="baseAmount"
-                        name="base_amount"
-                        type="number"
-                        value={formData.base_amount}
-                        onChange={(e) => {
-                          handleChange(e);
-                          calculateTotal();
-                        }}
-                      />
-                    </td>
-                  </tr>
-                  {selectedCountry.name === "India" && (
-                    (selectedState || "").trim().toLowerCase() === "gujarat" ? (
-                      <>
-                        <tr className="inside-india">
-                          <td></td>
-                          <td>CGST @ 9%</td>
-                          <td></td><td></td>
-                          <td>9%</td>
-                          <td>{Math.abs(formData.cgst)}</td>
-                        </tr>
-                        <tr className="inside-india">
-                          <td></td>
-                          <td>SGST @ 9%</td>
-                          <td></td><td></td>
-                          <td>9%</td>
-                          <td>{Math.abs(formData.sgst)}</td>
-                        </tr>
-                      </>
-                    ) : (
-                      <tr className="inside-india">
-                        <td></td>
-                        <td>IGST @ 18%</td>
-                        <td></td><td></td>
-                        <td>18%</td>
-                        <td>{Math.abs(formData.igst)}</td>
-                      </tr>
-                    )
-                  )}
-                  {/* Total row inside the main table, matching TaxInvoice.js */}
-                  <tr>
-                    <td colSpan="6">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        {/* Left side: INR conversion (not implemented in EditInvoice, so leave blank or add if needed) */}
-                        <div style={{ whiteSpace: 'nowrap' }}></div>
-                        {/* Right side: Total */}
-                        <div style={{ whiteSpace: 'nowrap', textAlign: 'center', width: "200px" }}>
-                          <strong>Total:</strong> &nbsp;
-                          <strong id="total-with-gst">
-                            <span className="currency-sym">{selectedCountry.currency}</span>
-                            {Math.abs(formData.total_with_gst)}
-                          </strong>
-                        </div>
+                      <div style={{ display: "flex", alignItems: "center" }}>
+                        <span className="currency-sym" style={{ marginRight: "4px", fontSize: "18px" }}>
+                          {currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}
+                        </span>
+                        <input
+                          type="number"
+                          name="base_amount"
+                          value={safeNumber(formData.base_amount)}
+                          onChange={handleBaseAmountChange}
+                         
+                          className="amount-input"
+                          placeholder="Enter amount"
+                          style={{ flex: 1 }}
+                        />
                       </div>
                     </td>
                   </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
 
-          <div className="row">
-            <div className="col-xs-12">
-              <div className="table-bordered black-bordered amount-box">
-                <div>
-                  <p>
-                    <strong>Amount Chargeable (in words):</strong>
-                  </p>
-                  <h4 className="total-in-words">
-                    <span className="currency-text"></span>{" "}
-                    {numberToWords(Math.floor(Math.abs(formData.total_with_gst)))}
-                  </h4>
-
-                  <div className="top-right-corner">
-                    <span>E. & O.E</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {selectedCountry.name === "India" && (
-            <div className="row">
-              <div className="col-xs-12 inside-india">
-                <table
-                  className="table black-bordered"
-                  style={{ width: "100%" }}
-                >
-                  <thead>
-                    <tr>
-                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">
-                        HSN/SAC
-                      </th>
-                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">
-                        Taxable Value
-                      </th>
-                      <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">
-                        Central Tax
-                      </th>
-                      <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">
-                        State Tax
-                      </th>
-                      <th
-                        style={{ backgroundColor: "#f1f3f4" }}
-                        colSpan="2"
-                        rowSpan="2"
-                      >
-                        Total Tax Amount
-                      </th>
-                    </tr>
-                    <tr>
-                      <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                      <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                      <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                      <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody style={{ borderBottom: "2px solid" }}>
-                    <tr>
+                  {selectedCountry.name === "India" && selectedState !== "Gujarat" && (
+                    <tr className="inside-india">
+                      <td></td>
                       <td>
-                        <span className="hns_select_text">{selectedHsn}</span>
+                        <span style={{ float: "right" }}>IGST @ 18%</span>
                       </td>
-                      <td className="taxable-value">{formData.base_amount}</td>
-                      <td>9%</td>
-                      <td className="tax-cgst">{Math.abs(formData.cgst)}</td>
-                      <td>9%</td>
-                      <td className="tax-sgst">{Math.abs(formData.sgst)}</td>
-                      <td className="all-tax-amount">{Math.abs(formData.taxtotal)}</td>
-                    </tr>
-                    <tr className="total-row">
-                      <td>Total</td>
-                      <td className="total-taxable">{formData.base_amount}</td>
                       <td></td>
-                      <td className="total-tax-cgst">{Math.abs(formData.cgst)}</td>
                       <td></td>
-                      <td className="total-tax-sgst">{Math.abs(formData.sgst)}</td>
-                      <td className="total-tax-amount">{Math.abs(formData.taxtotal)}</td>
+                      <td>18%</td>
+                      <td id="igst">
+                        <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
+                        {safeNumber(formData.igst)}
+                      </td>
                     </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-          <div>
-            <div className="col-xs-12 inside-india">
-              <div>
-                <strong>Tax Amount (in words):</strong>
-                <span className="total-tax-in-words">
-                  <span className="currency-text"></span>{" "}
-                  {numberToWords(Math.floor(Math.abs(formData.total_with_gst)))}
-                </span>
-              </div>
-            </div>
-            <div className="col-xs-12">
-              <div>
-                <h5>
-                  <strong>Remarks:</strong>
-                </h5>
-                <h5 className="html-remark">
-                  <input
-                    name="remark"
-                    type="text"
-                    value={formData.remark || ""}
-                    onChange={handleChange}
-                    className="remark"
-                    style={{ width: "550px" }}
-                  />
-                </h5>
-              </div>
-            </div>
-          </div>
+                  )}
 
-          <div className="row">
-            <div className="col-x-12">
-              <div className="hr">
-                {settingsData && (
-                  <div>
-                    <strong>Company's Bank Details</strong>
-                    <br />
-                    A/c Holder's Name: {settingsData.bank_account_holder}
-                    <br />
-                    Bank Name: {settingsData.bank_name}
-                    <br />
-                    A/c No.: {settingsData.account_number}
-                    <br />
-                    IFS Code: {settingsData.ifsc_code}
-                    <br />
-                    Branch: {settingsData.branch}
-                    <br />
-                    SWIFT Code: {settingsData.swift_code}
-                  </div>
-                )}
-              </div>
-
-              <div className="text-right signatory">
-                {settingsData && settingsData.logo && (
-                  <img
-                    src={`http://localhost:8000${settingsData.logo}`}
-                    alt="Company Logo"
-                    className="logo-image"
-                  />
-                )}
-
-                <p>for {settingsData?.company_name}</p>
-                <p>Authorized Signatory</p>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="d-flex justify-content-center">
-                    <button type="submit" className="btn btn-success mt-3 ">
-                        Update Invoice & Download PDF
-                    </button>
-                </div>
-      </form>
-      {/* PDF */}
-      <div
-        ref={invoiceRef}
-        style={{
-          position: "absolute",
-          top: "-9999px",
-          left: "-9999px",
-          fontFamily: "Arial, sans-serif",
-          color: "#575757",
-          width: "80%",
-          minHeight: "297mm",
-          background: "white",
-          boxSizing: "border-box",
-          padding: "0",
-          margin: "0",
-        }}
-      >
-        <h2 className="text-center" style={{ fontWeight: "bold" }}>TAX INVOICE</h2>
-        <div style={{ border: "2px solid", backgroundColor: "white", padding: "10px", width: "100%" }}>
-          <div className="row date-tables" style={{ width: "100%", display: "flex" }}>
-            <div className="col-6" style={{ width: "50%", display: "flex", flexDirection: "column" }}>
-              <table className="table black-bordered">
-                <tbody>
-                  <tr>
-                    <td className="gray-background">
-                      <strong style={{ fontSize: "15px" }}>{settingsData?.company_name}:</strong>
-                    </td>
-                  </tr>
-                  {settingsData && (
+                  {selectedCountry.name === "India" && selectedState === "Gujarat" && (
                     <>
-                      <tr>
-                        <td style={{ padding: "10px", height: "150px" }}>
-                          {settingsData.seller_address}<br />
-                          Email: {settingsData.seller_email}<br />
-                          PAN: {settingsData.seller_pan}<br />
+                      <tr className="inside-india">
+                        <td></td>
+                        <td>
+                          <span style={{ float: "right" }}>CGST @ 9%</span>
+                        </td>
+                        <td></td>
+                        <td></td>
+                        <td>9%</td>
+                        <td id="cgst">
+                          <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
+                          {safeNumber(formData.cgst)}
                         </td>
                       </tr>
-                      <tr>
-                        <td className="gray-background">
-                          <strong>GSTIN/UIN:</strong> {settingsData.seller_gstin}
+
+                      <tr className="inside-india">
+                        <td></td>
+                        <td>
+                          <span style={{ float: "right" }}>SGST @ 9%</span>
+                        </td>
+                        <td></td>
+                        <td></td>
+                        <td>9%</td>
+                        <td id="sgst">
+                          <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
+                          {safeNumber(formData.sgst)}
                         </td>
                       </tr>
                     </>
                   )}
-                </tbody>
-              </table>
 
-              <table className="table black-bordered">
-                <tbody>
-                  <tr>
-                    <td className="gray-background">
-                      <strong>Buyer (Bill to):</strong> {formData.buyer_name}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ maxWidth: "250px", overflowWrap: "break-word", height: "150px" }}>
-                      <div style={{ whiteSpace: "pre-wrap" }}>{formData.buyer_address}</div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="gray-background">
-                      <strong>GSTIN/UIN:</strong> {formData.buyer_gst}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <table className="table black-bordered">
-                <tbody>
-                  <tr>
-                    <td className="gray-background">
-                      <strong>Consignee (Ship to):</strong> {formData.consignee_name}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ maxWidth: "250px", overflowWrap: "break-word", height: "150px" }}>
-                      <div>{formData.consignee_address}</div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="gray-background">
-                      <strong>GSTIN/UIN:</strong> {formData.consignee_gst}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div className="col-6" style={{ width: "50%", display: "flex", flexDirection: "column" }}>
-              <table className="table black-bordered">
-                <tbody>
-                  <tr><td>Invoice No.</td><td>{`${String(formData.invoice_number).padStart(2, "0")}`}</td></tr>
-                  <tr><td>Date</td><td>{formatDisplayDate(formData.invoice_date)}</td></tr>
-                  <tr><td>Delivery Note</td><td>{formData.delivery_note}</td></tr>
-                  <tr><td>Mode/Terms of Payment</td><td>{formData.payment_mode}</td></tr>
-                  <tr><td>Delivery Note Date</td>
-                  <td>{formData.delivery_note_date ? formatDisplayDate(formData.delivery_note_date) : "-"}</td>
-                    </tr>
-                  <tr><td>Destination</td><td>{formData.destination}</td></tr>
-                  
-                </tbody>
-              </table>
-
-              <table className="table black-bordered">
-                <tbody>
-                  <tr><td className="gray-background"><strong>Terms to Delivery:</strong></td></tr>
-                  <tr><td style={{ maxWidth: "250px", overflowWrap: "break-word", height: "150px" }}>{formData.Terms_to_delivery}</td></tr>
-                </tbody>
-              </table>
-
-              <div className="relative w-72">
-                <p><strong>Country and currency:</strong></p>
-                <div className="flex items-center">
-                  {selectedCountry.flag && (
-                    <img src={selectedCountry.flag} alt="flag" style={{ width: "20px", marginRight: "8px" }} />
-                  )}
-                  <span>{selectedCountry.name} - {selectedCountry.currency} ({selectedCountry.currencyCode})</span>
-                </div>
-              </div>
-
-              {selectedCountry.name !== "India" && (
-                <>
-                  <div className="mt-4">
-                    <p style={{ margin: "0px" }}>Declare under LUT</p>
-                  </div>
-                  {settingsData && (
-                    <div className="lut mt-3">
-                      <p style={{ margin: "0px" }}></p>
-                      <p>{settingsData.company_code}</p>
-                    </div>
-                  )}
-                </>
-              )}
-
-              <input type="hidden" id="currencyTitle" value={selectedCountry.currencyCode} />
-              <input type="hidden" id="currencySymbol" value={selectedCountry.currency} />
-            </div>
-          </div>
-
-          <div className="row">
-            <div className="col-xs-12">
-              <table className="table black-bordered">
-                <thead>
-                  <tr className="trbody">
-                    <th style={{ backgroundColor: "#f1f3f4" }}>SI No.</th>
-                    <th style={{ backgroundColor: "#f1f3f4" }}>Particulars</th>
-                    <th style={{ backgroundColor: "#f1f3f4" }}>HSN/SAC</th>
-                    <th style={{ backgroundColor: "#f1f3f4" }}>Hours</th>
-                    <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                    <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr style={{ height: "130px" }}>
-                    <td>1</td>
-                    <td>{formData.Particulars}</td>
-                    <td>{formData.hsn_code}</td>
-                    <td>{formData.total_hours}</td>
-                    <td>{formData.rate}</td>
-                    <td><span className="currency-sym">{selectedCountry.currency}</span>{Math.abs(formData.base_amount)}</td>
-                  </tr>
-                  {selectedCountry.name === "India" && (
-                    (selectedState || "").trim().toLowerCase() === "gujarat" ? (
-                      <>
-                        <tr><td></td><td><span style={{ float: "right" }}>CGST @ 9%</span></td><td></td><td></td><td>9%</td><td><span className="currency-sym">₹</span>{Math.abs(formData.cgst)}</td></tr>
-                        <tr><td></td><td><span style={{ float: "right" }}>SGST @ 9%</span></td><td></td><td></td><td>9%</td><td><span className="currency-sym">₹</span>{Math.abs(formData.sgst)}</td></tr>
-                      </>
-                    ) : (
-                      <tr><td></td><td><span style={{ float: "right" }}>IGST @ 18%</span></td><td></td><td></td><td>18%</td><td><span className="currency-sym">₹</span>{Math.abs(formData.igst)}</td></tr>
-                    )
-                  )}
-                  {/* Total row inside the main table, matching TaxInvoice.js */}
                   <tr>
                     <td colSpan="6">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        {/* Left side: INR conversion (not implemented in EditInvoice, so leave blank or add if needed) */}
-                        <div style={{ whiteSpace: 'nowrap' }}></div>
+
+                        {/* Left side: INR conversion (words + number) */}
+                        <div style={{ whiteSpace: 'nowrap' }}>
+                          {showConversion && (
+                            <>
+                              <span className="currency-text">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.total_with_gst))))} Only —
+                              <span className="currency-text">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}</span> {calculateInrEquivalent(safeNumber(formData.total_with_gst))}
+                            </>
+                          )}
+                        </div>
+
                         {/* Right side: Total */}
                         <div style={{ whiteSpace: 'nowrap', textAlign: 'center', width: "200px" }}>
                           <strong>Total:</strong> &nbsp;
                           <strong id="total-with-gst">
-                            <span className="currency-sym">{selectedCountry.currency}</span>
-                            {Math.abs(formData.total_with_gst)}
+                            <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
+                            {safeNumber(formData.total_with_gst)}
                           </strong>
                         </div>
+
                       </div>
                     </td>
                   </tr>
+
+
                 </tbody>
               </table>
             </div>
@@ -1431,9 +1275,9 @@ const EditInvoice = () => {
                     <strong>Amount Chargeable (in words):</strong>
                   </p>
                   <h4 className="total-in-words">
-                    <span className="currency-text">INR</span>{" "}
-                    {numberToWords(Math.floor(Math.abs(formData.total_with_gst)))}
+                    {currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} {numberToWords(Math.floor(safeNumber(formData.total_with_gst)))} Only
                   </h4>
+
                   <div className="top-right-corner">
                     <span>E. & O.E</span>
                   </div>
@@ -1442,91 +1286,226 @@ const EditInvoice = () => {
             </div>
           </div>
 
-          {selectedCountry.name === "India" && (
-            <div className="row" style={{ padding: "10px" }}>
-              <div className="col-12">
-                <table className="table black-bordered">
+          {selectedCountry.name === "India" && selectedState === "Gujarat" && (
+            <div className="row">
+              <div className="col-xs-12 inside-india">
+                <table className="table table-bordered invoice-table">
                   <thead>
                     <tr>
                       <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
                       <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
                       <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Central Tax</th>
                       <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">State Tax</th>
-                      <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2" rowSpan="2">Total Tax Amount</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
                     </tr>
                     <tr>
-                      <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th><th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                      <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th><th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td>{selectedHsn}</td>
-                      <td>{Math.abs(formData.base_amount)}</td>
-                      <td>9%</td>
-                      <td>{Math.abs(formData.cgst)}</td>
-                      <td>9%</td>
-                      <td>{Math.abs(formData.sgst)}</td>
-                      <td>{Math.abs(formData.taxtotal)}</td>
-                    </tr>
-                    {/* Total row inside the main table, matching TaxInvoice.js */}
-                    <tr>
-                      <td colSpan="6">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          {/* Left side: INR conversion (not implemented in EditInvoice, so leave blank or add if needed) */}
-                          <div style={{ whiteSpace: 'nowrap' }}></div>
-                          {/* Right side: Total */}
-                          <div style={{ whiteSpace: 'nowrap', textAlign: 'center', width: "200px" }}>
-                            <strong>Total:</strong> &nbsp;
-                            <strong id="total-with-gst">
-                              <span className="currency-sym">{selectedCountry.currency}</span>
-                              {Math.abs(formData.total_with_gst)}
-                            </strong>
+                      <td>{formData.hsn_code}</td>
+                      <td>
+                        {safeNumber(formData.base_amount)}
+                        {showConversion && (
+                          <div className="inr-conversion">
+                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
                           </div>
-                        </div>
+                        )}
+                      </td>
+                      <td>9%</td>
+                      <td>
+                        <span className="currency-sym">{selectedCountry.currency} </span>
+                        {safeNumber(formData.cgst)}
+                      </td>
+                      <td>9%</td>
+                      <td>
+                        <span className="currency-sym">{selectedCountry.currency} </span>
+                        {safeNumber(formData.sgst)}
+                      </td>
+                      <td>
+                        <span className="currency-sym">{selectedCountry.currency} </span>
+                        {safeNumber(formData.taxtotal)}
+                      </td>
+                    </tr>
+                    <tr className="total-row">
+                      <td>Total</td>
+                      <td>
+                        {safeNumber(formData.base_amount)}
+                        {showConversion && (
+                          <div className="inr-conversion">
+                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
+                          </div>
+                        )}
+                      </td>
+                      <td></td>
+                      <td>
+                        <span className="currency-sym">{selectedCountry.currency} </span>
+                        {safeNumber(formData.cgst)}
+                      </td>
+                      <td></td>
+                      <td>
+                        <span className="currency-sym">{selectedCountry.currency} </span>
+                        {safeNumber(formData.sgst)}
+                      </td>
+                      <td>
+                        <span className="currency-sym">{selectedCountry.currency} </span>
+                        {safeNumber(formData.taxtotal)}
                       </td>
                     </tr>
                   </tbody>
                 </table>
-                <strong>Tax Amount (in words):</strong>
-                <span className="total-tax-in-words">INR {numberToWords(Math.floor(Math.abs(formData.total_with_gst)))}</span>
-              </div>
-
-              <div className="col-12">
-                <h4><strong>Remarks:</strong></h4>
-                <h5>{formData.remark}</h5>
               </div>
             </div>
           )}
 
-          <div className="row">
-            <div className="col-x-12">
+          {selectedCountry.name === "India" && selectedState !== "Gujarat" && (
+            <div className="row">
+              <div className="col-xs-12 outside-gujarat">
+                <table className="table table-bordered invoice-table">
+                  <thead>
+                    <tr>
+                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Integrated Tax</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
+                    </tr>
+                    <tr>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>{formData.hsn_code}</td>
+                      <td>
+                        {safeNumber(formData.base_amount)}
+                        {showConversion && (
+                          <div className="inr-conversion">
+                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
+                          </div>
+                        )}
+                      </td>
+                      <td>18%</td>
+                      <td>
+                        <span className="currency-sym">{selectedCountry.currency} </span>
+                        {safeNumber(formData.igst)}
+                      </td>
+                      <td>
+                        <span className="currency-sym">{selectedCountry.currency} </span>
+                        {safeNumber(formData.taxtotal)}
+                      </td>
+                    </tr>
+                    <tr className="total-row">
+                      <td><strong>Total</strong></td>
+                      <td>
+                        <strong>{safeNumber(formData.base_amount)}</strong>
+                        {showConversion && (
+                          <div className="inr-conversion">
+                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
+                          </div>
+                        )}
+                      </td>
+                      <td></td>
+                      <td>
+                        <strong>{safeNumber(formData.igst)}</strong>
+                        {showConversion && (
+                          <div className="inr-conversion">
+                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.igst))))}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <strong>{safeNumber(formData.taxtotal)}</strong>
+                        {showConversion && (
+                          <div className="inr-conversion">
+                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.taxtotal))))}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <div style={{ padding: "0 0 0 10px" }}>
+            <div className="col-xs-12 inside-india">
+              <div>
+                <strong>Tax Amount (in words):</strong>
+                <span className="total-tax-in-words">
+                  {currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} {numberToWords(Math.floor(safeNumber(formData.total_with_gst)))} Only
+                </span>
+
+              </div>
+            </div>
+            <div className="col-xs-12">
+              <div>
+                <h4>
+                  <strong>Remarks:</strong>
+                </h4>
+                <h5 className="html-remark">
+                  <input
+                    name="remark"
+                    type="text"
+                    value={formData.remark}
+                    onChange={handleChange}
+                    className="remark"
+                    style={{ width: "550px" }}
+                   
+                  />
+                </h5>
+              </div>
+            </div>
+          </div>
+          <div className="row mb-3">
+            <div className="col-x-12 mb-3">
               <div className="hr">
-                {settingsData && (
-                  <div>
-                    <strong>Company's Bank Details</strong><br />
-                    A/c Holder's Name: {settingsData.bank_account_holder}<br />
-                    Bank Name: {settingsData.bank_name}<br />
-                    A/c No.: {settingsData.account_number}<br />
-                    IFS Code: {settingsData.ifsc_code}<br />
-                    Branch: {settingsData.branch}<br />
-                    SWIFT Code: {settingsData.swift_code}
-                  </div>
-                )}
+                <strong>Company's Bank Details</strong>
+                <br />
+                A/c Holder's Name: {settingsData.bank_account_holder}
+                <br />
+                Bank Name:{settingsData.bank_name}
+                <br />
+                A/c No.:{settingsData.account_number}
+                <br />
+                IFS Code:{settingsData.ifsc_code}
+                <br />
+                Branch: {settingsData.branch}
+                <br />
+                SWIFT Code:{settingsData.swift_code}
               </div>
               <div className="text-right signatory">
-                {settingsData && settingsData.logoBase64 && (
-                  <img src={settingsData.logoBase64} alt="Company Logo" className="logo-image" style={{ maxWidth: "200px", height: "auto" }} />
+                {settingsData.logo && (
+                  <img
+                    src={`http://127.0.0.1:8000${settingsData.logo}`}
+                    alt="Company Logo"
+                    className="logo-image"
+                  />
                 )}
-                <p>for {settingsData?.company_name}</p>
+
+                <p>for Grabsolve Infotech</p>
                 <p>Authorized Signatory</p>
               </div>
             </div>
           </div>
         </div>
-
-        <p className="text-center" style={{ marginBottom: "0px" }}>This is a Computer Generated Invoice</p>
-      </div>
+          </div>
+        </div>
+        <div className="pdfbutton">
+          <button
+            type="submit"
+            className="bg-blue-500 text-white px-4 py-2 rounded mt-4"
+            disabled={loading}
+          >
+            {loading ? 'Processing...' : 'Update & Download PDF'}
+          </button>
+        </div>
+      </form>
     </div>
   );
 };

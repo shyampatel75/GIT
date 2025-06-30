@@ -58,6 +58,13 @@ const Address = () => {
         }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
+      // For DELETE requests, the response might be empty, so we don't try to parse JSON
+      if (options.method === 'DELETE') {
+        return { success: true }; // Return a success object for DELETE requests
+      }
+      
+      // For other requests, parse JSON as usual
       return await response.json();
     } catch (error) {
       console.error('Fetch error:', error);
@@ -258,7 +265,7 @@ const Address = () => {
 
       pdf.addImage(imgData, "PNG", x, y, renderWidth, renderHeight);
 
-      const fileName = `Invoice_${selectedInvoice?.buyer_name || "Client"}_${invoiceNumber}.pdf`;
+      const fileName = `${selectedInvoice?.buyer_name || "Client"}-${selectedInvoice?.invoice_number || invoiceNumber}.pdf`;
       pdf.save(fileName);
 
       toast.success("Invoice downloaded successfully!", {
@@ -324,7 +331,8 @@ const Address = () => {
         { method: "DELETE" }
       );
 
-      if (response) {
+      // Check if response exists (not null) - this means the request was successful
+      if (response !== null) {
         toast.success("Invoice deleted successfully!", {
           position: "top-right",
           autoClose: 3000,
@@ -334,13 +342,30 @@ const Address = () => {
           draggable: true,
         });
       } else {
-        toast.error("Failed to delete invoice from server");
-        fetchInvoices(); // rollback and re-fetch if failed
+        // If response is null, it means there was an error in fetchWithAuth
+        toast.error("Failed to delete invoice", {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+        // Rollback and re-fetch if failed
+        fetchInvoices();
       }
     } catch (err) {
       console.error("Error deleting invoice:", err);
-      toast.error(err.message || "Failed to delete invoice");
-      fetchInvoices(); // rollback and re-fetch if failed
+      toast.error("Failed to delete invoice", {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+      // Rollback and re-fetch if failed
+      fetchInvoices();
     }
   };
 
@@ -534,6 +559,11 @@ const Address = () => {
                             <strong>GSTIN/UIN:</strong> {selectedInvoice.buyer_gst || (selectedInvoice.country === "India" ? "Not Provided" : "N/A")}
                           </td>
                         </tr>
+                        <tr>
+                          <td>
+                            <strong>State:</strong> {selectedInvoice.state || "N/A"}
+                          </td>
+                        </tr>
                       </tbody>
                     </table>
 
@@ -563,9 +593,41 @@ const Address = () => {
                         </tr>
                       </tbody>
                     </table>
+
+                    {/* Country and State Row (like web UI) */}
+                    
                   </div>
 
                   <div className="col-6">
+                    {/* <div style={{ display: 'flex', gap: '20px', margin: '10px 0' }}>
+                      <div>
+                        <strong>Country and currency helooo:</strong>
+                        <span style={{ marginLeft: 8, display: 'inline-flex', alignItems: 'center' }}>
+                          {(selectedInvoice.country_flag || countryFlags[selectedInvoice.country]) && (
+                            <img
+                              src={selectedInvoice.country_flag || countryFlags[selectedInvoice.country]}
+                              alt={`${selectedInvoice.country} flag`}
+                              style={{
+                                width: 24,
+                                height: 18,
+                                border: "1px solid #ccc",
+                                objectFit: "cover",
+                                marginRight: 6
+                              }}
+                            />
+                          )}
+                          {selectedInvoice.country} - {selectedInvoice.currency === "INR" && "₹"}
+                          {selectedInvoice.currency === "USD" && "$"}
+                          {selectedInvoice.currency === "AUD" && "A$"}
+                          {" "}
+                        </span>
+                      </div>
+                      <div>
+                        <strong>Select State:</strong>
+                        <span style={{ marginLeft: 8 }}>{selectedInvoice.state || "N/A"}</span>
+                      </div>
+                    </div> */}
+
                     <table className="table table-bordered black-bordered">
                       <tbody style={{ border: "2px solid" }}>
                         <tr>
@@ -596,7 +658,7 @@ const Address = () => {
                     </table>
 
                     <table className="table table-bordered black-bordered">
-                      <tbody style={{ width: "100%", border: "2px solid" }}>
+                      <tbody style={{ border: "2px solid" }}>
                         <tr>
                           <td className="gray-background">
                             <strong>Terms to Delivery:</strong>
@@ -613,52 +675,76 @@ const Address = () => {
                         </tr>
                       </tbody>
                     </table>
+                    {/* Country and State Row (like web UI, for PDF) */}
+                    <div className="relative w-full max-w-4xl mx-auto">
 
-                    <div className="relative w-72">
-                      <p style={{ display: "flex", alignItems: "center", fontWeight: 500, gap: 8, margin: 0 }}>
-                        {/* Flag first */}
-                        {(selectedInvoice.country_flag || countryFlags[selectedInvoice.country]) && (
-                          <img
-                            src={selectedInvoice.country_flag || countryFlags[selectedInvoice.country]}
-                            alt={`${selectedInvoice.country} flag`}
-                            style={{
-                              width: 32,
-                              height: 24,
-                              border: "1px solid #ccc",
-                              objectFit: "cover",
-                              marginRight: 8
-                            }}
-                          />
-                        )}
-                        {/* Country name */}
-                        <span>{selectedInvoice.country}</span>
-                        {/* Dash */}
-                        <span>-</span>
-                        {/* Currency symbol and code */}
-                        <span>
-                          {selectedInvoice.currency === "INR" && "₹"}
-                          {selectedInvoice.currency === "USD" && "$"}
-                          {selectedInvoice.currency === "AUD" && "A$"}
-                          {/* Add more currency symbols as needed */}
-                          {" (" + selectedInvoice.currency + ")"}
-                        </span>
-                      </p>
-                    </div>
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        gap: 24,
+                                        marginBottom: 8,
+                                    }}
+                                >
+                                    {/* Country Section */}
+                                    <div style={{ flex: selectedInvoice.country !== "India" ? 0.5 : 1 }}>
+                                        <p><strong>Country and currency:</strong></p>
+                                        <div
+                                            style={{
+                                                border: "1px solid #ccc",
+                                                borderRadius: 4,
+                                                padding: "4px 12px",
+                                                background: "#f9f9f9",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 8,
+                                                width: "100%",
+                                            }}
+                                        >
+                                            <span>{selectedInvoice.country || "India"}</span>
+                                            <span>-</span>
+                                            <span>
+                                                ({selectedInvoice.currency || "INR"})
+                                            </span>
+                                        </div>
+                                    </div>
 
-                    {selectedInvoice.country !== "India" && (
-                      <div className="mt-2">
+                                    {/* State Section */}
+                                    {selectedInvoice.country === "India" && selectedInvoice.state && (
+                                        <div style={{ flex: 1 }}>
+                                            <p><strong>Select State:</strong></p>
+                                            <div
+                                                style={{
+                                                    border: "1px solid #ccc",
+                                                    borderRadius: 4,
+                                                    padding: "4px 12px",
+                                                    background: "#f9f9f9",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    width: "100%",
+                                                }}
+                                            >
+                                                <span>
+                                                    {selectedInvoice.state}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="mt-4">
+                                    {selectedInvoice.country !== "India" && (
+                                        <>
+                                            <div className="lut">
+                                                <p style={{ margin: "0px" }}>Declare under LUT</p>
+                                            </div>
+                                            <div className="lut mt-3">
+                                                <p style={{ margin: "0px" }}>{selectedInvoice.company_code || ""}</p>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
 
-                        <>
-                          <div className="lut">
-                            <p style={{ margin: "0px" }}>Declare under LUT</p>
-                          </div>
-                          <div className="lut mt-3">
-                            <p style={{ margin: "0px" }}>{selectedInvoice.company_code}</p>
-                          </div>
-                        </>
-
-                      </div>
-                    )}
+                              
+                            </div>
 
                     <input type="hidden" id="currencyTitle" value={selectedInvoice.currency || "INR"} />
                     <input type="hidden" id="currencySymbol" value={selectedInvoice.currency === "USD" ? "$" : "₹"} />

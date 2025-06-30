@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import './Address.css';
-import "./Taxinvoice.css";
+// import "./Taxinvoice.css";
 
 // Force browser cache refresh - country flag and company code display improved
 const ViewsButton = () => {
@@ -170,7 +170,7 @@ const ViewsButton = () => {
                     const errText = await settingsRes.text();
                     throw new Error(`Settings fetch failed: ${errText}`);
                 }
-                
+
                 const invoiceData = await invoiceRes.json();
                 const settingsData = await settingsRes.json();
 
@@ -178,21 +178,21 @@ const ViewsButton = () => {
 
                 // Handle different possible response formats by always taking the first object if it's an array
                 const settingsObject = Array.isArray(settingsData) && settingsData.length > 0 ? settingsData[0] : settingsData;
-                
+
                 if (settingsObject && typeof settingsObject === 'object') {
                     setSettings(settingsObject);
                 } else {
                     // Initialize with empty/default settings if fetch fails or data is empty
-                    setSettings({}); 
+                    setSettings({});
                     throw new Error("Settings data format is invalid or empty");
                 }
-                
+
                 setError("");
             })
             .catch((err) => {
                 console.error("Error fetching data:", err);
                 setError(err.message || "Failed to fetch data");
-                
+
                 // Handle authentication errors
                 if (err.message.includes("401") || err.message.includes("403")) {
                     navigate("/login");
@@ -233,7 +233,7 @@ const ViewsButton = () => {
                     });
                 }
             }
-            
+
             // Update state
             if (invoice.state) {
                 setSelectedState(invoice.state);
@@ -248,7 +248,7 @@ const ViewsButton = () => {
                     flag: "https://flagcdn.com/in.svg"
                 });
             }
-            
+
             if (invoice.state) {
                 setSelectedState(invoice.state);
             }
@@ -257,13 +257,13 @@ const ViewsButton = () => {
 
     const formatDate = (dateString) => {
         if (!dateString) return '';
-        
+
         const date = new Date(dateString);
-        
+
         const day = String(date.getDate()).padStart(2, '0');
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const year = date.getFullYear();
-        
+
         return `${day}-${month}-${year}`;
     };
 
@@ -296,12 +296,12 @@ const ViewsButton = () => {
             />
             <div style={{ paddingRight: "10px" }}>
                 <h2 className="text-center">TAX INVOICE</h2>
-                <div className="table-bordered black-bordered main-box" style={{backgroundColor:"white"}}>
+                <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white" }}>
                     <div className="row date-tables">
                         <div className="col-6">
                             {/* Seller Info */}
                             <table className="table table-bordered black-bordered">
-                                <tbody style={{border: "2px solid"}}>
+                                <tbody style={{ border: "2px solid" }}>
                                     <tr>
                                         <td className="gray-background">
                                             <strong style={{ fontSize: "15px" }}>
@@ -329,7 +329,7 @@ const ViewsButton = () => {
 
                             {/* Buyer Info */}
                             <table className="table table-bordered black-bordered">
-                                <tbody style={{border: "2px solid"}}>
+                                <tbody style={{ border: "2px solid" }}>
                                     <tr>
                                         <td className="gray-background">
                                             <strong>Buyer (Bill to):</strong> {invoice.buyer_name}
@@ -356,7 +356,7 @@ const ViewsButton = () => {
 
                             {/* Consignee Info */}
                             <table className="table table-bordered black-bordered">
-                                <tbody style={{border: "2px solid"}}>
+                                <tbody style={{ border: "2px solid" }}>
                                     <tr>
                                         <td className="gray-background">
                                             <strong>Consignee (Ship to):</strong> {invoice.consignee_name}
@@ -384,7 +384,7 @@ const ViewsButton = () => {
 
                         <div className="col-6">
                             <table className="table table-bordered black-bordered">
-                                <tbody style={{border: "2px solid"}}>
+                                <tbody style={{ border: "2px solid" }}>
                                     <tr>
                                         <td style={{ width: "50%" }}>Invoice No.</td>
                                         <td>{invoice.invoice_number}</td>
@@ -413,7 +413,7 @@ const ViewsButton = () => {
                             </table>
 
                             <table className="table table-bordered black-bordered">
-                                <tbody style={{ width: "100%", border: "2px solid"}}>
+                                <tbody style={{ width: "100%", border: "2px solid" }}>
                                     <tr>
                                         <td className="gray-background">
                                             <strong>Terms to Delivery:</strong>
@@ -431,53 +431,74 @@ const ViewsButton = () => {
                                 </tbody>
                             </table>
 
-                            <div className="relative w-72">
-                                <div style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 24,
-                                    marginBottom: 8,
-                                    width: "fit-content"
-                                }}>
-                                    <div style={{
-                                        border: "1px solid #ccc",
-                                        borderRadius: 4,
-                                        padding: "4px 12px",
-                                        background: "#f9f9f9",
+                            <div className="relative w-full max-w-4xl mx-auto">
+
+                                <div
+                                    style={{
                                         display: "flex",
-                                        alignItems: "center",
-                                        gap: 8
-                                    }}>
-                                        <img
-                                            src={getCountryFlag(selectedCountry?.name) || "https://flagcdn.com/in.svg"}
-                                            alt={`${selectedCountry?.name || 'Country'} flag`}
+                                        gap: 24,
+                                        marginBottom: 8,
+                                    }}
+                                >
+                                    {/* Country Section */}
+                                    <div style={{ flex: invoice.country !== "India" ? 0.5 : 1 }}>
+                                        <p><strong>Country and currency:</strong></p>
+                                        <div
                                             style={{
-                                                width: 32,
-                                                height: 24,
                                                 border: "1px solid #ccc",
-                                                objectFit: "cover",
-                                                marginRight: 8
+                                                borderRadius: 4,
+                                                padding: "4px 12px",
+                                                background: "#f9f9f9",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 8,
+                                                width: "100%",
                                             }}
-                                        />
-                                        <span>{selectedCountry?.name || 'India'}</span>
-                                        <span>-</span>
-                                        <span>
-                                            {selectedCountry?.currency || '₹'} ({selectedCountry?.currencyCode || 'INR'})
-                                        </span>
+                                        >
+                                            <span>{selectedCountry?.name}</span>
+                                            <span>-</span>
+                                            <span>
+                                                 ({selectedCountry?.currencyCode})
+                                            </span>
+                                        </div>
                                     </div>
-                                    {selectedState && selectedState !== "Gujarat" && (
-                                        <div style={{
-                                            border: "1px solid #ccc",
-                                            borderRadius: 4,
-                                            padding: "4px 12px",
-                                            background: "#f9f9f9",
-                                            display: "flex",
-                                            alignItems: "center"
-                                        }}>
-                                            <span><strong>State:</strong> {selectedState}</span>
+
+                                    {/* State Section */}
+                                    {invoice.country === "India" && selectedState && (
+                                        <div style={{ flex: 1 }}>
+                                            <p><strong>Select State:</strong></p>
+                                            <div
+                                                style={{
+                                                    border: "1px solid #ccc",
+                                                    borderRadius: 4,
+                                                    padding: "4px 12px",
+                                                    background: "#f9f9f9",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    width: "100%",
+                                                }}
+                                            >
+                                                <span>
+                                                    <strong></strong> {selectedState}
+                                                </span>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
+                                <div className="mt-4">
+                                    {selectedCountry.name !== "India" && (
+                                        <>
+                                            <div className="lut">
+                                                <p style={{ margin: "0px" }}>Declare under LUT</p>
+                                            </div>
+                                            <div className="lut mt-3">
+                                                <p style={{ margin: "0px" }}>{settings.company_code}</p>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+
+                              
                             </div>
 
                             <input type="hidden" id="currencyTitle" value="INR" />
@@ -490,7 +511,7 @@ const ViewsButton = () => {
                         <div className="col-xs-12">
                             <table className="table table-bordered black-bordered">
                                 <thead>
-                                    <tr className="trbody" style={{border:"2px solid"}}>
+                                    <tr className="trbody" style={{ border: "2px solid" }}>
                                         <th>SI No.</th>
                                         <th>Particulars</th>
                                         <th>HSN/SAC</th>
@@ -499,7 +520,7 @@ const ViewsButton = () => {
                                         <th>Amount</th>
                                     </tr>
                                 </thead>
-                                <tbody style={{border: "2px solid"}}>
+                                <tbody style={{ border: "2px solid" }}>
                                     <tr style={{ height: "111px" }}>
                                         <td>1</td>
                                         <td>{invoice.Particulars}</td>
@@ -605,7 +626,7 @@ const ViewsButton = () => {
                         <div className="row">
                             <div className="col-xs-12 inside-india">
                                 <table className="table table-bordered invoice-table">
-                                    <thead style={{border:"2px solid"}}>
+                                    <thead style={{ border: "2px solid" }}>
                                         {invoice.state === "Gujarat" ? (
                                             <>
                                                 <tr>
@@ -638,44 +659,44 @@ const ViewsButton = () => {
                                         )}
                                     </thead>
                                     <tbody style={{ border: "2px solid" }}>
-                                      <tr>
-                                        <td>{invoice.hsn_code || invoice.hsn_sac_code}</td>
-                                        <td>{isNaN(invoice.base_amount) ? '' : invoice.base_amount}</td>
-                                        {invoice.state === "Gujarat" ? (
-                                          <>
-                                            <td>9%</td>
-                                            <td>{isNaN(invoice.cgst) ? '' : invoice.cgst}</td>
-                                            <td>9%</td>
-                                            <td>{isNaN(invoice.sgst) ? '' : invoice.sgst}</td>
-                                            <td>{isNaN(invoice.taxtotal) ? '' : invoice.taxtotal}</td>
-                                          </>
-                                        ) : (
-                                          <>
-                                            <td>18%</td>
-                                            <td>{isNaN(invoice.taxtotal) ? '' : invoice.taxtotal}</td>
-                                            <td>{isNaN(invoice.taxtotal) ? '' : invoice.taxtotal}</td>
-                                          </>
-                                        )}
-                                      </tr>
-                                      <tr className="total-row">
-                                        <td>Total</td>
-                                        <td>{isNaN(invoice.base_amount) ? '' : invoice.base_amount}</td>
-                                        {invoice.state === "Gujarat" ? (
-                                          <>
-                                            <td></td>
-                                            <td>{isNaN(invoice.cgst) ? '' : invoice.cgst}</td>
-                                            <td></td>
-                                            <td>{isNaN(invoice.sgst) ? '' : invoice.sgst}</td>
-                                            <td>{isNaN(invoice.taxtotal) ? '' : invoice.taxtotal}</td>
-                                          </>
-                                        ) : (
-                                          <>
-                                            <td></td>
-                                            <td>{isNaN(invoice.taxtotal) ? '' : invoice.taxtotal}</td>
-                                            <td>{isNaN(invoice.taxtotal) ? '' : invoice.taxtotal}</td>
-                                          </>
-                                        )}
-                                      </tr>
+                                        <tr>
+                                            <td>{invoice.hsn_code || invoice.hsn_sac_code}</td>
+                                            <td>{isNaN(invoice.base_amount) ? '' : invoice.base_amount}</td>
+                                            {invoice.state === "Gujarat" ? (
+                                                <>
+                                                    <td>9%</td>
+                                                    <td>{isNaN(invoice.cgst) ? '' : invoice.cgst}</td>
+                                                    <td>9%</td>
+                                                    <td>{isNaN(invoice.sgst) ? '' : invoice.sgst}</td>
+                                                    <td>{isNaN(invoice.taxtotal) ? '' : invoice.taxtotal}</td>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <td>18%</td>
+                                                    <td>{isNaN(invoice.taxtotal) ? '' : invoice.taxtotal}</td>
+                                                    <td>{isNaN(invoice.taxtotal) ? '' : invoice.taxtotal}</td>
+                                                </>
+                                            )}
+                                        </tr>
+                                        <tr className="total-row">
+                                            <td>Total</td>
+                                            <td>{isNaN(invoice.base_amount) ? '' : invoice.base_amount}</td>
+                                            {invoice.state === "Gujarat" ? (
+                                                <>
+                                                    <td></td>
+                                                    <td>{isNaN(invoice.cgst) ? '' : invoice.cgst}</td>
+                                                    <td></td>
+                                                    <td>{isNaN(invoice.sgst) ? '' : invoice.sgst}</td>
+                                                    <td>{isNaN(invoice.taxtotal) ? '' : invoice.taxtotal}</td>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <td></td>
+                                                    <td>{isNaN(invoice.taxtotal) ? '' : invoice.taxtotal}</td>
+                                                    <td>{isNaN(invoice.taxtotal) ? '' : invoice.taxtotal}</td>
+                                                </>
+                                            )}
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -720,11 +741,11 @@ const ViewsButton = () => {
                             </div>
                             <div className="text-right signatory">
                                 {settings.logo && (
-                                    <img 
-                                        className="logo-image" 
-                                        src={`http://localhost:8000${settings.logo}`} 
-                                        alt="Logo" 
-                                        height={100} 
+                                    <img
+                                        className="logo-image"
+                                        src={`http://localhost:8000${settings.logo}`}
+                                        alt="Logo"
+                                        height={100}
                                     />
                                 )}
                                 <p>for {settings.company_name}</p>

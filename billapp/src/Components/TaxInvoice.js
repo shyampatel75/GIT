@@ -835,7 +835,7 @@ const Taxinvoice = () => {
       const y = (pageHeight - renderHeight) / 2;
 
       pdf.addImage(imgData, "PNG", x, y, renderWidth, renderHeight);
-      pdf.save(`Invoice_${formData.buyer_name}_${invoiceNumber}.pdf`);
+      pdf.save(`${formData.buyer_name}-${invoiceNumber}.pdf`);
     } catch (error) {
       console.error("PDF generation error:", error);
       toast.error("Failed to generate PDF", {

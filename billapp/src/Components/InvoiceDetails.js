@@ -4,6 +4,7 @@ import jsPDF from "jspdf";
 import autoTable from 'jspdf-autotable';
 // import html2canvas from "html2canvas";
 import './style/invoiceDetail.css';
+import "./Taxinvoice.css";
 
 const getCurrencySymbol = (currencyCode) => {
   switch (currencyCode) {
