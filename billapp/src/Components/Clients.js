@@ -481,24 +481,6 @@ const Clients = () => {
                         </button>
                         <span className="tooltip-text">Newbill</span>
                       </div>
-
-                      <div className="tooltip-container">
-                        <button
-                          className="action-btn call"
-                          onClick={() => {
-                            const phone = group.buyer_phone || invoice.buyer_phone;
-                            if (phone) {
-                              alert(`Buyer Phone: ${phone}`);
-                            } else {
-                              alert('No phone number available');
-                            }
-                          }}
-                          disabled={loading}
-                        >
-                          <i className="fa-solid fa-phone"></i>
-                        </button>
-                        <span className="tooltip-text">Call</span>
-                      </div>
                     </td>
                   </tr>
                 ))

@@ -1228,7 +1228,7 @@ const Taxinvoice = () => {
                                 setSearchCountry(""); // Clear search after selection
                               }}
                             >
-                              {country.name} - {country.currencyCode} -{country.currency}
+                              {country.name} - {country.currencyCode} - -{country.currency}
                             </li>
                           ))}
                         </ul>
@@ -1379,7 +1379,7 @@ const Taxinvoice = () => {
                     <td style={{ width: "200px" }}>
                       <div style={{ display: "flex", alignItems: "center" }}>
                         <span className="currency-sym" style={{ marginRight: "4px", fontSize: "18px" }}>
-                          {selectedCountry.currencyCode}
+                          {currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}
                         </span>
                         <input
                           type="number"
@@ -1405,7 +1405,7 @@ const Taxinvoice = () => {
                       <td></td>
                       <td>18%</td>
                       <td id="igst">
-                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
+                        <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
                         {safeNumber(formData.igst)}
                       </td>
                     </tr>
@@ -1422,7 +1422,7 @@ const Taxinvoice = () => {
                         <td></td>
                         <td>9%</td>
                         <td id="cgst">
-                          <span className="currency-sym">{selectedCountry.currencyCode} </span>
+                          <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
                           {safeNumber(formData.cgst)}
                         </td>
                       </tr>
@@ -1436,7 +1436,7 @@ const Taxinvoice = () => {
                         <td></td>
                         <td>9%</td>
                         <td id="sgst">
-                          <span className="currency-sym">{selectedCountry.currencyCode} </span>
+                          <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
                           {safeNumber(formData.sgst)}
                         </td>
                       </tr>
@@ -1451,8 +1451,8 @@ const Taxinvoice = () => {
                         <div style={{ whiteSpace: 'nowrap' }}>
                           {showConversion && (
                             <>
-                              <span className="currency-text">{selectedCountry.currencyCode}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.total_with_gst))))} Only —
-                              <span className="currency-text">{selectedCountry.currencyCode}</span> {calculateInrEquivalent(safeNumber(formData.total_with_gst))}
+                              <span className="currency-text">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.total_with_gst))))} Only —
+                              <span className="currency-text">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}</span> {calculateInrEquivalent(safeNumber(formData.total_with_gst))}
                             </>
                           )}
                         </div>
@@ -1461,7 +1461,7 @@ const Taxinvoice = () => {
                         <div style={{ whiteSpace: 'nowrap', textAlign: 'center', width: "200px" }}>
                           <strong>Total:</strong> &nbsp;
                           <strong id="total-with-gst">
-                            <span className="currency-sym">{selectedCountry.currencyCode} </span>
+                            <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
                             {safeNumber(formData.total_with_gst)}
                           </strong>
                         </div>
@@ -1484,7 +1484,7 @@ const Taxinvoice = () => {
                     <strong>Amount Chargeable (in words):</strong>
                   </p>
                   <h4 className="total-in-words">
-                    {selectedCountry.currencyCode} {numberToWords(Math.floor(safeNumber(formData.total_with_gst)))} Only
+                  {selectedCountry.name}  { selectedCountry.currencyCode} {numberToWords(Math.floor(safeNumber(formData.total_with_gst)))} Only
                   </h4>
 
                   <div className="top-right-corner">
@@ -1521,22 +1521,22 @@ const Taxinvoice = () => {
                         {safeNumber(formData.base_amount)}
                         {showConversion && (
                           <div className="inr-conversion">
-                            <span className="currency-text">{selectedCountry.currencyCode}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
+                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
                           </div>
                         )}
                       </td>
                       <td>9%</td>
                       <td>
-                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
+                        <span className="currency-sym">{selectedCountry.currency} </span>
                         {safeNumber(formData.cgst)}
                       </td>
                       <td>9%</td>
                       <td>
-                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
+                        <span className="currency-sym">{selectedCountry.currency} </span>
                         {safeNumber(formData.sgst)}
                       </td>
                       <td>
-                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
+                        <span className="currency-sym">{selectedCountry.currency} </span>
                         {safeNumber(formData.taxtotal)}
                       </td>
                     </tr>
@@ -1546,22 +1546,22 @@ const Taxinvoice = () => {
                         {safeNumber(formData.base_amount)}
                         {showConversion && (
                           <div className="inr-conversion">
-                            <span className="currency-text">{selectedCountry.currencyCode}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
+                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
                           </div>
                         )}
                       </td>
                       <td></td>
                       <td>
-                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
+                        <span className="currency-sym">{selectedCountry.currency} </span>
                         {safeNumber(formData.cgst)}
                       </td>
                       <td></td>
                       <td>
-                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
+                        <span className="currency-sym">{selectedCountry.currency} </span>
                         {safeNumber(formData.sgst)}
                       </td>
                       <td>
-                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
+                        <span className="currency-sym">{selectedCountry.currency} </span>
                         {safeNumber(formData.taxtotal)}
                       </td>
                     </tr>
@@ -1594,17 +1594,17 @@ const Taxinvoice = () => {
                         {safeNumber(formData.base_amount)}
                         {showConversion && (
                           <div className="inr-conversion">
-                            <span className="currency-text">{selectedCountry.currencyCode}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
+                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
                           </div>
                         )}
                       </td>
                       <td>18%</td>
                       <td>
-                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
+                        <span className="currency-sym">{selectedCountry.currency} </span>
                         {safeNumber(formData.igst)}
                       </td>
                       <td>
-                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
+                        <span className="currency-sym">{selectedCountry.currency} </span>
                         {safeNumber(formData.taxtotal)}
                       </td>
                     </tr>
@@ -1614,7 +1614,7 @@ const Taxinvoice = () => {
                         <strong>{safeNumber(formData.base_amount)}</strong>
                         {showConversion && (
                           <div className="inr-conversion">
-                            <span className="currency-text">{selectedCountry.currencyCode}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
+                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
                           </div>
                         )}
                       </td>
@@ -1623,7 +1623,7 @@ const Taxinvoice = () => {
                         <strong>{safeNumber(formData.igst)}</strong>
                         {showConversion && (
                           <div className="inr-conversion">
-                            <span className="currency-text">{selectedCountry.currencyCode}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.igst))))}
+                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.igst))))}
                           </div>
                         )}
                       </td>
@@ -1647,7 +1647,7 @@ const Taxinvoice = () => {
               <div>
                 <strong>Tax Amount (in words):</strong>
                 <span className="total-tax-in-words">
-                  {selectedCountry.currencyCode} {numberToWords(Math.floor(safeNumber(formData.total_with_gst)))} Only
+                {selectedCountry.name} {selectedCountry.currencyCode} {numberToWords(Math.floor(safeNumber(formData.total_with_gst)))} Only
                 </span>
 
               </div>

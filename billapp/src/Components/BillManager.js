@@ -200,10 +200,10 @@ const BillManager = () => {
                   <tbody>
                     {allCombined
                       .filter((txn) =>
-                        txn.source.toLowerCase().includes(filterText.toLowerCase()) ||
-                        txn.name.toLowerCase().includes(filterText.toLowerCase()) ||
-                        txn.note.toLowerCase().includes(filterText.toLowerCase()) ||
-                        txn.amount.toString().includes(filterText)
+                        String(txn.source || "").toLowerCase().includes(filterText.toLowerCase()) ||
+                        String(txn.name || "").toLowerCase().includes(filterText.toLowerCase()) ||
+                        String(txn.note || "").toLowerCase().includes(filterText.toLowerCase()) ||
+                        String(txn.amount || "").toString().includes(filterText)
                       )
                       .sort((a, b) => new Date(a.date) - new Date(b.date))
                       .map((txn, index) => (
