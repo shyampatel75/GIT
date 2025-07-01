@@ -72,4 +72,6 @@ urlpatterns = [
     # Partner paths
     path('partners/', views.partner_list_create, name='partner-list-create'),
     path('partners/<int:pk>/', views.partner_detail, name='partner-detail'),
+
+    path('get_next_invoice_number_by_year/', views.get_next_invoice_number_by_year, name='get_next_invoice_number_by_year'),
 ]

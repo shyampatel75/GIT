@@ -402,11 +402,11 @@ def get_invoices(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_next_invoice_number(request):
-    # Financial year logic: March 1st to February end
+    # Financial year logic: April 1st to March 31st
     current_date = datetime.now().date()
-    if current_date.month >= 3:  # March or later
+    if current_date.month >= 4:  # April or later
         financial_year_start = current_date.year
-    else:  # January or February
+    else:  # January, February, or March
         financial_year_start = current_date.year - 1
     
     financial_year_end = financial_year_start + 1
@@ -440,7 +440,7 @@ def get_next_invoice_number_by_year(request):
     """
     Generate next invoice number for a specific year
     Query parameter: year (e.g., 2024, 2025)
-    Financial year logic: March 1st to February end
+    Financial year logic: April 1st to March 31st
     """
     year = request.GET.get('year')
     
@@ -451,7 +451,7 @@ def get_next_invoice_number_by_year(request):
     
     try:
         year = int(year)
-        # Financial year logic: March 1st to February end
+        # Financial year logic: April 1st to March 31st
         # The year parameter represents the start of the financial year
         financial_year_start = year
         financial_year_end = year + 1
@@ -482,7 +482,6 @@ def get_next_invoice_number_by_year(request):
         'invoice_number': invoice_number,
         'financial_year': financial_year
     })
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_invoice(request):

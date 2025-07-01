@@ -8,7 +8,7 @@ def create_default_settings(sender, **kwargs):
     if Setting.objects.count() == 0:
         Setting.objects.create(
             company_name="",
-            seller_address="Your Address",
+            seller_address="",
             seller_email="",
             seller_pan="",
             seller_gstin="",

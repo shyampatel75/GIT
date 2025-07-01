@@ -147,8 +147,8 @@ const addHsnCode = () => {
         const setting = Array.isArray(data) ? (data.length > 0 ? data[0] : {}) : data;
 
         setFormData({
-          company_name: setting.company_name || "Your Company",
-          seller_address: setting.seller_address || "Your Address",
+          company_name: setting.company_name || "",
+          seller_address: setting.seller_address || "",
           seller_pan: setting.seller_pan || "",
           seller_gstin: setting.seller_gstin || "",
           seller_email: setting.seller_email || "",
@@ -190,6 +190,7 @@ const addHsnCode = () => {
                 value={formData.company_name}
                 onChange={handleChange}
                 disabled={loading}
+                placeholder="Company name"
               />
             </div>
             <div className="fastinput">
@@ -200,6 +201,7 @@ const addHsnCode = () => {
                 value={formData.seller_pan}
                 onChange={handleChange}
                 disabled={loading}
+                placeholder="PAN Number"
               />
             </div>
           </div>
@@ -212,7 +214,7 @@ const addHsnCode = () => {
                 value={formData.seller_address}
                 onChange={handleChange}
                 rows={4}
-                placeholder="Enter seller address"
+                placeholder="Seller Address"
                 disabled={loading}
               />
             </div>
@@ -227,6 +229,7 @@ const addHsnCode = () => {
                 value={formData.seller_gstin}
                 onChange={handleChange}
                 disabled={loading}
+                placeholder="GST Number"
               />
             </div>
             <div className="fastinput">
@@ -237,6 +240,7 @@ const addHsnCode = () => {
                 value={formData.seller_email}
                 onChange={handleChange}
                 disabled={loading}
+                placeholder="Email"
               />
             </div>
           </div>
@@ -250,6 +254,7 @@ const addHsnCode = () => {
                 value={formData.bank_name}
                 onChange={handleChange}
                 disabled={loading}
+                placeholder="Bank Name"
               />
             </div>
             <div className="fastinput">
@@ -260,6 +265,7 @@ const addHsnCode = () => {
                 value={formData.account_number}
                 onChange={handleChange}
                 disabled={loading}
+                placeholder="Account Number"
               />
             </div>
           </div>
@@ -273,6 +279,7 @@ const addHsnCode = () => {
                 value={formData.ifsc_code}
                 onChange={handleChange}
                 disabled={loading}
+                placeholder="IFSC Code"
               />
             </div>
             <div className="fastinput">
@@ -283,6 +290,7 @@ const addHsnCode = () => {
                 value={formData.bank_account_holder}
                 onChange={handleChange}
                 disabled={loading}
+                placeholder="A/c Holder's Name"
               />
             </div>
           </div>
@@ -296,6 +304,7 @@ const addHsnCode = () => {
                 value={formData.branch}
                 onChange={handleChange}
                 disabled={loading}
+                placeholder="Branch"
               />
             </div>
             <div className="fastinput">
@@ -306,23 +315,13 @@ const addHsnCode = () => {
                 value={formData.swift_code}
                 onChange={handleChange}
                 disabled={loading}
+                placeholder="SWIFT Code"
               />
             </div>
           </div>
 
           <div className="form-row">
-            <div className="fastinput">
-              <label>Company Code</label>
-              <input
-                type="text"
-                name="company_code"
-                value={formData.company_code}
-                onChange={handleChange}
-                disabled={loading}
-              />
-            </div>
-
-            <div className="hsn-section">
+            <div className="fastinput" style={{ width: '50%' }}>
               <label>HSN Codes</label>
               <div className="hsn-input-group">
                 <input
@@ -330,27 +329,10 @@ const addHsnCode = () => {
                   value={newHsn}
                   onChange={(e) => setNewHsn(e.target.value)}
                   disabled={loading}
+                  placeholder="HSN Code"
                 />
                 <button className="hsn-add-btn" onClick={addHsnCode} disabled={loading}>Add</button>
               </div>
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="fastinput">
-              <label>Upload Logo</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                disabled={loading}
-              />
-              {formData.logoUrl && (
-                <img src={formData.logoUrl} alt="Preview" className="preview-image" />
-              )}
-            </div>
-
-            <div className="fastinput" style={{marginTop: "30px"}}>
               <div className="hsn-code-list">
                 {formData.HSN_codes.map((code, index) => (
                   <div key={index} className="hsn-code-item">
@@ -359,6 +341,21 @@ const addHsnCode = () => {
                   </div>
                 ))}
               </div>
+            </div>
+            <div className="fastinput" style={{ width: '50%' }}>
+              <label>Upload Logo</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                disabled={loading}
+                placeholder="Upload Logo"
+              />
+              {formData.logoUrl && (
+                <div className="upload-preview">
+                  <img src={formData.logoUrl} alt="Preview" className="preview-image" />
+                </div>
+              )}
             </div>
           </div>
 

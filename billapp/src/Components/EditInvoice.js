@@ -1073,9 +1073,6 @@ const EditInvoice = () => {
                     <div className="lut">
                       <p style={{ margin: "0px" }}>Declare under LUT</p>
                     </div>
-                    <div className="lut mt-3">
-                      <p style={{ margin: "0px" }}>{settingsData.company_code}</p>
-                    </div>
                   </>
                 )}
               </div>

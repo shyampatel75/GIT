@@ -20,16 +20,16 @@ const getCurrentInvoiceYear = () => {
   return `${year}/${year + 1}`;
 };
 
-// Helper function to calculate financial year based on March 1st to February end
+// Helper function to calculate financial year based on April 1st to March end
 const getFinancialYearFromDate = (date) => {
   const selectedDate = new Date(date);
   const selectedYear = selectedDate.getFullYear();
   const selectedMonth = selectedDate.getMonth() + 1; // getMonth() returns 0-11
   
-  // Financial year logic: March 1st to February end
-  // If date is March (3) or later, financial year starts that year
-  // If date is January (1) or February (2), financial year started the previous year
-  if (selectedMonth >= 3) {
+  // Financial year logic: April 1st to March end
+  // If date is April (4) or later, financial year starts that year
+  // If date is January (1), February (2), or March (3), financial year started the previous year
+  if (selectedMonth >= 4) {
     return `${selectedYear}/${selectedYear + 1}`;
   } else {
     return `${selectedYear - 1}/${selectedYear}`;
@@ -42,12 +42,24 @@ const getFinancialYearStart = (date) => {
   const selectedYear = selectedDate.getFullYear();
   const selectedMonth = selectedDate.getMonth() + 1;
   
-  if (selectedMonth >= 3) {
+  if (selectedMonth >= 4) {
     return selectedYear;
   } else {
     return selectedYear - 1;
   }
 };
+
+const allCountriesList = [
+  { name: "India", currency: "₹", currencyCode: "INR", flag: "https://flagcdn.com/in.svg" },
+  { name: "United States", currency: "$", currencyCode: "USD", flag: "https://flagcdn.com/us.svg" },
+  { name: "United Kingdom", currency: "£", currencyCode: "GBP", flag: "https://flagcdn.com/gb.svg" },
+  { name: "Australia", currency: "$", currencyCode: "AUD", flag: "https://flagcdn.com/au.svg" },
+  { name: "Canada", currency: "$", currencyCode: "CAD", flag: "https://flagcdn.com/ca.svg" },
+  { name: "Germany", currency: "€", currencyCode: "EUR", flag: "https://flagcdn.com/de.svg" },
+  { name: "France", currency: "€", currencyCode: "EUR", flag: "https://flagcdn.com/fr.svg" },
+  { name: "Japan", currency: "¥", currencyCode: "JPY", flag: "https://flagcdn.com/jp.svg" },
+  // ... और भी देश (आप चाहें तो 200+ country डाल सकते हैं)
+];
 
 const Taxinvoice = () => {
   const location = useLocation();
@@ -131,7 +143,7 @@ const Taxinvoice = () => {
 
   // Helper function to safely display numeric values
   const safeNumber = (value) => {
-    if (value === null || value === undefined || isNaN(value) || value === 0) return "";
+    if (value === null || value === undefined || isNaN(value) || value === "") return "";
     return value;
   };
 
@@ -257,14 +269,8 @@ const Taxinvoice = () => {
       setCountries(countryList);
     } catch (error) {
       console.error("Error fetching countries:", error);
-      // fallback to a few countries if API fails
-      setCountries([
-        { name: "India", currency: "₹", currencyCode: "INR", flag: "https://flagcdn.com/in.svg" },
-        { name: "United States", currency: "$", currencyCode: "USD", flag: "https://flagcdn.com/us.svg" },
-        { name: "United Kingdom", currency: "£", currencyCode: "GBP", flag: "https://flagcdn.com/gb.svg" },
-        { name: "European Union", currency: "€", currencyCode: "EUR", flag: "https://flagcdn.com/eu.svg" },
-        { name: "Japan", currency: "¥", currencyCode: "JPY", flag: "https://flagcdn.com/jp.svg" }
-      ]);
+      // fallback to a large static list if API fails
+      setCountries(allCountriesList);
     }
   }, []);
 
@@ -530,7 +536,7 @@ const Taxinvoice = () => {
     } else if (base_amount > 0) {
       calculatedBaseAmount = base_amount;
     } else {
-      calculatedBaseAmount = 0;
+      calculatedBaseAmount = "";
     }
 
     if (selectedCountry.name === "India") {
@@ -541,12 +547,12 @@ const Taxinvoice = () => {
 
         setFormData(prev => ({
           ...prev,
-          base_amount: calculatedBaseAmount || "",
-          cgst: tax || "",
-          sgst: tax || "",
-          igst: "",
-          taxtotal: total_tax || "",
-          total_with_gst: total_with_gst || "",
+          base_amount: calculatedBaseAmount,
+          cgst: tax > 0 ? tax : "",
+          sgst: tax > 0 ? tax : "",
+          igst: 0,
+          taxtotal: total_tax > 0 ? total_tax : "",
+          total_with_gst: total_with_gst > 0 ? total_with_gst : "",
         }));
       } else {
         const igst = (calculatedBaseAmount * 18) / 100;
@@ -554,23 +560,23 @@ const Taxinvoice = () => {
 
         setFormData(prev => ({
           ...prev,
-          base_amount: calculatedBaseAmount || "",
-          cgst: "",
-          sgst: "",
-          igst: igst || "",
-          taxtotal: igst || "",
-          total_with_gst: total_with_gst || "",
+          base_amount: calculatedBaseAmount,
+          cgst: 0,
+          sgst: 0,
+          igst: igst > 0 ? igst : "",
+          taxtotal: igst > 0 ? igst : "",
+          total_with_gst: total_with_gst > 0 ? total_with_gst : "",
         }));
       }
     } else {
       setFormData(prev => ({
         ...prev,
-        base_amount: calculatedBaseAmount || "",
-        cgst: "",
-        sgst: "",
-        igst: "",
-        taxtotal: "",
-        total_with_gst: Math.round(calculatedBaseAmount) || "",
+        base_amount: calculatedBaseAmount,
+        cgst: 0,
+        sgst: 0,
+        igst: 0,
+        taxtotal: 0,
+        total_with_gst: calculatedBaseAmount > 0 ? calculatedBaseAmount : "",
       }));
     }
   }, [formData.total_hours, formData.rate, formData.base_amount, selectedCountry.name, selectedState]);
@@ -835,7 +841,7 @@ const Taxinvoice = () => {
       const y = (pageHeight - renderHeight) / 2;
 
       pdf.addImage(imgData, "PNG", x, y, renderWidth, renderHeight);
-      pdf.save(`${formData.buyer_name}-${invoiceNumber}.pdf`);
+      pdf.save(`Invoice_${formData.buyer_name}_${invoiceNumber}.pdf`);
     } catch (error) {
       console.error("PDF generation error:", error);
       toast.error("Failed to generate PDF", {
@@ -898,7 +904,7 @@ const Taxinvoice = () => {
                     </td>
                   </tr>
                   <tr>
-                    <td style={{ padding: "10px", fontFamily: "Arial, sans-serif" }}>
+                    <td style={{ padding: "10px", fontFamily: "Arial, sans-serif", whiteSpace: "pre-line" }}>
                       {settingsData.seller_address}
                       <br />
                       Email: {settingsData.seller_email}
@@ -937,15 +943,39 @@ const Taxinvoice = () => {
                       />
                       <br />
                       Address:
-                      <textarea
-                        type="text"
-                        name="buyer_address"
-                        className="billToAddress"
-                        style={{ width: "100%", height: "100px" }}
-                        value={formData.buyer_address}
-                        onChange={handleChange}
-                        readOnly={isSubmitted}
-                      />
+                      {!isSubmitted ? (
+                        <textarea
+                          type="text"
+                          name="buyer_address"
+                          className="billToAddress"
+                          style={{
+                            width: "100%",
+                            minHeight: "100px",
+                            resize: "vertical"
+                          }}
+                          value={formData.buyer_address}
+                          onChange={handleChange}
+                          readOnly={isSubmitted}
+                        />
+                      ) : (
+                        <div
+                          className="billToAddress"
+                          style={{
+                            width: "100%",
+                            minHeight: "100px",
+                            height: "auto",
+                            whiteSpace: "pre-line",
+                            border: "1px solid #ccc",
+                            borderRadius: "4px",
+                            padding: "10px",
+                            wordBreak: "break-word",
+                            overflowWrap: "break-word",
+                            boxSizing: "border-box"
+                          }}
+                        >
+                          {formData.buyer_address}
+                        </div>
+                      )}
                       <br />
                       GSTIN/UIN:{" "}
                       <input
@@ -996,14 +1026,38 @@ const Taxinvoice = () => {
                       />
                       <br />
                       Address:
-                      <textarea
-                        name="consignee_address"
-                        className="shipToAddress"
-                        style={{ width: "100%", height: "100px" }}
-                        value={formData.consignee_address}
-                        onChange={handleChange}
-                        readOnly={isSubmitted}
-                      />
+                      {!isSubmitted ? (
+                        <textarea
+                          name="consignee_address"
+                          className="shipToAddress"
+                          style={{
+                            width: "100%",
+                            minHeight: "100px",
+                            resize: "vertical"
+                          }}
+                          value={formData.consignee_address}
+                          onChange={handleChange}
+                          readOnly={isSubmitted}
+                        />
+                      ) : (
+                        <div
+                          className="shipToAddress"
+                          style={{
+                            width: "100%",
+                            minHeight: "100px",
+                            height: "auto",
+                            whiteSpace: "pre-line",
+                            border: "1px solid #ccc",
+                            borderRadius: "4px",
+                            padding: "10px",
+                            wordBreak: "break-word",
+                            overflowWrap: "break-word",
+                            boxSizing: "border-box"
+                          }}
+                        >
+                          {formData.consignee_address}
+                        </div>
+                      )}
                       <br />
                       GSTIN/UIN:{" "}
                       <input
@@ -1142,15 +1196,8 @@ const Taxinvoice = () => {
                         className="flex items-center"
                         style={{ height: "30px" }}
                       >
-                        {selectedCountry.flag && (
-                          <img
-                            src={selectedCountry.flag}
-                            alt={`${selectedCountry.name} flag`}
-                            style={{ width: "20px", marginRight: "8px" }}
-                          />
-                        )}
                         <span className="mr-2">
-                          {selectedCountry.name} - {currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}
+                          {selectedCountry.name} - {selectedCountry.currencyCode} - {selectedCountry.currency}
                         </span>
                       </div>
                     </div>
@@ -1181,14 +1228,7 @@ const Taxinvoice = () => {
                                 setSearchCountry(""); // Clear search after selection
                               }}
                             >
-                              {country.flag && (
-                                <img
-                                  src={country.flag}
-                                  alt={`${country.name} flag`}
-                                  style={{ width: "20px", marginRight: "8px" }}
-                                />
-                              )}
-                              {country.name} - {currencySymbols[country.currencyCode] || country.currency || country.currencyCode}
+                              {country.name} - {country.currencyCode} -{country.currency}
                             </li>
                           ))}
                         </ul>
@@ -1244,9 +1284,6 @@ const Taxinvoice = () => {
                   <>
                     <div className="lut">
                       <p style={{ margin: "0px" }}>Declare under LUT</p>
-                    </div>
-                    <div className="lut mt-3">
-                      <p style={{ margin: "0px" }}>{settingsData.company_code}</p>
                     </div>
                   </>
                 )}
@@ -1342,7 +1379,7 @@ const Taxinvoice = () => {
                     <td style={{ width: "200px" }}>
                       <div style={{ display: "flex", alignItems: "center" }}>
                         <span className="currency-sym" style={{ marginRight: "4px", fontSize: "18px" }}>
-                          {currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}
+                          {selectedCountry.currencyCode}
                         </span>
                         <input
                           type="number"
@@ -1368,7 +1405,7 @@ const Taxinvoice = () => {
                       <td></td>
                       <td>18%</td>
                       <td id="igst">
-                        <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
+                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
                         {safeNumber(formData.igst)}
                       </td>
                     </tr>
@@ -1385,7 +1422,7 @@ const Taxinvoice = () => {
                         <td></td>
                         <td>9%</td>
                         <td id="cgst">
-                          <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
+                          <span className="currency-sym">{selectedCountry.currencyCode} </span>
                           {safeNumber(formData.cgst)}
                         </td>
                       </tr>
@@ -1399,7 +1436,7 @@ const Taxinvoice = () => {
                         <td></td>
                         <td>9%</td>
                         <td id="sgst">
-                          <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
+                          <span className="currency-sym">{selectedCountry.currencyCode} </span>
                           {safeNumber(formData.sgst)}
                         </td>
                       </tr>
@@ -1414,8 +1451,8 @@ const Taxinvoice = () => {
                         <div style={{ whiteSpace: 'nowrap' }}>
                           {showConversion && (
                             <>
-                              <span className="currency-text">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.total_with_gst))))} Only —
-                              <span className="currency-text">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}</span> {calculateInrEquivalent(safeNumber(formData.total_with_gst))}
+                              <span className="currency-text">{selectedCountry.currencyCode}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.total_with_gst))))} Only —
+                              <span className="currency-text">{selectedCountry.currencyCode}</span> {calculateInrEquivalent(safeNumber(formData.total_with_gst))}
                             </>
                           )}
                         </div>
@@ -1424,7 +1461,7 @@ const Taxinvoice = () => {
                         <div style={{ whiteSpace: 'nowrap', textAlign: 'center', width: "200px" }}>
                           <strong>Total:</strong> &nbsp;
                           <strong id="total-with-gst">
-                            <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
+                            <span className="currency-sym">{selectedCountry.currencyCode} </span>
                             {safeNumber(formData.total_with_gst)}
                           </strong>
                         </div>
@@ -1447,7 +1484,7 @@ const Taxinvoice = () => {
                     <strong>Amount Chargeable (in words):</strong>
                   </p>
                   <h4 className="total-in-words">
-                    {currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} {numberToWords(Math.floor(safeNumber(formData.total_with_gst)))} Only
+                    {selectedCountry.currencyCode} {numberToWords(Math.floor(safeNumber(formData.total_with_gst)))} Only
                   </h4>
 
                   <div className="top-right-corner">
@@ -1484,22 +1521,22 @@ const Taxinvoice = () => {
                         {safeNumber(formData.base_amount)}
                         {showConversion && (
                           <div className="inr-conversion">
-                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
+                            <span className="currency-text">{selectedCountry.currencyCode}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
                           </div>
                         )}
                       </td>
                       <td>9%</td>
                       <td>
-                        <span className="currency-sym">{selectedCountry.currency} </span>
+                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
                         {safeNumber(formData.cgst)}
                       </td>
                       <td>9%</td>
                       <td>
-                        <span className="currency-sym">{selectedCountry.currency} </span>
+                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
                         {safeNumber(formData.sgst)}
                       </td>
                       <td>
-                        <span className="currency-sym">{selectedCountry.currency} </span>
+                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
                         {safeNumber(formData.taxtotal)}
                       </td>
                     </tr>
@@ -1509,22 +1546,22 @@ const Taxinvoice = () => {
                         {safeNumber(formData.base_amount)}
                         {showConversion && (
                           <div className="inr-conversion">
-                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
+                            <span className="currency-text">{selectedCountry.currencyCode}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
                           </div>
                         )}
                       </td>
                       <td></td>
                       <td>
-                        <span className="currency-sym">{selectedCountry.currency} </span>
+                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
                         {safeNumber(formData.cgst)}
                       </td>
                       <td></td>
                       <td>
-                        <span className="currency-sym">{selectedCountry.currency} </span>
+                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
                         {safeNumber(formData.sgst)}
                       </td>
                       <td>
-                        <span className="currency-sym">{selectedCountry.currency} </span>
+                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
                         {safeNumber(formData.taxtotal)}
                       </td>
                     </tr>
@@ -1557,17 +1594,17 @@ const Taxinvoice = () => {
                         {safeNumber(formData.base_amount)}
                         {showConversion && (
                           <div className="inr-conversion">
-                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
+                            <span className="currency-text">{selectedCountry.currencyCode}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
                           </div>
                         )}
                       </td>
                       <td>18%</td>
                       <td>
-                        <span className="currency-sym">{selectedCountry.currency} </span>
+                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
                         {safeNumber(formData.igst)}
                       </td>
                       <td>
-                        <span className="currency-sym">{selectedCountry.currency} </span>
+                        <span className="currency-sym">{selectedCountry.currencyCode} </span>
                         {safeNumber(formData.taxtotal)}
                       </td>
                     </tr>
@@ -1577,7 +1614,7 @@ const Taxinvoice = () => {
                         <strong>{safeNumber(formData.base_amount)}</strong>
                         {showConversion && (
                           <div className="inr-conversion">
-                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
+                            <span className="currency-text">{selectedCountry.currencyCode}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
                           </div>
                         )}
                       </td>
@@ -1586,7 +1623,7 @@ const Taxinvoice = () => {
                         <strong>{safeNumber(formData.igst)}</strong>
                         {showConversion && (
                           <div className="inr-conversion">
-                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.igst))))}
+                            <span className="currency-text">{selectedCountry.currencyCode}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.igst))))}
                           </div>
                         )}
                       </td>
@@ -1610,7 +1647,7 @@ const Taxinvoice = () => {
               <div>
                 <strong>Tax Amount (in words):</strong>
                 <span className="total-tax-in-words">
-                  {currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} {numberToWords(Math.floor(safeNumber(formData.total_with_gst)))} Only
+                  {selectedCountry.currencyCode} {numberToWords(Math.floor(safeNumber(formData.total_with_gst)))} Only
                 </span>
 
               </div>

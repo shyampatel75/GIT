@@ -117,12 +117,12 @@ class Invoice(models.Model):
         if not self.pk:
             # Use invoice_date to determine financial year, fallback to current year
             if self.invoice_date:
-                # Financial year logic: March 1st to February end
-                # If date is March 1st or later, financial year starts that year
-                # If date is before March 1st, financial year started the previous year
-                if self.invoice_date.month >= 3:  # March or later
+                # Financial year logic: April 1st to March 31st
+                # If date is April (4) or later, financial year starts that year
+                # If date is January (1), February (2), or March (3), financial year started the previous year
+                if self.invoice_date.month >= 4:  # April or later
                     financial_year_start = self.invoice_date.year
-                else:  # January or February
+                else:  # January, February, or March
                     financial_year_start = self.invoice_date.year - 1
                 
                 financial_year_end = financial_year_start + 1
@@ -130,9 +130,9 @@ class Invoice(models.Model):
             else:
                 # Fallback to current date logic
                 current_date = datetime.now().date()
-                if current_date.month >= 3:  # March or later
+                if current_date.month >= 4:  # April or later
                     financial_year_start = current_date.year
-                else:  # January or February
+                else:  # January, February, or March
                     financial_year_start = current_date.year - 1
                 
                 financial_year_end = financial_year_start + 1
@@ -188,8 +188,8 @@ class Invoice(models.Model):
 
 class Setting(models.Model):
     # Seller Info
-    company_name = models.CharField(max_length=255, default='Your Company')
-    seller_address = models.TextField(default='Your Address')
+    company_name = models.CharField(max_length=255, blank=True, null=True)
+    seller_address = models.TextField(blank=True, null=True)
     seller_email = models.EmailField(blank=True, null=True)
     seller_pan = models.CharField(max_length=20, blank=True, null=True)
     seller_gstin = models.CharField(max_length=20, blank=True, null=True)
