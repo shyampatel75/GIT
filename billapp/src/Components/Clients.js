@@ -16,6 +16,9 @@ const Clients = () => {
   const [loading, setLoading] = useState(false);
   const printRef = useRef();
   const [countryFlags, setCountryFlags] = useState({});
+  const toastShown = useRef(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState(null);
 
   const fetchWithAuth = async (url, options = {}) => {
     const token = localStorage.getItem("access_token");
@@ -34,9 +37,13 @@ const Clients = () => {
         }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
+      if (options.method === 'DELETE') {
+        return { success: true };
+      }
       return await response.json();
     } catch (error) {
       console.error('Fetch error:', error);
+      toast.error(error.message || "Failed to fetch data");
       return null;
     }
   };
@@ -47,14 +54,13 @@ const Clients = () => {
       const data = await fetchWithAuth("http://localhost:8000/api/grouped-invoices/");
       if (data) {
         setInvoices(data);
-        // Only show toast if there are invoices
-        if (data.length > 0) {
+        if (data.length > 0 && !toastShown.current) {
           toast.success("Invoices loaded successfully");
+          toastShown.current = true;
         }
       }
     } catch (err) {
       console.error("Error fetching invoices:", err);
-      // Only show error toast if there's a real error
       if (err.message !== "Failed to fetch") {
         toast.error(err.message || "Failed to load invoices");
       }
@@ -126,7 +132,7 @@ const Clients = () => {
       // Set combined data - note: pdfMainDetails is already the object
       setSelectedInvoice({
         ...pdfBasicDetail,
-        ...pdfMainDetails // No need for [0] since it's not an array
+        ...pdfMainDetails
       });
 
       // Preload logo
@@ -136,7 +142,7 @@ const Clients = () => {
       logoImg.onload = () => setLogoLoaded(true);
       logoImg.onerror = () => {
         console.warn("Failed to load logo, using default");
-        setLogoLoaded(true); // Still proceed even if logo fails
+        setLogoLoaded(true);
       };
 
     } catch (err) {
@@ -171,7 +177,6 @@ const Clients = () => {
     }
 
     try {
-      // Give a brief delay to ensure DOM is fully rendered
       await new Promise(resolve => setTimeout(resolve, 100));
 
       const canvas = await html2canvas(input, {
@@ -189,8 +194,7 @@ const Clients = () => {
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF("p", "mm", "a4");
 
-      // Reduce margins for better space utilization
-      const margin = 5; // Reduced from 10
+      const margin = 5;
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const maxWidth = pageWidth - 2 * margin;
@@ -208,7 +212,6 @@ const Clients = () => {
         renderWidth = maxHeight * imgAspectRatio;
       }
 
-      // Center the image on the page
       const x = (pageWidth - renderWidth) / 2;
       const y = (pageHeight - renderHeight) / 2;
 
@@ -240,15 +243,12 @@ const Clients = () => {
   };
 
   const handleNewBill = (group) => {
-    // Get the most recent invoice from the group to extract country and state
-    const mostRecentInvoice = group.invoices[0]; // Assuming invoices are sorted by date desc
+    const mostRecentInvoice = group.invoices[0];
     
-    // Extract country and state information
     const country = mostRecentInvoice.country || "India";
     const state = mostRecentInvoice.state || "";
     const currency = mostRecentInvoice.currency || "INR";
     
-    // Determine currency symbol based on currency code
     const currencySymbols = {
       INR: "₹",
       USD: "$",
@@ -266,7 +266,6 @@ const Clients = () => {
           buyer_address: group.buyer_address || '',
           buyer_gst: group.buyer_gst || '',
         },
-        // Pass country and state information for pre-selection
         countryData: {
           country: country,
           state: state,
@@ -287,38 +286,55 @@ const Clients = () => {
   };
 
   const handleDelete = async (invoiceId) => {
-    if (window.confirm("Are you sure you want to delete this invoice?")) {
-      // Optimistically remove the row from UI
-      setInvoices((prev) =>
-        prev
-          .map((group) => ({
-            ...group,
-            invoices: group.invoices.filter((inv) => inv.id !== invoiceId),
-          }))
-          .filter((group) => group.invoices.length > 0)
+    setInvoices((prev) =>
+      prev
+        .map((group) => ({
+          ...group,
+          invoices: group.invoices.filter((inv) => inv.id !== invoiceId),
+        }))
+        .filter((group) => group.invoices.length > 0)
+    );
+
+    try {
+      const response = await fetchWithAuth(
+        `http://localhost:8000/api/delete/${invoiceId}/`,
+        { method: "DELETE" }
       );
 
-      try {
-        const response = await fetchWithAuth(
-          `http://localhost:8000/api/delete/${invoiceId}/`,
-          { method: "DELETE" }
-        );
-
-        if (response) {
-          toast.success("Invoice deleted successfully");
-        } else {
-          toast.error("Failed to delete invoice from server");
-          fetchInvoices(); // rollback and re-fetch if failed
-        }
-      } catch (err) {
-        console.error("Error deleting invoice:", err);
-        toast.error(err.message || "Failed to delete invoice");
-        fetchInvoices(); // rollback and re-fetch if failed
+      if (response !== null) {
+        toast.success("Invoice deleted successfully!", {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+      } else {
+        toast.error("Failed to delete invoice", {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
+        fetchInvoices();
       }
+    } catch (err) {
+      console.error("Error deleting invoice:", err);
+      toast.error("Failed to delete invoice", {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+      fetchInvoices();
     }
   };
 
-  // Check if user is authenticated on component mount
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     if (!token) {
@@ -326,7 +342,6 @@ const Clients = () => {
     }
   }, [navigate]);
 
-  // Fetch country flags on mount
   useEffect(() => {
     const fetchCountryFlags = async () => {
       try {
@@ -354,14 +369,6 @@ const Clients = () => {
         autoClose={3000}
         limit={1}
       />
-{/* 
-      {loading && (
-        <div className="text-center mt-3">
-          <div className="spinner-border" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
-        </div>
-      )} */}
 
       <div className="header-bar">
         <button
@@ -453,7 +460,10 @@ const Clients = () => {
                       <div className="tooltip-container">
                         <button
                           className="action-btn delete"
-                          onClick={() => handleDelete(invoice.id)}
+                          onClick={() => {
+                            setShowDeleteModal(true);
+                            setInvoiceToDelete(invoice.id);
+                          }}
                           disabled={loading}
                         >
                           <i className="fa-solid fa-trash"></i>
@@ -471,6 +481,24 @@ const Clients = () => {
                         </button>
                         <span className="tooltip-text">Newbill</span>
                       </div>
+
+                      <div className="tooltip-container">
+                        <button
+                          className="action-btn call"
+                          onClick={() => {
+                            const phone = group.buyer_phone || invoice.buyer_phone;
+                            if (phone) {
+                              alert(`Buyer Phone: ${phone}`);
+                            } else {
+                              alert('No phone number available');
+                            }
+                          }}
+                          disabled={loading}
+                        >
+                          <i className="fa-solid fa-phone"></i>
+                        </button>
+                        <span className="tooltip-text">Call</span>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -480,7 +508,20 @@ const Clients = () => {
         </tbody>
       </table>
 
-      {/* Hidden printable invoice for PDF */}
+      {showDeleteModal && (
+        <div className="delete-modal">
+          <div className="delete-modal-content">
+            <span className="close-button" onClick={() => setShowDeleteModal(false)}>&times;</span>
+            <p>Are you sure you want to delete this invoice?</p>
+            <button onClick={() => {
+              handleDelete(invoiceToDelete);
+              setShowDeleteModal(false);
+            }}>Yes</button>
+            <button onClick={() => setShowDeleteModal(false)}>No</button>
+          </div>
+        </div>
+      )}
+
       {selectedInvoice && (
         <div ref={pdfRef} style={{ position: "absolute", left: "-9999px" }}>
           <div style={{ paddingLeft: "5px" }}>
@@ -489,7 +530,6 @@ const Clients = () => {
               <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white", margin: "0" }}>
                 <div className="row date-tables">
                   <div className="col-6">
-                    {/* Seller Info */}
                     <table className="table table-bordered black-bordered">
                       <tbody style={{ border: "2px solid" }}>
                         <tr>
@@ -517,7 +557,6 @@ const Clients = () => {
                       </tbody>
                     </table>
 
-                    {/* Buyer Info */}
                     <table className="table table-bordered black-bordered">
                       <tbody style={{ border: "2px solid" }}>
                         <tr>
@@ -545,7 +584,6 @@ const Clients = () => {
                       </tbody>
                     </table>
 
-                    {/* Consignee Info */}
                     <table className="table table-bordered black-bordered">
                       <tbody style={{ border: "2px solid" }}>
                         <tr>
@@ -707,7 +745,6 @@ const Clients = () => {
                           </td>
                         </tr>
 
-                        {/* IGST for other states */}
                         {selectedInvoice.country === "India" && selectedInvoice.state !== "Gujarat" && (
                           <tr className="inside-india">
                             <td></td>
@@ -723,7 +760,6 @@ const Clients = () => {
                           </tr>
                         )}
 
-                        {/* CGST/SGST for Gujarat */}
                         {selectedInvoice.country === "India" && selectedInvoice.state === "Gujarat" && (
                           <>
                             <tr className="inside-india">
@@ -753,18 +789,15 @@ const Clients = () => {
                           </>
                         )}
 
-                        {/* Total row */}
                         <tr>
                           <td colSpan="6">
                             <div style={{ display: 'flex', alignItems: 'center' }}>
-                              {/* Left side: INR Equivalent (if applicable) */}
                               {selectedInvoice.country !== "India" && selectedInvoice.inr_equivalent && (
                                 <div style={{ whiteSpace: 'nowrap' }}>
                                   INR Equivalent: INR {isNaN(selectedInvoice.inr_equivalent) ? '' : selectedInvoice.inr_equivalent.toFixed(2)}
                                 </div>
                               )}
 
-                              {/* Right side: Total (always right aligned) */}
                               <div style={{ whiteSpace: 'nowrap', marginLeft: 'auto', textAlign: 'right' }}>
                                 <strong>Total:</strong> &nbsp;
                                 <strong id="total-with-gst">

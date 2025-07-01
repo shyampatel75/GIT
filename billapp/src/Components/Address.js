@@ -36,21 +36,14 @@ const Address = () => {
   // Auth fetch wrapper
   const fetchWithAuth = async (url, options = {}) => {
     const token = localStorage.getItem("access_token");
-    if (!token) {
-      navigate('/login');
-      return null;
-    }
+    const headers = {
+      ...options.headers,
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
 
     try {
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          ...options.headers,
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
+      const response = await fetch(url, { ...options, headers });
       if (!response.ok) {
         if (response.status === 401) {
           navigate('/login');
@@ -58,13 +51,10 @@ const Address = () => {
         }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
       // For DELETE requests, the response might be empty, so we don't try to parse JSON
       if (options.method === 'DELETE') {
-        return { success: true }; // Return a success object for DELETE requests
+        return { success: true };
       }
-      
-      // For other requests, parse JSON as usual
       return await response.json();
     } catch (error) {
       console.error('Fetch error:', error);
