@@ -722,7 +722,6 @@ const EditInvoice = () => {
       <form onSubmit={handleSubmit}>
         <div style={{ paddingRight: "10px" }} ref={pdfRef}>
           <h2 className="text-center">TAX INVOICE</h2>
-          <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white" }} >
             {/* ... copy the entire JSX from TaxInvoice.js, but remove all and make all fields editable ... */}
             {/* For all input/textarea/select fields, remove and  */}
             {/* The rest of the JSX is identical to TaxInvoice.js, except all fields are editable ... */}
@@ -740,7 +739,7 @@ const EditInvoice = () => {
                     </td>
                   </tr>
                   <tr>
-                    <td style={{ padding: "10px", fontFamily: "Arial, sans-serif" }}>
+                    <td style={{ padding: "10px", fontFamily: "Arial, sans-serif",whiteSpace: "pre-line", }}>
                       {settingsData.seller_address}
                       <br />
                       Email: {settingsData.seller_email}
@@ -783,7 +782,18 @@ const EditInvoice = () => {
                         type="text"
                         name="buyer_address"
                         className="billToAddress"
-                        style={{ width: "100%", height: "100px" }}
+                        style={{
+                          width: "100%",
+                          minHeight: "100px",
+                          height: "auto",
+                          whiteSpace: "pre-line",
+                          border: "1px solid #ccc",
+                          borderRadius: "4px",
+                          padding: "10px",
+                          wordBreak: "break-word",
+                          overflowWrap: "break-word",
+                          boxSizing: "border-box"
+                        }}
                         value={formData.buyer_address}
                         onChange={handleChange}
                        
@@ -840,7 +850,18 @@ const EditInvoice = () => {
                       <textarea
                         name="consignee_address"
                         className="shipToAddress"
-                        style={{ width: "100%", height: "100px" }}
+                        style={{
+                          width: "100%",
+                          minHeight: "100px",
+                          height: "auto",
+                          whiteSpace: "pre-line",
+                          border: "1px solid #ccc",
+                          borderRadius: "4px",
+                          padding: "10px",
+                          wordBreak: "break-word",
+                          overflowWrap: "break-word",
+                          boxSizing: "border-box"
+                        }}
                         value={formData.consignee_address}
                         onChange={handleChange}
                        
@@ -881,14 +902,21 @@ const EditInvoice = () => {
                   <tr>
                     <td>Date</td>
                     <td>
-                      <input
-                        type="date"
-                        id="datePicker"
-                        value={formData.invoice_date}
-                        onChange={handleChange}
-                        name="invoice_date"
-                       
-                      />
+                      {success ? (
+                        <input
+                          type="text"
+                          value={formatDisplayDate(formData.invoice_date)}
+                          readOnly
+                        />
+                      ) : (
+                        <input
+                          type="date"
+                          id="datePicker"
+                          value={formData.invoice_date}
+                          onChange={handleChange}
+                          name="invoice_date"
+                        />
+                      )}
                     </td>
                   </tr>
                   <tr>
@@ -920,14 +948,21 @@ const EditInvoice = () => {
                   <tr>
                     <td>Delivery Note Date</td>
                     <td>
-                      <input
-                        type="date"
-                        name="delivery_note_date"
-                        className="deliveryNote"
-                        value={formData.delivery_note_date}
-                        onChange={handleChange}
-                       
-                      />
+                      {success ? (
+                        <input
+                          type="text"
+                          value={formatDisplayDate(formData.delivery_note_date)}
+                          readOnly
+                        />
+                      ) : (
+                        <input
+                          type="date"
+                          name="delivery_note_date"
+                          className="deliveryNote"
+                          value={formData.delivery_note_date}
+                          onChange={handleChange}
+                        />
+                      )}
                     </td>
                   </tr>
 
@@ -1490,10 +1525,7 @@ const EditInvoice = () => {
               </div>
             </div>
           </div>
-        </div>
-          </div>
-        </div>
-        <div className="pdfbutton">
+          <div className="pdfbutton">
           <button
             type="submit"
             className="bg-blue-500 text-white px-4 py-2 rounded mt-4"
@@ -1502,6 +1534,10 @@ const EditInvoice = () => {
             {loading ? 'Processing...' : 'Update & Download PDF'}
           </button>
         </div>
+        </div>
+          
+        </div>
+       
       </form>
     </div>
   );

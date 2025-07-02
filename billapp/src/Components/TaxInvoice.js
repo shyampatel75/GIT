@@ -195,6 +195,10 @@ const Taxinvoice = () => {
     return adjusted;
   };
 
+  const formatToTwoDecimals = (value) => {
+    if (value === null || value === undefined || value === "" || isNaN(value)) return "";
+    return Number(value).toFixed(2);
+  };
 
   useEffect(() => {
     if (settingsData?.HSN_codes?.length > 0 && (!formData.hsn_code || formData.hsn_code === "998314")) {
@@ -1094,14 +1098,21 @@ const Taxinvoice = () => {
                   <tr>
                     <td>Date</td>
                     <td>
-                      <input
-                        type="date"
-                        id="datePicker"
-                        value={formData.invoice_date}
-                        onChange={handleChange}
-                        name="invoice_date"
-                        readOnly={isSubmitted}
-                      />
+                      {isSubmitted ? (
+                        <input
+                          type="text"
+                          value={formatDisplayDate(formData.invoice_date)}
+                          readOnly
+                        />
+                      ) : (
+                        <input
+                          type="date"
+                          id="datePicker"
+                          value={formData.invoice_date}
+                          onChange={handleChange}
+                          name="invoice_date"
+                        />
+                      )}
                     </td>
                   </tr>
                   <tr>
@@ -1133,14 +1144,21 @@ const Taxinvoice = () => {
                   <tr>
                     <td>Delivery Note Date</td>
                     <td>
-                      <input
-                        type="date"
-                        name="delivery_note_date"
-                        className="deliveryNote"
-                        value={formData.delivery_note_date}
-                        onChange={handleChange}
-                        readOnly={isSubmitted}
-                      />
+                      {isSubmitted ? (
+                        <input
+                          type="text"
+                          value={formatDisplayDate(formData.delivery_note_date)}
+                          readOnly
+                        />
+                      ) : (
+                        <input
+                          type="date"
+                          name="delivery_note_date"
+                          className="deliveryNote"
+                          value={formData.delivery_note_date}
+                          onChange={handleChange}
+                        />
+                      )}
                     </td>
                   </tr>
 
@@ -1379,7 +1397,7 @@ const Taxinvoice = () => {
                     <td style={{ width: "200px" }}>
                       <div style={{ display: "flex", alignItems: "center" }}>
                         <span className="currency-sym" style={{ marginRight: "4px", fontSize: "18px" }}>
-                          {selectedCountry.currencyCode}
+                          {selectedCountry.currency}
                         </span>
                         <input
                           type="number"
@@ -1451,8 +1469,8 @@ const Taxinvoice = () => {
                         <div style={{ whiteSpace: 'nowrap' }}>
                           {showConversion && (
                             <>
-                              <span className="currency-text">{selectedCountry.currencyCode}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.total_with_gst))))} Only —
-                              <span className="currency-text">{selectedCountry.currencyCode}</span> {calculateInrEquivalent(safeNumber(formData.total_with_gst))}
+                              <span className="currency-text">INR</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.total_with_gst))))} Only —
+                              <span className="currency-text">₹</span> {formatToTwoDecimals(calculateInrEquivalent(safeNumber(formData.total_with_gst)))}
                             </>
                           )}
                         </div>
@@ -1461,7 +1479,7 @@ const Taxinvoice = () => {
                         <div style={{ whiteSpace: 'nowrap', textAlign: 'center', width: "200px" }}>
                           <strong>Total:</strong> &nbsp;
                           <strong id="total-with-gst">
-                            <span className="currency-sym">{selectedCountry.currencyCode} </span>
+                            <span className="currency-sym">{selectedCountry.currency} </span>
                             {safeNumber(formData.total_with_gst)}
                           </strong>
                         </div>

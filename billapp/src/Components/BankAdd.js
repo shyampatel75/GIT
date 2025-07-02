@@ -225,16 +225,24 @@ const BankAdd = () => {
       return;
     }
 
+    const { confirm_account_number, ...payload } = formData;
+    payload.amount = parseFloat(payload.amount);
+
+    // Check for required fields
+    if (!payload.bank_name || !payload.account_number || isNaN(payload.amount)) {
+      setError("All fields are required and amount must be a number.");
+      return;
+    }
+
     try {
       setLoading(true);
       const token = localStorage.getItem("access_token");
       if (!token) throw new Error("No authentication token found");
 
-      const { confirm_account_number, ...payload } = formData;
-      payload.amount = parseFloat(payload.amount);
-
       let response;
       if (editingBank) {
+        const userId = JSON.parse(localStorage.getItem("user"))?.id;
+        payload.user = userId;
         response = await fetch(`http://127.0.0.1:8000/api/bank-accounts/${editingBank.id}/`, {
           method: "PUT",
           headers: {

@@ -4,7 +4,7 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import './Address.css';
+import "./Address.css";
 import "./Taxinvoice.css";
 
 // Force browser cache refresh - fetchCountries issue fixed
@@ -18,10 +18,9 @@ const Address = () => {
   const [error, setError] = useState("");
   const isFirstRun = useRef(true);
   const [showConversion, setShowConversion] = useState(false);
-  const [countryFlags, setCountryFlags] = useState({});
+  // const [countryFlags, setCountryFlags] = useState({});
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState(null);
-
 
   const calculateInrEquivalent = (amount) => {
     // Assuming selectedInvoice.currency is either "INR" or "USD"
@@ -38,26 +37,26 @@ const Address = () => {
     const token = localStorage.getItem("access_token");
     const headers = {
       ...options.headers,
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
     };
 
     try {
       const response = await fetch(url, { ...options, headers });
       if (!response.ok) {
         if (response.status === 401) {
-          navigate('/login');
+          navigate("/login");
           return null;
         }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       // For DELETE requests, the response might be empty, so we don't try to parse JSON
-      if (options.method === 'DELETE') {
+      if (options.method === "DELETE") {
         return { success: true };
       }
       return await response.json();
     } catch (error) {
-      console.error('Fetch error:', error);
+      console.error("Fetch error:", error);
       toast.error(error.message || "Failed to fetch data");
       return null;
     }
@@ -67,7 +66,9 @@ const Address = () => {
     try {
       setLoading(true);
       setError("");
-      const data = await fetchWithAuth("http://localhost:8000/api/grouped-invoices/");
+      const data = await fetchWithAuth(
+        "http://localhost:8000/api/grouped-invoices/"
+      );
       if (data) {
         setInvoices(data);
         // Only show toast if there are invoices
@@ -93,31 +94,45 @@ const Address = () => {
     }
   }, [fetchInvoices]);
 
-  // Fetch country flags on mount
-  useEffect(() => {
-    const fetchCountryFlags = async () => {
-      try {
-        const response = await fetch("https://restcountries.com/v3.1/all");
-        if (!response.ok) throw new Error("Failed to fetch country flags");
-        const data = await response.json();
-        const flags = {};
-        data.forEach((country) => {
-          if (country.name && country.name.common && country.flags && country.flags.svg) {
-            flags[country.name.common] = country.flags.svg;
-          }
-        });
-        setCountryFlags(flags);
-      } catch (error) {
-        console.error("Error fetching country flags:", error);
-      }
-    };
-    fetchCountryFlags();
-  }, []);
+
 
   const numberToWords = (num) => {
-    const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
-    const teens = ["Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
-    const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+    const ones = [
+      "",
+      "One",
+      "Two",
+      "Three",
+      "Four",
+      "Five",
+      "Six",
+      "Seven",
+      "Eight",
+      "Nine",
+    ];
+    const teens = [
+      "Ten",
+      "Eleven",
+      "Twelve",
+      "Thirteen",
+      "Fourteen",
+      "Fifteen",
+      "Sixteen",
+      "Seventeen",
+      "Eighteen",
+      "Nineteen",
+    ];
+    const tens = [
+      "",
+      "",
+      "Twenty",
+      "Thirty",
+      "Forty",
+      "Fifty",
+      "Sixty",
+      "Seventy",
+      "Eighty",
+      "Ninety",
+    ];
     const thousandUnits = ["", "Thousand", "Lakh", "Crore"];
 
     if (num === 0) return "Zero";
@@ -138,9 +153,12 @@ const Address = () => {
         } else if (chunk < 20) {
           chunkWords += teens[chunk - 10];
         } else {
-          chunkWords += tens[Math.floor(chunk / 10)] + (chunk % 10 !== 0 ? " " + ones[chunk % 10] : "");
+          chunkWords +=
+            tens[Math.floor(chunk / 10)] +
+            (chunk % 10 !== 0 ? " " + ones[chunk % 10] : "");
         }
-        words = chunkWords.trim() + " " + thousandUnits[unitIndex] + " " + words;
+        words =
+          chunkWords.trim() + " " + thousandUnits[unitIndex] + " " + words;
       }
       integerPart = Math.floor(integerPart / 1000);
       unitIndex++;
@@ -174,19 +192,20 @@ const Address = () => {
       // Set combined data - note: pdfMainDetails is already the object
       setSelectedInvoice({
         ...pdfBasicDetail,
-        ...pdfMainDetails // No need for [0] since it's not an array
+        ...pdfMainDetails, // No need for [0] since it's not an array
       });
 
       // Preload logo
       const logoImg = new Image();
       logoImg.crossOrigin = "Anonymous";
-      logoImg.src = `http://localhost:8000${pdfMainDetails?.logo || '/media/favicon_cvGw7pn.png'}`;
+      logoImg.src = `http://localhost:8000${
+        pdfMainDetails?.logo || "/media/favicon_cvGw7pn.png"
+      }`;
       logoImg.onload = () => setLogoLoaded(true);
       logoImg.onerror = () => {
         console.warn("Failed to load logo, using default");
-        setLogoLoaded(true); 
+        setLogoLoaded(true);
       };
-
     } catch (err) {
       console.error("Download error:", err);
       toast.error(err.message || "Failed to prepare invoice");
@@ -219,14 +238,13 @@ const Address = () => {
     }
 
     try {
-      
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const canvas = await html2canvas(input, {
         useCORS: true,
         allowTaint: true,
         scale: 2,
-        scrollY: -window.scrollY, 
+        scrollY: -window.scrollY,
       });
 
       const imgData = canvas.toDataURL("image/png");
@@ -255,7 +273,9 @@ const Address = () => {
 
       pdf.addImage(imgData, "PNG", x, y, renderWidth, renderHeight);
 
-      const fileName = `${selectedInvoice?.buyer_name || "Client"}-${selectedInvoice?.invoice_number || invoiceNumber}.pdf`;
+      const fileName = `${selectedInvoice?.buyer_name || "Client"}-${
+        selectedInvoice?.invoice_number || invoiceNumber
+      }.pdf`;
       pdf.save(fileName);
 
       toast.success("Invoice downloaded successfully!", {
@@ -269,30 +289,6 @@ const Address = () => {
         autoClose: 3000,
       });
     }
-  };
-
-
-  const handleNewBill = (invoice) => {
-    navigate('/tax-invoice', {
-      state: {
-        buyerData: {
-          buyer_name: invoice?.buyer_name || '',
-          buyer_address: invoice?.buyer_address || '',
-          buyer_gst: invoice?.buyer_gst || '',
-        },
-        consigneeData: {
-          consignee_name: invoice?.consignee_name || '',
-          consignee_address: invoice?.consignee_address || '',
-          consignee_gst: invoice?.consignee_gst || '',
-        },
-        countryData: {
-          country: invoice?.country || 'India',
-          currency: invoice?.currency || 'INR',
-          state: invoice?.state || '',
-          destination: invoice?.destination || '',
-        }
-      }
-    });
   };
 
   const handleEdit = (invoice) => {
@@ -360,18 +356,14 @@ const Address = () => {
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return '';
+    if (!dateString) return "";
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB');
+    return date.toLocaleDateString("en-GB");
   };
 
   return (
     <div className="year_container">
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        limit={1}  
-      />
+      <ToastContainer position="top-right" autoClose={3000} limit={1} />
 
       {/* Header with New Bill Button */}
       <div className="header-bar">
@@ -381,12 +373,10 @@ const Address = () => {
           onClick={() => navigate("/tax-invoice")}
           disabled={loading}
         >
-          <i className="bi bi-plus-lg"></i> {loading ? "Loading..." : "New Bills"}
+          <i className="bi bi-plus-lg"></i>{" "}
+          {loading ? "Loading..." : "New Bills"}
         </button>
-       
       </div>
-
-
 
       {/* Invoice Table */}
       <table className="custom-table">
@@ -403,17 +393,23 @@ const Address = () => {
         <tbody>
           {loading && invoices.length === 0 ? (
             <tr>
-              <td colSpan="7" className="text-center">Loading invoices...</td>
+              <td colSpan="7" className="text-center">
+                Loading invoices...
+              </td>
             </tr>
           ) : invoices.length === 0 ? (
             <tr>
-              <td colSpan="7" className="text-center">No invoices found</td>
+              <td colSpan="7" className="text-center">
+                No invoices found
+              </td>
             </tr>
           ) : (
             invoices.flatMap((group, groupIndex) =>
               group.invoices.map((invoice, invoiceIndex) => (
                 <tr key={invoice.id}>
-                  <td>{groupIndex + 1}.{invoiceIndex + 1}</td>
+                  <td>
+                    {groupIndex + 1}.{invoiceIndex + 1}
+                  </td>
                   <td>{group.buyer_name}</td>
                   <td
                     className="truncate address-hover"
@@ -430,14 +426,23 @@ const Address = () => {
                   <td>{invoice.invoice_number}</td>
 
                   <td>
-                    {invoice.currency} {parseFloat(invoice.total_with_gst).toFixed(2)}
+                    {invoice.currency}{" "}
+                    {parseFloat(invoice.total_with_gst).toFixed(2)}
                   </td>
-                  <td style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                  <td
+                    style={{
+                      display: "flex",
+                      justifyContent: "center",
+                      gap: "10px",
+                    }}
+                  >
                     <div className="tooltip-container">
                       <button
                         type="button"
                         className="action-btn view"
-                        onClick={() => navigate(`/invoice-detail/${invoice.id}`)}
+                        onClick={() =>
+                          navigate(`/invoice-detail/${invoice.id}`)
+                        }
                         disabled={loading}
                       >
                         <i className="fa-regular fa-eye"></i>
@@ -494,7 +499,10 @@ const Address = () => {
           <div style={{ paddingLeft: "10px" }}>
             <div style={{ paddingRight: "10px" }}>
               <h2 className="text-center">TAX INVOICE</h2>
-              <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white" }}>
+              <div
+                className="table-bordered black-bordered main-box"
+                style={{ backgroundColor: "white" }}
+              >
                 <div className="row date-tables">
                   <div className="col-6">
                     {/* Seller Info */}
@@ -519,7 +527,8 @@ const Address = () => {
                         </tr>
                         <tr>
                           <td className="gray-background">
-                            <strong>GSTIN/UIN:</strong> {selectedInvoice.seller_gstin}
+                            <strong>GSTIN/UIN:</strong>{" "}
+                            {selectedInvoice.seller_gstin}
                           </td>
                         </tr>
                       </tbody>
@@ -530,15 +539,18 @@ const Address = () => {
                       <tbody style={{ border: "2px solid" }}>
                         <tr>
                           <td className="gray-background">
-                            <strong>Buyer (Bill to):</strong> {selectedInvoice.buyer_name}
+                            <strong>Buyer (Bill to):</strong>{" "}
+                            {selectedInvoice.buyer_name}
                           </td>
                         </tr>
                         <tr>
-                          <td style={{
-                            maxWidth: "250px",
-                            overflowWrap: "break-word",
-                            height: "150px"
-                          }}>
+                          <td
+                            style={{
+                              maxWidth: "250px",
+                              overflowWrap: "break-word",
+                              height: "150px",
+                            }}
+                          >
                             <div style={{ whiteSpace: "pre-wrap" }}>
                               {selectedInvoice.buyer_address}
                             </div>
@@ -546,12 +558,17 @@ const Address = () => {
                         </tr>
                         <tr>
                           <td className="gray-background">
-                            <strong>GSTIN/UIN:</strong> {selectedInvoice.buyer_gst || (selectedInvoice.country === "India" ? "Not Provided" : "N/A")}
+                            <strong>GSTIN/UIN:</strong>{" "}
+                            {selectedInvoice.buyer_gst ||
+                              (selectedInvoice.country === "India"
+                                ? "Not Provided"
+                                : "N/A")}
                           </td>
                         </tr>
                         <tr>
                           <td>
-                            <strong>State:</strong> {selectedInvoice.state || "N/A"}
+                            <strong>State:</strong>{" "}
+                            {selectedInvoice.state || "N/A"}
                           </td>
                         </tr>
                       </tbody>
@@ -562,15 +579,18 @@ const Address = () => {
                       <tbody style={{ border: "2px solid" }}>
                         <tr>
                           <td className="gray-background">
-                            <strong>Consignee (Ship to):</strong> {selectedInvoice.consignee_name}
+                            <strong>Consignee (Ship to):</strong>{" "}
+                            {selectedInvoice.consignee_name}
                           </td>
                         </tr>
                         <tr>
-                          <td style={{
-                            maxWidth: "250px",
-                            overflowWrap: "break-word",
-                            height: "150px"
-                          }}>
+                          <td
+                            style={{
+                              maxWidth: "250px",
+                              overflowWrap: "break-word",
+                              height: "150px",
+                            }}
+                          >
                             <div style={{ whiteSpace: "pre-wrap" }}>
                               {selectedInvoice.consignee_address}
                             </div>
@@ -578,14 +598,17 @@ const Address = () => {
                         </tr>
                         <tr>
                           <td className="gray-background">
-                            <strong>GSTIN/UIN:</strong> {selectedInvoice.consignee_gst || (selectedInvoice.country === "India" ? "Not Provided" : "N/A")}
+                            <strong>GSTIN/UIN:</strong>{" "}
+                            {selectedInvoice.consignee_gst ||
+                              (selectedInvoice.country === "India"
+                                ? "Not Provided"
+                                : "N/A")}
                           </td>
                         </tr>
                       </tbody>
                     </table>
 
                     {/* Country and State Row (like web UI) */}
-                    
                   </div>
 
                   <div className="col-6">
@@ -626,7 +649,11 @@ const Address = () => {
                         </tr>
                         <tr>
                           <td>Date</td>
-                          <td>{new Date(selectedInvoice.invoice_date).toLocaleDateString("en-GB")}</td>
+                          <td>
+                            {new Date(
+                              selectedInvoice.invoice_date
+                            ).toLocaleDateString("en-GB")}
+                          </td>
                         </tr>
                         <tr>
                           <td>Delivery Note</td>
@@ -638,7 +665,13 @@ const Address = () => {
                         </tr>
                         <tr>
                           <td>Delivery Note Date</td>
-                          <td>{selectedInvoice.delivery_note_date ? new Date(selectedInvoice.delivery_note_date).toLocaleDateString("en-GB") : ''}</td>
+                          <td>
+                            {selectedInvoice.delivery_note_date
+                              ? new Date(
+                                  selectedInvoice.delivery_note_date
+                                ).toLocaleDateString("en-GB")
+                              : ""}
+                          </td>
                         </tr>
                         <tr>
                           <td>Destination</td>
@@ -655,11 +688,13 @@ const Address = () => {
                           </td>
                         </tr>
                         <tr>
-                          <td style={{
-                            maxWidth: "250px",
-                            overflowWrap: "break-word",
-                            height: "150px"
-                          }}>
+                          <td
+                            style={{
+                              maxWidth: "250px",
+                              overflowWrap: "break-word",
+                              height: "150px",
+                            }}
+                          >
                             {selectedInvoice.Terms_to_delivery}
                           </td>
                         </tr>
@@ -667,88 +702,100 @@ const Address = () => {
                     </table>
                     {/* Country and State Row (like web UI, for PDF) */}
                     <div className="relative w-full max-w-4xl mx-auto">
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 24,
+                          marginBottom: 8,
+                        }}
+                      >
+                        {/* Country Section */}
+                        <div
+                          style={{
+                            flex: selectedInvoice.country !== "India" ? 0.5 : 1,
+                          }}
+                        >
+                          <p>
+                            <strong>Country and currency:</strong>
+                          </p>
+                          <div
+                            style={{
+                              border: "1px solid #ccc",
+                              borderRadius: 4,
+                              padding: "4px 12px",
+                              background: "#f9f9f9",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              width: "100%",
+                            }}
+                          >
+                            <span>{selectedInvoice.country || "India"}</span>
+                            <span>-</span>
+                            <span>({selectedInvoice.currency || "INR"})</span>
+                          </div>
+                        </div>
 
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        gap: 24,
-                                        marginBottom: 8,
-                                    }}
-                                >
-                                    {/* Country Section */}
-                                    <div style={{ flex: selectedInvoice.country !== "India" ? 0.5 : 1 }}>
-                                        <p><strong>Country and currency:</strong></p>
-                                        <div
-                                            style={{
-                                                border: "1px solid #ccc",
-                                                borderRadius: 4,
-                                                padding: "4px 12px",
-                                                background: "#f9f9f9",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: 8,
-                                                width: "100%",
-                                            }}
-                                        >
-                                            <span>{selectedInvoice.country || "India"}</span>
-                                            <span>-</span>
-                                            <span>
-                                                ({selectedInvoice.currency || "INR"})
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* State Section */}
-                                    {selectedInvoice.country === "India" && selectedInvoice.state && (
-                                        <div style={{ flex: 1 }}>
-                                            <p><strong>Select State:</strong></p>
-                                            <div
-                                                style={{
-                                                    border: "1px solid #ccc",
-                                                    borderRadius: 4,
-                                                    padding: "4px 12px",
-                                                    background: "#f9f9f9",
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    width: "100%",
-                                                }}
-                                            >
-                                                <span>
-                                                    {selectedInvoice.state}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="mt-4">
-                                    {selectedInvoice.country !== "India" && (
-                                        <>
-                                            <div className="lut">
-                                                <p style={{ margin: "0px" }}>Declare under LUT</p>
-                                            </div>
-                                            <div className="lut mt-3">
-                                                <p style={{ margin: "0px" }}>{selectedInvoice.company_code || ""}</p>
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-
-                              
+                        {/* State Section */}
+                        {selectedInvoice.country === "India" &&
+                          selectedInvoice.state && (
+                            <div style={{ flex: 1 }}>
+                              <p>
+                                <strong>Select State:</strong>
+                              </p>
+                              <div
+                                style={{
+                                  border: "1px solid #ccc",
+                                  borderRadius: 4,
+                                  padding: "4px 12px",
+                                  background: "#f9f9f9",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  width: "100%",
+                                }}
+                              >
+                                <span>{selectedInvoice.state}</span>
+                              </div>
                             </div>
+                          )}
+                      </div>
+                      <div className="mt-4">
+                        {selectedInvoice.country !== "India" && (
+                          <div className="lut">
+                            <p style={{ margin: "0px" }}>Declare under LUT</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
-                    <input type="hidden" id="currencyTitle" value={selectedInvoice.currency || "INR"} />
-                    <input type="hidden" id="currencySymbol" value={selectedInvoice.currency === "USD" ? "$" : "₹"} />
+                    <input
+                      type="hidden"
+                      id="currencyTitle"
+                      value={selectedInvoice.currency || "INR"}
+                    />
+                    <input
+                      type="hidden"
+                      id="currencySymbol"
+                      value={selectedInvoice.currency === "USD" ? "$" : "₹"}
+                    />
                   </div>
                 </div>
 
                 <div className="row">
                   <div className="col-xs-12">
-                    <table className="table table-bordered black-bordered" style={{ textAlign: "center" }}>
+                    <table
+                      className="table table-bordered black-bordered"
+                      style={{ textAlign: "center" }}
+                    >
                       <thead>
                         <tr className="trbody">
                           <th style={{ backgroundColor: "#f1f3f4" }}>SI No.</th>
-                          <th style={{ backgroundColor: "#f1f3f4" }}>Particulars</th>
-                          <th style={{ backgroundColor: "#f1f3f4" }}>HSN/SAC</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>
+                            Particulars
+                          </th>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>
+                            HSN/SAC
+                          </th>
                           <th style={{ backgroundColor: "#f1f3f4" }}>Hours</th>
                           <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
                           <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
@@ -757,88 +804,142 @@ const Address = () => {
                       <tbody>
                         <tr style={{ height: "111px" }}>
                           <td>1</td>
-                          <td style={{ width: "526px" }}>{selectedInvoice.Particulars}</td>
-                          <td style={{ width: "130px", paddingTop: "16px" }}>{selectedInvoice.hsn_code || selectedInvoice.hsn_sac_code}</td>
-                          <td style={{ width: "10%" }}>{isNaN(selectedInvoice.total_hours) ? '' : selectedInvoice.total_hours}</td>
-                          <td style={{ width: "10%" }}>{isNaN(selectedInvoice.rate) ? '' : selectedInvoice.rate}</td>
+                          <td style={{ width: "526px" }}>
+                            {selectedInvoice.Particulars}
+                          </td>
+                          <td style={{ width: "130px", paddingTop: "16px" }}>
+                            {selectedInvoice.hsn_code ||
+                              selectedInvoice.hsn_sac_code}
+                          </td>
+                          <td style={{ width: "10%" }}>
+                            {isNaN(selectedInvoice.total_hours)
+                              ? ""
+                              : selectedInvoice.total_hours}
+                          </td>
+                          <td style={{ width: "10%" }}>
+                            {isNaN(selectedInvoice.rate)
+                              ? ""
+                              : selectedInvoice.rate}
+                          </td>
                           <td style={{ width: "200px" }}>
                             <span className="currency-sym">
-                              {selectedInvoice.currency} {isNaN(selectedInvoice.base_amount) ? '' : selectedInvoice.base_amount}
+                              {selectedInvoice.currency}{" "}
+                              {isNaN(selectedInvoice.base_amount)
+                                ? ""
+                                : selectedInvoice.base_amount}
                             </span>
                           </td>
                         </tr>
 
                         {/* IGST for other states */}
-                        {selectedInvoice.country === "India" && selectedInvoice.state !== "Gujarat" && (
-                          <tr className="inside-india">
-                            <td></td>
-                            <td>
-                              <span style={{ float: "right" }}>IGST @ 18%</span>
-                            </td>
-                            <td></td>
-                            <td></td>
-                            <td>18%</td>
-                            <td id="igst">
-                              <span className="currency-sym">{selectedInvoice.currency} {isNaN(selectedInvoice.taxtotal) ? '' : selectedInvoice.taxtotal}</span>
-                            </td>
-                          </tr>
-                        )}
+                        {selectedInvoice.country === "India" &&
+                          selectedInvoice.state !== "Gujarat" && (
+                            <tr className="inside-india">
+                              <td></td>
+                              <td>
+                                <span style={{ float: "right" }}>
+                                  IGST @ 18%
+                                </span>
+                              </td>
+                              <td></td>
+                              <td></td>
+                              <td>18%</td>
+                              <td id="igst">
+                                <span className="currency-sym">
+                                  {selectedInvoice.currency}{" "}
+                                  {isNaN(selectedInvoice.taxtotal)
+                                    ? ""
+                                    : selectedInvoice.taxtotal}
+                                </span>
+                              </td>
+                            </tr>
+                          )}
 
                         {/* CGST/SGST for Gujarat */}
-                        {selectedInvoice.country === "India" && selectedInvoice.state === "Gujarat" && (
-                          <>
-                            <tr className="inside-india">
-                              <td></td>
-                              <td>
-                                <span style={{ float: "right" }}>CGST @ 9%</span>
-                              </td>
-                              <td></td>
-                              <td></td>
-                              <td>9%</td>
-                              <td id="cgst">
-                                <span className="currency-sym">{selectedInvoice.currency} {isNaN(selectedInvoice.cgst) ? '' : selectedInvoice.cgst}</span>
-                              </td>
-                            </tr>
-                            <tr className="inside-india">
-                              <td></td>
-                              <td>
-                                <span style={{ float: "right" }}>SGST @ 9%</span>
-                              </td>
-                              <td></td>
-                              <td></td>
-                              <td>9%</td>
-                              <td id="sgst">
-                                <span className="currency-sym">{selectedInvoice.currency} {isNaN(selectedInvoice.sgst) ? '' : selectedInvoice.sgst}</span>
-                              </td>
-                            </tr>
-                          </>
-                        )}
+                        {selectedInvoice.country === "India" &&
+                          selectedInvoice.state === "Gujarat" && (
+                            <>
+                              <tr className="inside-india">
+                                <td></td>
+                                <td>
+                                  <span style={{ float: "right" }}>
+                                    CGST @ 9%
+                                  </span>
+                                </td>
+                                <td></td>
+                                <td></td>
+                                <td>9%</td>
+                                <td id="cgst">
+                                  <span className="currency-sym">
+                                    {selectedInvoice.currency}{" "}
+                                    {isNaN(selectedInvoice.cgst)
+                                      ? ""
+                                      : selectedInvoice.cgst}
+                                  </span>
+                                </td>
+                              </tr>
+                              <tr className="inside-india">
+                                <td></td>
+                                <td>
+                                  <span style={{ float: "right" }}>
+                                    SGST @ 9%
+                                  </span>
+                                </td>
+                                <td></td>
+                                <td></td>
+                                <td>9%</td>
+                                <td id="sgst">
+                                  <span className="currency-sym">
+                                    {selectedInvoice.currency}{" "}
+                                    {isNaN(selectedInvoice.sgst)
+                                      ? ""
+                                      : selectedInvoice.sgst}
+                                  </span>
+                                </td>
+                              </tr>
+                            </>
+                          )}
 
                         {/* Total row */}
                         <tr>
                           <td colSpan="6">
-                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                            <div
+                              style={{ display: "flex", alignItems: "center" }}
+                            >
                               {/* Left side: INR Equivalent (if applicable) */}
-                              {selectedInvoice.country !== "India" && selectedInvoice.inr_equivalent && (
-                                <div style={{ whiteSpace: 'nowrap' }}>
-                                  INR Equivalent: INR {isNaN(selectedInvoice.inr_equivalent) ? '' : selectedInvoice.inr_equivalent.toFixed(2)}
-                                </div>
-                              )}
-
+                              {selectedInvoice.country !== "India" &&
+                                selectedInvoice.inr_equivalent && (
+                                  <div style={{ whiteSpace: "nowrap" }}>
+                                    INR Equivalent: INR{" "}
+                                    {isNaN(selectedInvoice.inr_equivalent)
+                                      ? ""
+                                      : selectedInvoice.inr_equivalent.toFixed(
+                                          2
+                                        )}
+                                  </div>
+                                )}
 
                               {/* Right side: Total (always right aligned) */}
-                              <div style={{ whiteSpace: 'nowrap', marginLeft: 'auto', textAlign: 'right' }}>
+                              <div
+                                style={{
+                                  whiteSpace: "nowrap",
+                                  marginLeft: "auto",
+                                  textAlign: "right",
+                                }}
+                              >
                                 <strong>Total:</strong> &nbsp;
                                 <strong id="total-with-gst">
-                                  <span className="currency-sym">{selectedInvoice.currency} </span>
-                                  {isNaN(selectedInvoice.total_with_gst) ? '' : selectedInvoice.total_with_gst}
+                                  <span className="currency-sym">
+                                    {selectedInvoice.currency}{" "}
+                                  </span>
+                                  {isNaN(selectedInvoice.total_with_gst)
+                                    ? ""
+                                    : selectedInvoice.total_with_gst}
                                 </strong>
                               </div>
                             </div>
                           </td>
                         </tr>
-
-
                       </tbody>
                     </table>
                   </div>
@@ -852,8 +953,17 @@ const Address = () => {
                           <strong>Amount Chargeable (in words):</strong>
                         </p>
                         <h4 className="total-in-words">
-                          <span className="currency-text">{selectedInvoice.currency} </span>
-                          {numberToWords(Math.floor(isNaN(selectedInvoice.total_with_gst) ? 0 : selectedInvoice.total_with_gst))} Only
+                          <span className="currency-text">
+                            {selectedInvoice.currency}{" "}
+                          </span>
+                          {numberToWords(
+                            Math.floor(
+                              isNaN(selectedInvoice.total_with_gst)
+                                ? 0
+                                : selectedInvoice.total_with_gst
+                            )
+                          )}{" "}
+                          Only
                         </h4>
                         <div className="top-right-corner">
                           <span>E. & O.E</span>
@@ -871,30 +981,87 @@ const Address = () => {
                           {selectedInvoice.state === "Gujarat" ? (
                             <>
                               <tr>
-                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Central Tax</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">State Tax</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
+                                <th
+                                  style={{ backgroundColor: "#f1f3f4" }}
+                                  rowSpan="2"
+                                >
+                                  HSN/SAC
+                                </th>
+                                <th
+                                  style={{ backgroundColor: "#f1f3f4" }}
+                                  rowSpan="2"
+                                >
+                                  Taxable Value
+                                </th>
+                                <th
+                                  style={{ backgroundColor: "#f1f3f4" }}
+                                  colSpan="2"
+                                >
+                                  Central Tax
+                                </th>
+                                <th
+                                  style={{ backgroundColor: "#f1f3f4" }}
+                                  colSpan="2"
+                                >
+                                  State Tax
+                                </th>
+                                <th
+                                  style={{ backgroundColor: "#f1f3f4" }}
+                                  rowSpan="2"
+                                >
+                                  Total Tax Amount
+                                </th>
                               </tr>
                               <tr>
-                                <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }}>
+                                  Rate
+                                </th>
+                                <th style={{ backgroundColor: "#f1f3f4" }}>
+                                  Amount
+                                </th>
+                                <th style={{ backgroundColor: "#f1f3f4" }}>
+                                  Rate
+                                </th>
+                                <th style={{ backgroundColor: "#f1f3f4" }}>
+                                  Amount
+                                </th>
                               </tr>
                             </>
                           ) : (
                             <>
                               <tr>
-                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Integrated Tax</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
+                                <th
+                                  style={{ backgroundColor: "#f1f3f4" }}
+                                  rowSpan="2"
+                                >
+                                  HSN/SAC
+                                </th>
+                                <th
+                                  style={{ backgroundColor: "#f1f3f4" }}
+                                  rowSpan="2"
+                                >
+                                  Taxable Value
+                                </th>
+                                <th
+                                  style={{ backgroundColor: "#f1f3f4" }}
+                                  colSpan="2"
+                                >
+                                  Integrated Tax
+                                </th>
+                                <th
+                                  style={{ backgroundColor: "#f1f3f4" }}
+                                  rowSpan="2"
+                                >
+                                  Total Tax Amount
+                                </th>
                               </tr>
                               <tr>
-                                <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }}>
+                                  Rate
+                                </th>
+                                <th style={{ backgroundColor: "#f1f3f4" }}>
+                                  Amount
+                                </th>
                               </tr>
                             </>
                           )}
@@ -902,39 +1069,87 @@ const Address = () => {
                         <tbody style={{ border: "2px solid" }}>
                           <tr>
                             <td>{selectedInvoice.hsn_code}</td>
-                            <td>{isNaN(selectedInvoice.base_amount) ? '' : selectedInvoice.base_amount}</td>
+                            <td>
+                              {isNaN(selectedInvoice.base_amount)
+                                ? ""
+                                : selectedInvoice.base_amount}
+                            </td>
                             {selectedInvoice.state === "Gujarat" ? (
                               <>
                                 <td>9%</td>
-                                <td>{isNaN(selectedInvoice.cgst) ? '' : selectedInvoice.cgst}</td>
+                                <td>
+                                  {isNaN(selectedInvoice.cgst)
+                                    ? ""
+                                    : selectedInvoice.cgst}
+                                </td>
                                 <td>9%</td>
-                                <td>{isNaN(selectedInvoice.sgst) ? '' : selectedInvoice.sgst}</td>
-                                <td>{isNaN(selectedInvoice.taxtotal) ? '' : selectedInvoice.taxtotal}</td>
+                                <td>
+                                  {isNaN(selectedInvoice.sgst)
+                                    ? ""
+                                    : selectedInvoice.sgst}
+                                </td>
+                                <td>
+                                  {isNaN(selectedInvoice.taxtotal)
+                                    ? ""
+                                    : selectedInvoice.taxtotal}
+                                </td>
                               </>
                             ) : (
                               <>
                                 <td>18%</td>
-                                <td>{isNaN(selectedInvoice.taxtotal) ? '' : selectedInvoice.taxtotal}</td>
-                                <td>{isNaN(selectedInvoice.taxtotal) ? '' : selectedInvoice.taxtotal}</td>
+                                <td>
+                                  {isNaN(selectedInvoice.taxtotal)
+                                    ? ""
+                                    : selectedInvoice.taxtotal}
+                                </td>
+                                <td>
+                                  {isNaN(selectedInvoice.taxtotal)
+                                    ? ""
+                                    : selectedInvoice.taxtotal}
+                                </td>
                               </>
                             )}
                           </tr>
                           <tr className="total-row">
                             <td>Total</td>
-                            <td>{isNaN(selectedInvoice.base_amount) ? '' : selectedInvoice.base_amount}</td>
+                            <td>
+                              {isNaN(selectedInvoice.base_amount)
+                                ? ""
+                                : selectedInvoice.base_amount}
+                            </td>
                             {selectedInvoice.state === "Gujarat" ? (
                               <>
                                 <td></td>
-                                <td>{isNaN(selectedInvoice.cgst) ? '' : selectedInvoice.cgst}</td>
+                                <td>
+                                  {isNaN(selectedInvoice.cgst)
+                                    ? ""
+                                    : selectedInvoice.cgst}
+                                </td>
                                 <td></td>
-                                <td>{isNaN(selectedInvoice.sgst) ? '' : selectedInvoice.sgst}</td>
-                                <td>{isNaN(selectedInvoice.taxtotal) ? '' : selectedInvoice.taxtotal}</td>
+                                <td>
+                                  {isNaN(selectedInvoice.sgst)
+                                    ? ""
+                                    : selectedInvoice.sgst}
+                                </td>
+                                <td>
+                                  {isNaN(selectedInvoice.taxtotal)
+                                    ? ""
+                                    : selectedInvoice.taxtotal}
+                                </td>
                               </>
                             ) : (
                               <>
                                 <td></td>
-                                <td>{isNaN(selectedInvoice.igst) ? '' : selectedInvoice.igst}</td>
-                                <td>{isNaN(selectedInvoice.taxtotal) ? '' : selectedInvoice.taxtotal}</td>
+                                <td>
+                                  {isNaN(selectedInvoice.igst)
+                                    ? ""
+                                    : selectedInvoice.igst}
+                                </td>
+                                <td>
+                                  {isNaN(selectedInvoice.taxtotal)
+                                    ? ""
+                                    : selectedInvoice.taxtotal}
+                                </td>
                               </>
                             )}
                           </tr>
@@ -946,8 +1161,17 @@ const Address = () => {
                         <div>
                           <strong>Tax Amount (in words):</strong>
                           <span className="total-tax-in-words">
-                            <span className="currency-text">{selectedInvoice.currency} </span>
-                            {numberToWords(Math.floor(isNaN(selectedInvoice.total_with_gst) ? 0 : selectedInvoice.total_with_gst))} Only
+                            <span className="currency-text">
+                              {selectedInvoice.currency}{" "}
+                            </span>
+                            {numberToWords(
+                              Math.floor(
+                                isNaN(selectedInvoice.total_with_gst)
+                                  ? 0
+                                  : selectedInvoice.total_with_gst
+                              )
+                            )}{" "}
+                            Only
                           </span>
                         </div>
                       </div>
@@ -956,7 +1180,9 @@ const Address = () => {
                           <h4>
                             <strong>Remarks:</strong>
                           </h4>
-                          <h5 className="html-remark">{selectedInvoice.remark}</h5>
+                          <h5 className="html-remark">
+                            {selectedInvoice.remark}
+                          </h5>
                         </div>
                       </div>
                     </div>
@@ -988,13 +1214,18 @@ const Address = () => {
                           className="logo-image"
                         />
                       )}
-                      <p>for {selectedInvoice.company_name || 'Grabsolve Infotech'}</p>
+                      <p>
+                        for{" "}
+                        {selectedInvoice.company_name || "Grabsolve Infotech"}
+                      </p>
                       <p>Authorized Signatory</p>
                     </div>
                   </div>
                 </div>
               </div>
-              <p className="text-center" style={{ marginBottom: "0px" }}>This is a Computer Generated Invoice</p>
+              <p className="text-center" style={{ marginBottom: "0px" }}>
+                This is a Computer Generated Invoice
+              </p>
             </div>
           </div>
         </div>
@@ -1003,12 +1234,21 @@ const Address = () => {
       {showDeleteModal && (
         <div className="delete-modal">
           <div className="delete-modal-content">
-            <span className="close-button" onClick={() => setShowDeleteModal(false)}>&times;</span>
+            <span
+              className="close-button"
+              onClick={() => setShowDeleteModal(false)}
+            >
+              &times;
+            </span>
             <p>Are you sure you want to delete this invoice?</p>
-            <button onClick={() => {
-              handleDelete(invoiceToDelete);
-              setShowDeleteModal(false);
-            }}>Yes</button>
+            <button
+              onClick={() => {
+                handleDelete(invoiceToDelete);
+                setShowDeleteModal(false);
+              }}
+            >
+              Yes
+            </button>
             <button onClick={() => setShowDeleteModal(false)}>No</button>
           </div>
         </div>

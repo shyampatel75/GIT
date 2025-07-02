@@ -415,9 +415,9 @@ const Clients = () => {
                     <td>{idx === 0 ? group.serial_number : ''}</td>
                     <td>{group.buyer_name}</td>
                     <td>
-                      {group.buyer_address.length > 20
-                        ? group.buyer_address.substring(0, 20) + "..."
-                        : group.buyer_address}
+                      <div style={{ whiteSpace: "pre-line" }}>
+                        {group.buyer_address}
+                      </div>
                     </td>
                     <td>{invoice.invoice_number}</td>
                     <td>
@@ -482,23 +482,7 @@ const Clients = () => {
                         <span className="tooltip-text">Newbill</span>
                       </div>
 
-                      <div className="tooltip-container">
-                        <button
-                          className="action-btn call"
-                          onClick={() => {
-                            const phone = group.buyer_phone || invoice.buyer_phone;
-                            if (phone) {
-                              alert(`Buyer Phone: ${phone}`);
-                            } else {
-                              alert('No phone number available');
-                            }
-                          }}
-                          disabled={loading}
-                        >
-                          <i className="fa-solid fa-phone"></i>
-                        </button>
-                        <span className="tooltip-text">Call</span>
-                      </div>
+                     
                     </td>
                   </tr>
                 ))
@@ -571,7 +555,7 @@ const Clients = () => {
                             height: "120px",
                             padding: "5px"
                           }}>
-                            <div style={{ whiteSpace: "pre-wrap" }}>
+                            <div style={{ whiteSpace: "pre-line" }}>
                               {selectedInvoice.buyer_address}
                             </div>
                           </td>
@@ -598,7 +582,7 @@ const Clients = () => {
                             height: "120px",
                             padding: "5px"
                           }}>
-                            <div style={{ whiteSpace: "pre-wrap" }}>
+                            <div style={{ whiteSpace: "pre-line" }}>
                               {selectedInvoice.consignee_address}
                             </div>
                           </td>
@@ -705,9 +689,7 @@ const Clients = () => {
                             <div className="lut">
                               <p style={{ margin: "0px" }}>Declare under LUT</p>
                             </div>
-                            <div className="lut mt-3">
-                              <p style={{ margin: "0px" }}>{selectedInvoice.company_code}</p>
-                            </div>
+                          
                           </>
                         </div>
                       )}
