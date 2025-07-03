@@ -1190,37 +1190,108 @@ const EditInvoice = () => {
                       </tr>
                     )}
 
-                    {selectedCountry.name === "India" && selectedState === "Gujarat" && (
-                      <>
-                        <tr className="inside-india">
-                          <td></td>
-                          <td>
-                            <span style={{ float: "right" }}>CGST @ 9%</span>
-                          </td>
-                          <td></td>
-                          <td></td>
-                          <td>9%</td>
-                          <td id="cgst">
-                            <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
-                            {safeNumber(formData.cgst)}
-                          </td>
-                        </tr>
-
-                        <tr className="inside-india">
-                          <td></td>
-                          <td>
-                            <span style={{ float: "right" }}>SGST @ 9%</span>
-                          </td>
-                          <td></td>
-                          <td></td>
-                          <td>9%</td>
-                          <td id="sgst">
-                            <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
-                            {safeNumber(formData.sgst)}
-                          </td>
-                        </tr>
-                      </>
-                    )}
+                    {/* Render CGST/SGST table for India+Gujarat (with values) and for non-India (with dashes) */}
+                    {(selectedCountry.name === "India" && selectedState === "Gujarat") || selectedCountry.name !== "India" ? (
+                      <div className="row">
+                        <div className="col-xs-12 inside-india">
+                          <table className="table table-bordered invoice-table">
+                            <thead>
+                              <tr>
+                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Central Tax</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">State Tax</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
+                              </tr>
+                              <tr>
+                                <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {selectedCountry.name === "India" && selectedState === "Gujarat" ? (
+                                <>
+                                  <tr>
+                                    <td>{formData.hsn_code}</td>
+                                    <td>
+                                      {safeNumber(formData.base_amount)}
+                                      {showConversion && (
+                                        <div className="inr-conversion">
+                                          <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td>9%</td>
+                                    <td>
+                                      <span className="currency-sym">{selectedCountry.currency} </span>
+                                      {safeNumber(formData.cgst)}
+                                    </td>
+                                    <td>9%</td>
+                                    <td>
+                                      <span className="currency-sym">{selectedCountry.currency} </span>
+                                      {safeNumber(formData.sgst)}
+                                    </td>
+                                    <td>
+                                      <span className="currency-sym">{selectedCountry.currency} </span>
+                                      {safeNumber(formData.taxtotal)}
+                                    </td>
+                                  </tr>
+                                  <tr className="total-row">
+                                    <td>Total</td>
+                                    <td>
+                                      {safeNumber(formData.base_amount)}
+                                      {showConversion && (
+                                        <div className="inr-conversion">
+                                          <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td></td>
+                                    <td>
+                                      <span className="currency-sym">{selectedCountry.currency} </span>
+                                      {safeNumber(formData.cgst)}
+                                    </td>
+                                    <td></td>
+                                    <td>
+                                      <span className="currency-sym">{selectedCountry.currency} </span>
+                                      {safeNumber(formData.sgst)}
+                                    </td>
+                                    <td>
+                                      <span className="currency-sym">{selectedCountry.currency} </span>
+                                      {safeNumber(formData.taxtotal)}
+                                    </td>
+                                  </tr>
+                                </>
+                              ) : (
+                                // For non-India, show dashes (---) in all cells
+                                <>
+                                  <tr>
+                                    <td>{formData.hsn_code}</td>
+                                    <td>{safeNumber(formData.base_amount)}</td>
+                                    <td>9%</td>
+                                    <td>---</td>
+                                    <td>9%</td>
+                                    <td>---</td>
+                                    <td>---</td>
+                                  </tr>
+                                  <tr className="total-row">
+                                    <td>Total</td>
+                                    <td>{safeNumber(formData.base_amount)}</td>
+                                    <td></td>
+                                    <td>---</td>
+                                    <td></td>
+                                    <td>---</td>
+                                    <td>---</td>
+                                  </tr>
+                                </>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ) : null}
 
                     <tr>
                       <td colSpan="6">
@@ -1271,153 +1342,6 @@ const EditInvoice = () => {
                 </div>
               </div>
             </div>
-
-            {selectedCountry.name === "India" && selectedState === "Gujarat" && (
-              <div className="row">
-                <div className="col-xs-12 inside-india">
-                  <table className="table table-bordered invoice-table">
-                    <thead>
-                      <tr>
-                        <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
-                        <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
-                        <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Central Tax</th>
-                        <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">State Tax</th>
-                        <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
-                      </tr>
-                      <tr>
-                        <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                        <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                        <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                        <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td>{formData.hsn_code}</td>
-                        <td>
-                          {safeNumber(formData.base_amount)}
-                          {showConversion && (
-                            <div className="inr-conversion">
-                              <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
-                            </div>
-                          )}
-                        </td>
-                        <td>9%</td>
-                        <td>
-                          <span className="currency-sym">{selectedCountry.currency} </span>
-                          {safeNumber(formData.cgst)}
-                        </td>
-                        <td>9%</td>
-                        <td>
-                          <span className="currency-sym">{selectedCountry.currency} </span>
-                          {safeNumber(formData.sgst)}
-                        </td>
-                        <td>
-                          <span className="currency-sym">{selectedCountry.currency} </span>
-                          {safeNumber(formData.taxtotal)}
-                        </td>
-                      </tr>
-                      <tr className="total-row">
-                        <td>Total</td>
-                        <td>
-                          {safeNumber(formData.base_amount)}
-                          {showConversion && (
-                            <div className="inr-conversion">
-                              <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
-                            </div>
-                          )}
-                        </td>
-                        <td></td>
-                        <td>
-                          <span className="currency-sym">{selectedCountry.currency} </span>
-                          {safeNumber(formData.cgst)}
-                        </td>
-                        <td></td>
-                        <td>
-                          <span className="currency-sym">{selectedCountry.currency} </span>
-                          {safeNumber(formData.sgst)}
-                        </td>
-                        <td>
-                          <span className="currency-sym">{selectedCountry.currency} </span>
-                          {safeNumber(formData.taxtotal)}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {selectedCountry.name === "India" && selectedState !== "Gujarat" && (
-              <div className="row">
-                <div className="col-xs-12 outside-gujarat">
-                  <table className="table table-bordered invoice-table">
-                    <thead>
-                      <tr>
-                        <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
-                        <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
-                        <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Integrated Tax</th>
-                        <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
-                      </tr>
-                      <tr>
-                        <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                        <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td>{formData.hsn_code}</td>
-                        <td>
-                          {safeNumber(formData.base_amount)}
-                          {showConversion && (
-                            <div className="inr-conversion">
-                              <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
-                            </div>
-                          )}
-                        </td>
-                        <td>18%</td>
-                        <td>
-                          <span className="currency-sym">{selectedCountry.currency} </span>
-                          {safeNumber(formData.igst)}
-                        </td>
-                        <td>
-                          <span className="currency-sym">{selectedCountry.currency} </span>
-                          {safeNumber(formData.taxtotal)}
-                        </td>
-                      </tr>
-                      <tr className="total-row">
-                        <td><strong>Total</strong></td>
-                        <td>
-                          <strong>{safeNumber(formData.base_amount)}</strong>
-                          {showConversion && (
-                            <div className="inr-conversion">
-                              <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
-                            </div>
-                          )}
-                        </td>
-                        <td></td>
-                        <td>
-                          <strong>{safeNumber(formData.igst)}</strong>
-                          {showConversion && (
-                            <div className="inr-conversion">
-                              <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.igst))))}
-                            </div>
-                          )}
-                        </td>
-                        <td>
-                          <strong>{safeNumber(formData.taxtotal)}</strong>
-                          {showConversion && (
-                            <div className="inr-conversion">
-                              <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.taxtotal))))}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
 
             <div style={{ padding: "0 0 0 10px" }}>
               <div className="col-xs-12 inside-india">
