@@ -100,6 +100,7 @@ const EditInvoice = () => {
   const [searchState, setSearchState] = useState("");
   const [exchangeRate, setExchangeRate] = useState(1);
   const [showConversion, setShowConversion] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
   const countryDropdownRef = useRef(null);
   const stateDropdownRef = useRef(null);
@@ -634,6 +635,7 @@ const EditInvoice = () => {
         throw new Error(errorMessages || "Failed to update invoice");
       }
       setSuccess(true);
+      setIsSubmitted(true);
       setFormData(prev => ({
         ...prev,
         invoice_number: responseData.invoice_number || prev.invoice_number
@@ -722,823 +724,741 @@ const EditInvoice = () => {
       <form onSubmit={handleSubmit}>
         <div style={{ paddingRight: "10px" }} ref={pdfRef}>
           <h2 className="text-center">TAX INVOICE</h2>
-            {/* ... copy the entire JSX from TaxInvoice.js, but remove all and make all fields editable ... */}
-            {/* For all input/textarea/select fields, remove and  */}
-            {/* The rest of the JSX is identical to TaxInvoice.js, except all fields are editable ... */}
-            <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white" }} >
-          <div className="row date-tables">
-            <div className="col-6">
-              {/* Seller Info */}
-              <table className="table table-bordered black-bordered">
-                <tbody>
-                  <tr>
-                    <td className="gray-background">
-                      <strong style={{ fontSize: "15px", fontfamily: "Arial, sans-serif" }}>
-                        {settingsData.company_name}
-                      </strong>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ padding: "10px", fontFamily: "Arial, sans-serif",whiteSpace: "pre-line", }}>
-                      {settingsData.seller_address}
-                      <br />
-                      Email: {settingsData.seller_email}
-                      <br />
-                      PAN: {settingsData.seller_pan}
-                      <br />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="gray-background">
-                      <strong>GSTIN/UIN:</strong>{settingsData.seller_gstin}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+          <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white" }} >
+            <div className="row date-tables">
+              <div className="col-6">
+                <table className="table table-bordered black-bordered">
+                  <tbody>
+                    <tr>
+                      <td className="gray-background">
+                        <strong style={{ fontSize: "15px", fontfamily: "Arial, sans-serif" }}>
+                          {settingsData.company_name}
+                        </strong>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={{ padding: "10px", fontFamily: "Arial, sans-serif",whiteSpace: "pre-line", }}>
+                        {settingsData.seller_address}
+                        <br />
+                        Email: {settingsData.seller_email}
+                        <br />
+                        PAN: {settingsData.seller_pan}
+                        <br />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="gray-background">
+                        <strong>GSTIN/UIN:</strong>{settingsData.seller_gstin}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
 
-              {/* Buyer Info */}
-              <table className="table table-bordered black-bordered">
-                <tbody>
-                  <tr>
-                    <td className="gray-background">
-                      <strong>Buyer (Bill to):</strong>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      Name:{" "}
-                      <input
-                        type="text"
-                        name="buyer_name"
-                        className="billToTitle"
-                        value={formData.buyer_name}
-                        onChange={handleChange}
-                        required
-                       
-                      />
-                      <br />
-                      Address:
-                      <textarea
-                        type="text"
-                        name="buyer_address"
-                        className="billToAddress"
-                        style={{
-                          width: "100%",
-                          minHeight: "100px",
-                          height: "auto",
-                          whiteSpace: "pre-line",
-                          border: "1px solid #ccc",
-                          borderRadius: "4px",
-                          padding: "10px",
-                          wordBreak: "break-word",
-                          overflowWrap: "break-word",
-                          boxSizing: "border-box"
-                        }}
-                        value={formData.buyer_address}
-                        onChange={handleChange}
-                       
-                      />
-                      <br />
-                      GSTIN/UIN:{" "}
-                      <input
-                        type="text"
-                        name="buyer_gst"
-                        className="billToGST"
-                        value={formData.buyer_gst}
-                        onChange={handleChange}
-                        title="15 digit GST number required"
-                       
-                      />
-                      {error && (
-                        <div className="toast-error">
-                          {error}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-
-              {/* Consignee Info */}
-              <table className="table table-bordered black-bordered">
-                <tbody>
-                  <tr>
-                    <td className="gray-background">
-                      <strong>Consignee (Ship to):</strong>
-                      <button
-                        className="copybutton"
-                        style={{ float: "right" }}
-                        onClick={copyBillToShip}
-                      >
-                        Copy
-                      </button>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      Name:{" "}
-                      <input
-                        type="text"
-                        name="consignee_name"
-                        className="shipToTitle"
-                        value={formData.consignee_name}
-                        onChange={handleChange}
-                       
-                      />
-                      <br />
-                      Address:
-                      <textarea
-                        name="consignee_address"
-                        className="shipToAddress"
-                        style={{
-                          width: "100%",
-                          minHeight: "100px",
-                          height: "auto",
-                          whiteSpace: "pre-line",
-                          border: "1px solid #ccc",
-                          borderRadius: "4px",
-                          padding: "10px",
-                          wordBreak: "break-word",
-                          overflowWrap: "break-word",
-                          boxSizing: "border-box"
-                        }}
-                        value={formData.consignee_address}
-                        onChange={handleChange}
-                       
-                      />
-                      <br />
-                      GSTIN/UIN:{" "}
-                      <input
-                        type="text"
-                        name="consignee_gst"
-                        className="shipToGST"
-                        value={formData.consignee_gst}
-                        onChange={handleChange}
-                        title="15 digit GST number required"
-                       
-                      />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div className="col-6">
-              <table className="table table-bordered black-bordered">
-                <tbody>
-                  <tr>
-                    <td style={{ width: "50%" }}>Invoice No.</td>
-                    <td className="invoice-no-td">
-                      <input
-                        type="text"
-                        style={{ width: "75%", margin: "1px 5px 1px 5px" }}
-                        name="invoice_number"
-                        className="invoice_Number"
-                        value={formData.invoice_number || "Will be generated"}
-                        readOnly
-                      />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Date</td>
-                    <td>
-                      {success ? (
+                <table className="table table-bordered black-bordered">
+                  <tbody>
+                    <tr>
+                      <td className="gray-background">
+                        <strong>Buyer (Bill to):</strong>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Name:{" "}
                         <input
                           type="text"
-                          value={formatDisplayDate(formData.invoice_date)}
-                          readOnly
-                        />
-                      ) : (
-                        <input
-                          type="date"
-                          id="datePicker"
-                          value={formData.invoice_date}
+                          name="buyer_name"
+                          className="billToTitle"
+                          value={formData.buyer_name}
                           onChange={handleChange}
-                          name="invoice_date"
+                          required
+                         
                         />
-                      )}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Delivery Note</td>
-                    <td>
-                      <input
-                        type="text"
-                        className="deliveryNote"
-                        value={formData.delivery_note}
-                        onChange={handleChange}
-                        name="delivery_note"
-                       
-                      />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Mode/Terms of Payment</td>
-                    <td>
-                      <input
-                        type="text"
-                        className="deliveryNote"
-                        value={formData.payment_mode}
-                        onChange={handleChange}
-                        name="payment_mode"
-                       
-                      />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Delivery Note Date</td>
-                    <td>
-                      {success ? (
-                        <input
+                        <br />
+                        Address:
+                        <textarea
                           type="text"
-                          value={formatDisplayDate(formData.delivery_note_date)}
-                          readOnly
-                        />
-                      ) : (
-                        <input
-                          type="date"
-                          name="delivery_note_date"
-                          className="deliveryNote"
-                          value={formData.delivery_note_date}
+                          name="buyer_address"
+                          className="billToAddress"
+                          style={{
+                            width: "100%",
+                            minHeight: "100px",
+                            height: "auto",
+                            whiteSpace: "pre-line",
+                            border: "1px solid #ccc",
+                            borderRadius: "4px",
+                            padding: "10px",
+                            wordBreak: "break-word",
+                            overflowWrap: "break-word",
+                            boxSizing: "border-box"
+                          }}
+                          value={formData.buyer_address}
                           onChange={handleChange}
+                         
                         />
-                      )}
-                    </td>
-                  </tr>
-
-                  <tr>
-                    <td>Destination</td>
-                    <td>
-                      <input
-                        type="text"
-                        name="destination"
-                        className="deliveryNote"
-                        value={formData.destination}
-                        onChange={handleChange}
-                       
-                      />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <table className="table table-bordered black-bordered">
-                <tbody>
-                  <tr>
-                    <td className="gray-background">
-                      <strong>Terms to Delivery:</strong>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <textarea
-                        className="billToAddress"
-                        name="Terms_to_delivery"
-                        style={{ width: "100%", height: "100px" }}
-                        value={formData.Terms_to_delivery}
-                        onChange={handleChange}
-                       
-                      />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <div className="relative w-72">
-                <div className="d-flex gap-4">
-                  {/* Country Selector */}
-                  <div style={{ position: "relative", width: "300px" }} ref={countryDropdownRef}>
-                    <p><strong>Country and currency:</strong></p>
-                    <div
-                      className="border border-gray-300 p-2 rounded flex items-center justify-between cursor-pointer bg-white"
-                      onClick={() => setIsOpenCountry(!isOpenCountry)}
-                      style={{ cursor: 'pointer', height: "40px" }}
-                    >
-                      <div
-                        className="flex items-center"
-                        style={{ height: "30px" }}
-                      >
-                       
-                        <span className="mr-2">
-                          {selectedCountry.name} - {currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Dropdown Menu */}
-                    {isOpenCountry && (
-                      <div className="absolute bg-white border border-gray-300 w-full mt-1 rounded shadow-lg z-10">
+                        <br />
+                        GSTIN/UIN:{" "}
                         <input
                           type="text"
-                          className="w-full p-2 border-b border-gray-200 focus:outline-none"
-                          placeholder="Search country..."
-                          value={searchCountry}
-                          onChange={(e) => setSearchCountry(e.target.value)}
+                          name="buyer_gst"
+                          className="billToGST"
+                          value={formData.buyer_gst}
+                          onChange={handleChange}
+                          title="15 digit GST number required"
+                         
                         />
+                        {error && (
+                          <div className="toast-error">
+                            {error}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
 
-                        {/* Country List */}
-                        <ul
-                          className="overflow-y-auto list-group"
-                          style={{ height: "200px" }}
+                <table className="table table-bordered black-bordered">
+                  <tbody>
+                    <tr>
+                      <td className="gray-background">
+                        <strong>Consignee (Ship to):</strong>
+                        <button
+                          className="copybutton"
+                          style={{ float: "right" }}
+                          onClick={copyBillToShip}
                         >
-                          {filteredCountries.map((country, index) => (
-                            <li
-                              key={index}
-                              className="p-2 flex items-center hover:bg-gray-100 cursor-pointer"
-                              onClick={() => {
-                                setSelectedCountry(country);
-                                setIsOpenCountry(false);
-                                setSearchCountry(""); // Clear search after selection
-                              }}
-                            >
-                             
-                              {country.name} - {currencySymbols[country.currencyCode] || country.currency || country.currencyCode}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
+                          Copy
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Name:{" "}
+                        <input
+                          type="text"
+                          name="consignee_name"
+                          className="shipToTitle"
+                          value={formData.consignee_name}
+                          onChange={handleChange}
+                         
+                        />
+                        <br />
+                        Address:
+                        <textarea
+                          name="consignee_address"
+                          className="shipToAddress"
+                          style={{
+                            width: "100%",
+                            minHeight: "100px",
+                            height: "auto",
+                            whiteSpace: "pre-line",
+                            border: "1px solid #ccc",
+                            borderRadius: "4px",
+                            padding: "10px",
+                            wordBreak: "break-word",
+                            overflowWrap: "break-word",
+                            boxSizing: "border-box"
+                          }}
+                          value={formData.consignee_address}
+                          onChange={handleChange}
+                         
+                        />
+                        <br />
+                        GSTIN/UIN:{" "}
+                        <input
+                          type="text"
+                          name="consignee_gst"
+                          className="shipToGST"
+                          value={formData.consignee_gst}
+                          onChange={handleChange}
+                          title="15 digit GST number required"
+                         
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
 
-                  {/* Show State Selector only if selected country is India */}
-                  {selectedCountry.name === "India" && (
-                    <div style={{ position: "relative", width: "300px" }} ref={stateDropdownRef}>
-                      <p><strong>Select State:</strong></p>
+              <div className="col-6">
+                <table className="table table-bordered black-bordered">
+                  <tbody>
+                    <tr>
+                      <td style={{ width: "50%" }}>Invoice No.</td>
+                      <td className="invoice-no-td">
+                        <input
+                          type="text"
+                          style={{ width: "75%", margin: "1px 5px 1px 5px" }}
+                          name="invoice_number"
+                          className="invoice_Number"
+                          value={formData.invoice_number || "Will be generated"}
+                          readOnly
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Date</td>
+                      <td>
+                        {success ? (
+                          <input
+                            type="text"
+                            value={formatDisplayDate(formData.invoice_date)}
+                            readOnly
+                          />
+                        ) : (
+                          <input
+                            type="date"
+                            id="datePicker"
+                            value={formData.invoice_date}
+                            onChange={handleChange}
+                            name="invoice_date"
+                          />
+                        )}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Delivery Note</td>
+                      <td>
+                        <input
+                          type="text"
+                          className="deliveryNote"
+                          value={formData.delivery_note}
+                          onChange={handleChange}
+                          name="delivery_note"
+                         
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Mode/Terms of Payment</td>
+                      <td>
+                        <input
+                          type="text"
+                          className="deliveryNote"
+                          value={formData.payment_mode}
+                          onChange={handleChange}
+                          name="payment_mode"
+                         
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Delivery Note Date</td>
+                      <td>
+                        {success ? (
+                          <input
+                            type="text"
+                            value={formatDisplayDate(formData.delivery_note_date)}
+                            readOnly
+                          />
+                        ) : (
+                          <input
+                            type="date"
+                            name="delivery_note_date"
+                            className="deliveryNote"
+                            value={formData.delivery_note_date}
+                            onChange={handleChange}
+                          />
+                        )}
+                      </td>
+                    </tr>
+
+                    <tr>
+                      <td>Destination</td>
+                      <td>
+                        <input
+                          type="text"
+                          name="destination"
+                          className="deliveryNote"
+                          value={formData.destination}
+                          onChange={handleChange}
+                         
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <table className="table table-bordered black-bordered">
+                  <tbody>
+                    <tr>
+                      <td className="gray-background">
+                        <strong>Terms to Delivery:</strong>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <textarea
+                          className="billToAddress"
+                          name="Terms_to_delivery"
+                          style={{ width: "100%", height: "100px" }}
+                          value={formData.Terms_to_delivery}
+                          onChange={handleChange}
+                         
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div className="relative w-72">
+                  <div className="d-flex gap-4">
+                    <div style={{ position: "relative", width: "300px" }} ref={countryDropdownRef}>
+                      <p><strong>Country and currency:</strong></p>
                       <div
-                        className="border border-gray-300 p-2 rounded bg-white cursor-pointer states"
-                        onClick={() => setIsOpenState(!isOpenState)}
+                        className="border border-gray-300 p-2 rounded flex items-center justify-between cursor-pointer bg-white"
+                        onClick={() => setIsOpenCountry(!isOpenCountry)}
+                        style={{ cursor: 'pointer', height: "40px" }}
                       >
-                        {selectedState || "-- Select State --"}
+                        <div
+                          className="flex items-center"
+                          style={{ height: "30px" }}
+                        >
+                         
+                          <span className="mr-2">
+                            {selectedCountry.name} - {currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}
+                          </span>
+                        </div>
                       </div>
 
-                      {isOpenState && (
+                      {isOpenCountry && (
                         <div className="absolute bg-white border border-gray-300 w-full mt-1 rounded shadow-lg z-10">
                           <input
                             type="text"
-                            className="w-full p-2 border-b border-gray-200 focus:outline-none"
-                            placeholder="Search state..."
-                            value={searchState}
-                            onChange={(e) => setSearchState(e.target.value)}
+                            name="buyer_name"
+                            className="billToTitle"
+                            value={formData.buyer_name}
+                            onChange={handleChange}
+                            required
+                            readOnly={isSubmitted}
                           />
-                          <ul className="overflow-y-auto" style={{ maxHeight: "200px" }}>
-                            {filteredStates.map((state, index) => (
-                              <li
-                                key={index}
-                                className="p-2 hover:bg-gray-100 cursor-pointer"
-                                onClick={() => {
-                                  setSelectedState(state.name);
-                                  setIsOpenState(false);
-                                  setSearchState("");
-                                }}
-                              >
-                                {state.name}
-                              </li>
-                            ))}
-                          </ul>
+                          <br />
+                          Address:
+                          <textarea
+                            type="text"
+                            name="buyer_address"
+                            className="billToAddress"
+                            style={{ width: "100%", height: "100px" }}
+                            value={formData.buyer_address}
+                            onChange={handleChange}
+                            readOnly={isSubmitted}
+                          />
+                          <br />
+                          GSTIN/UIN:{" "}
+                          <input
+                            type="text"
+                            name="buyer_gst"
+                            className="billToGST"
+                            value={formData.buyer_gst}
+                            onChange={handleChange}
+                            title="15 digit GST number required"
+                            readOnly={isSubmitted}
+                          />
+                          {error && (
+                            <div className="toast-error">
+                              {error}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
-              </div>
 
-              <div className="mt-4">
-                {selectedCountry.name !== "India" && (
-                  <>
-                    <div className="lut">
-                      <p style={{ margin: "0px" }}>Declare under LUT</p>
-                    </div>
-                  </>
-                )}
-              </div>
+                    {selectedCountry.name === "India" && (
+                      <div style={{ position: "relative", width: "300px" }} ref={stateDropdownRef}>
+                        <p><strong>Select State:</strong></p>
+                        <div
+                          className="border border-gray-300 p-2 rounded bg-white cursor-pointer states"
+                          onClick={() => setIsOpenState(!isOpenState)}
+                        >
+                          {selectedState || "-- Select State --"}
+                        </div>
 
-              {showConversion && (
-                <div className="exchange-rate-note mt-2">
-                  <p>
-                    <strong>Note:</strong> Conversion rate used: 1 {selectedCountry.currencyCode} = ₹{exchangeRate.toFixed(4)}
-                  </p>
-                </div>
-              )}
-
-              <input type="hidden" id="currencyTitle" value="INR" />
-              <input type="hidden" id="currencySymbol" value="₹" />
-            </div>
-          </div>
-
-          <div className="row" style={{ marginTop: "20px" }}>
-            <div className="col-xs-12">
-              <table className="table table-bordered black-bordered" style={{ textAlign: "center" }}>
-                <thead>
-                  <tr className="trbody">
-                    <th style={{ backgroundColor: "#f1f3f4" }}>SI No.</th>
-                    <th style={{ backgroundColor: "#f1f3f4" }}>Particulars</th>
-                    <th style={{ backgroundColor: "#f1f3f4" }}>HSN/SAC</th>
-                    <th style={{ backgroundColor: "#f1f3f4" }}>Hours</th>
-                    <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                    <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr style={{ height: "111px" }}>
-                    <td>1</td>
-                    <td>
-                      <input
-                        name="Particulars"
-                        id="gstConsultancy"
-                        value={formData.Particulars}
-                        onChange={handleChange}
-                        type="text"
-                       
-                      />
-                    </td>
-                    <td style={{ width: "130px", paddingTop: "16px" }}>
-                      <select
-                        name="hsn_code"
-                        id="hns_select"
-                        onChange={handleSelectChange}
-                        value={formData.hsn_code || ""}
-                        style={{ height: "46px" }}
-                       
-                        required
-                      >
-                        <option value="">Select</option>
-                        {settingsData?.HSN_codes?.map((code, index) => (
-                          <option key={index} value={code}>{code}</option>
-                        ))}
-                      </select>
-                    </td>
-
-                    <td style={{ width: "10%" }}>
-                      <input
-                        type="number"
-                        name="total_hours"
-                        value={safeNumber(formData.total_hours)}
-                        onChange={(e) => {
-                          handleChange(e);
-                          setFormData(prev => ({
-                            ...prev,
-                            base_amount: ""
-                          }));
-                        }}
-                       
-                      />
-                    </td>
-
-                    <td style={{ width: "10%" }}>
-                      <input
-                        type="number"
-                        name="rate"
-                        value={safeNumber(formData.rate)}
-                        onChange={(e) => {
-                          handleChange(e);
-                          setFormData(prev => ({
-                            ...prev,
-                            base_amount: ""
-                          }));
-                        }}
-                       
-                      />
-                    </td>
-                    <td style={{ width: "200px" }}>
-                      <div style={{ display: "flex", alignItems: "center" }}>
-                        <span className="currency-sym" style={{ marginRight: "4px", fontSize: "18px" }}>
-                          {currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}
-                        </span>
-                        <input
-                          type="number"
-                          name="base_amount"
-                          value={safeNumber(formData.base_amount)}
-                          onChange={handleBaseAmountChange}
-                         
-                          className="amount-input"
-                          placeholder="Enter amount"
-                          style={{ flex: 1 }}
-                        />
+                        {isOpenState && (
+                          <div className="absolute bg-white border border-gray-300 w-full mt-1 rounded shadow-lg z-10">
+                            <input
+                              type="text"
+                              className="w-full p-2 border-b border-gray-200 focus:outline-none"
+                              placeholder="Search state..."
+                              value={searchState}
+                              onChange={(e) => setSearchState(e.target.value)}
+                            />
+                            <ul className="overflow-y-auto" style={{ maxHeight: "200px" }}>
+                              {filteredStates.map((state, index) => (
+                                <li
+                                  key={index}
+                                  className="p-2 hover:bg-gray-100 cursor-pointer"
+                                  onClick={() => {
+                                    setSelectedState(state.name);
+                                    setIsOpenState(false);
+                                    setSearchState("");
+                                  }}
+                                >
+                                  {state.name}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </div>
-                    </td>
-                  </tr>
+                    )}
+                  </div>
+                </div>
 
-                  {selectedCountry.name === "India" && selectedState !== "Gujarat" && (
-                    <tr className="inside-india">
-                      <td></td>
-                      <td>
-                        <span style={{ float: "right" }}>IGST @ 18%</span>
-                      </td>
-                      <td></td>
-                      <td></td>
-                      <td>18%</td>
-                      <td id="igst">
-                        <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
-                        {safeNumber(formData.igst)}
-                      </td>
-                    </tr>
-                  )}
-
-                  {selectedCountry.name === "India" && selectedState === "Gujarat" && (
+                <div className="mt-4">
+                  {selectedCountry.name !== "India" && (
                     <>
-                      <tr className="inside-india">
-                        <td></td>
-                        <td>
-                          <span style={{ float: "right" }}>CGST @ 9%</span>
-                        </td>
-                        <td></td>
-                        <td></td>
-                        <td>9%</td>
-                        <td id="cgst">
-                          <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
-                          {safeNumber(formData.cgst)}
-                        </td>
-                      </tr>
-
-                      <tr className="inside-india">
-                        <td></td>
-                        <td>
-                          <span style={{ float: "right" }}>SGST @ 9%</span>
-                        </td>
-                        <td></td>
-                        <td></td>
-                        <td>9%</td>
-                        <td id="sgst">
-                          <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
-                          {safeNumber(formData.sgst)}
-                        </td>
-                      </tr>
+                      <div className="lut">
+                        <p style={{ margin: "0px" }}>Declare under LUT</p>
+                      </div>
                     </>
                   )}
+                </div>
 
-                  <tr>
-                    <td colSpan="6">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {showConversion && (
+                  <div className="exchange-rate-note mt-2">
+                    <p>
+                      <strong>Note:</strong> Conversion rate used: 1 {selectedCountry.currencyCode} = ₹{exchangeRate.toFixed(4)}
+                    </p>
+                  </div>
+                )}
 
-                        {/* Left side: INR conversion (words + number) */}
-                        <div style={{ whiteSpace: 'nowrap' }}>
-                          {showConversion && (
-                            <>
-                              <span className="currency-text">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.total_with_gst))))} Only —
-                              <span className="currency-text">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}</span> {calculateInrEquivalent(safeNumber(formData.total_with_gst))}
-                            </>
-                          )}
-                        </div>
-
-                        {/* Right side: Total */}
-                        <div style={{ whiteSpace: 'nowrap', textAlign: 'center', width: "200px" }}>
-                          <strong>Total:</strong> &nbsp;
-                          <strong id="total-with-gst">
-                            <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
-                            {safeNumber(formData.total_with_gst)}
-                          </strong>
-                        </div>
-
-                      </div>
-                    </td>
-                  </tr>
-
-
-                </tbody>
-              </table>
+                <input type="hidden" id="currencyTitle" value="INR" />
+                <input type="hidden" id="currencySymbol" value="₹" />
+              </div>
             </div>
-          </div>
 
-          <div className="row">
-            <div className="col-xs-12">
-              <div className="table-bordered black-bordered amount-box">
-                <div>
-                  <p>
-                    <strong>Amount Chargeable (in words):</strong>
-                  </p>
-                  <h4 className="total-in-words">
-                    {currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} {numberToWords(Math.floor(safeNumber(formData.total_with_gst)))} Only
-                  </h4>
+            <div className="row" style={{ marginTop: "20px" }}>
+              <div className="col-xs-12">
+                <table className="table table-bordered black-bordered" style={{ textAlign: "center" }}>
+                  <thead>
+                    <tr className="trbody">
+                      <th style={{ backgroundColor: "#f1f3f4" }}>SI No.</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Particulars</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>HSN/SAC</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Hours</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                      <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{ height: "111px" }}>
+                      <td>1</td>
+                      <td>
+                        <input
+                          name="Particulars"
+                          id="gstConsultancy"
+                          value={formData.Particulars}
+                          onChange={handleChange}
+                          type="text"
+                          readOnly={isSubmitted}
+                        />
+                      </td>
+                      <td style={{ width: "130px", paddingTop: "16px" }}>
+                        <select
+                          name="hsn_code"
+                          id="hns_select"
+                          onChange={handleSelectChange}
+                          value={formData.hsn_code || ""}
+                          style={{ height: "46px" }}
+                          readOnly={isSubmitted}
+                          required
+                        >
+                          <option value="">Select</option>
+                          {settingsData?.HSN_codes?.map((code, index) => (
+                            <option key={index} value={code}>{code}</option>
+                          ))}
+                        </select>
+                      </td>
 
-                  <div className="top-right-corner">
-                    <span>E. & O.E</span>
+                      <td style={{ width: "10%" }}>
+                        <input
+                          type="number"
+                          name="total_hours"
+                          value={safeNumber(formData.total_hours)}
+                          onChange={(e) => {
+                            handleChange(e);
+                            setFormData(prev => ({
+                              ...prev,
+                              base_amount: ""
+                            }));
+                          }}
+                          readOnly={isSubmitted}
+                        />
+                      </td>
+
+                      <td style={{ width: "10%" }}>
+                        <input
+                          type="number"
+                          name="rate"
+                          value={safeNumber(formData.rate)}
+                          onChange={(e) => {
+                            handleChange(e);
+                            setFormData(prev => ({
+                              ...prev,
+                              base_amount: ""
+                            }));
+                          }}
+                          readOnly={isSubmitted}
+                        />
+                      </td>
+                      <td style={{ width: "200px" }}>
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          <span className="currency-sym" style={{ marginRight: "4px", fontSize: "18px" }}>
+                            {currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}
+                          </span>
+                          <input
+                            type="number"
+                            name="base_amount"
+                            value={safeNumber(formData.base_amount)}
+                            onChange={handleBaseAmountChange}
+                            readOnly={isSubmitted}
+                            className="amount-input"
+                            placeholder="Enter amount"
+                            style={{ flex: 1 }}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+
+                    {selectedCountry.name === "India" && selectedState !== "Gujarat" && (
+                      <tr className="inside-india">
+                        <td></td>
+                        <td>
+                          <span style={{ float: "right" }}>IGST @ 18%</span>
+                        </td>
+                        <td></td>
+                        <td></td>
+                        <td>18%</td>
+                        <td id="igst">
+                          <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
+                          {safeNumber(formData.igst)}
+                        </td>
+                      </tr>
+                    )}
+
+                    {(selectedCountry.name === "India" && selectedState === "Gujarat") || selectedCountry.name !== "India" ? (
+                      <div className="row">
+                        <div className="col-xs-12 inside-india">
+                          <table className="table table-bordered invoice-table">
+                            <thead>
+                              <tr>
+                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Central Tax</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">State Tax</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
+                              </tr>
+                              <tr>
+                                <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                                <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {selectedCountry.name === "India" && selectedState === "Gujarat" ? (
+                                <>
+                                  <tr>
+                                    <td>{formData.hsn_code}</td>
+                                    <td>
+                                      {safeNumber(formData.base_amount)}
+                                      {showConversion && (
+                                        <div className="inr-conversion">
+                                          <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td>9%</td>
+                                    <td>
+                                      <span className="currency-sym">{selectedCountry.currency} </span>
+                                      {safeNumber(formData.cgst)}
+                                    </td>
+                                    <td>9%</td>
+                                    <td>
+                                      <span className="currency-sym">{selectedCountry.currency} </span>
+                                      {safeNumber(formData.sgst)}
+                                    </td>
+                                    <td>
+                                      <span className="currency-sym">{selectedCountry.currency} </span>
+                                      {safeNumber(formData.taxtotal)}
+                                    </td>
+                                  </tr>
+                                  <tr className="total-row">
+                                    <td>Total</td>
+                                    <td>
+                                      {safeNumber(formData.base_amount)}
+                                      {showConversion && (
+                                        <div className="inr-conversion">
+                                          <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td></td>
+                                    <td>
+                                      <span className="currency-sym">{selectedCountry.currency} </span>
+                                      {safeNumber(formData.cgst)}
+                                    </td>
+                                    <td></td>
+                                    <td>
+                                      <span className="currency-sym">{selectedCountry.currency} </span>
+                                      {safeNumber(formData.sgst)}
+                                    </td>
+                                    <td>
+                                      <span className="currency-sym">{selectedCountry.currency} </span>
+                                      {safeNumber(formData.taxtotal)}
+                                    </td>
+                                  </tr>
+                                </>
+                              ) : (
+                                <>
+                                  <tr>
+                                    <td>{formData.hsn_code}</td>
+                                    <td>{safeNumber(formData.base_amount)}</td>
+                                    <td>9%</td>
+                                    <td>---</td>
+                                    <td>9%</td>
+                                    <td>---</td>
+                                    <td>---</td>
+                                  </tr>
+                                  <tr className="total-row">
+                                    <td>Total</td>
+                                    <td>{safeNumber(formData.base_amount)}</td>
+                                    <td></td>
+                                    <td>---</td>
+                                    <td></td>
+                                    <td>---</td>
+                                    <td>---</td>
+                                  </tr>
+                                </>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <tr>
+                      <td colSpan="6">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+
+                          <div style={{ whiteSpace: 'nowrap' }}>
+                            {showConversion && (
+                              <>
+                                <span className="currency-text">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.total_with_gst))))} Only —
+                                <span className="currency-text">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}</span> {calculateInrEquivalent(safeNumber(formData.total_with_gst))}
+                              </>
+                            )}
+                          </div>
+
+                          <div style={{ whiteSpace: 'nowrap', textAlign: 'center', width: "200px" }}>
+                            <strong>Total:</strong> &nbsp;
+                            <strong id="total-with-gst">
+                              <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
+                              {safeNumber(formData.total_with_gst)}
+                            </strong>
+                          </div>
+
+                        </div>
+                      </td>
+                    </tr>
+
+
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-xs-12">
+                <div className="table-bordered black-bordered amount-box">
+                  <div>
+                    <p>
+                      <strong>Amount Chargeable (in words):</strong>
+                    </p>
+                    <h4 className="total-in-words">
+                      {currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} {numberToWords(Math.floor(safeNumber(formData.total_with_gst)))} Only
+                    </h4>
+
+                    <div className="top-right-corner">
+                      <span>E. & O.E</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {selectedCountry.name === "India" && selectedState === "Gujarat" && (
-            <div className="row">
+            <div style={{ padding: "0 0 0 10px" }}>
               <div className="col-xs-12 inside-india">
-                <table className="table table-bordered invoice-table">
-                  <thead>
-                    <tr>
-                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
-                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
-                      <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Central Tax</th>
-                      <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">State Tax</th>
-                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
-                    </tr>
-                    <tr>
-                      <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                      <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                      <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                      <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>{formData.hsn_code}</td>
-                      <td>
-                        {safeNumber(formData.base_amount)}
-                        {showConversion && (
-                          <div className="inr-conversion">
-                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
-                          </div>
-                        )}
-                      </td>
-                      <td>9%</td>
-                      <td>
-                        <span className="currency-sym">{selectedCountry.currency} </span>
-                        {safeNumber(formData.cgst)}
-                      </td>
-                      <td>9%</td>
-                      <td>
-                        <span className="currency-sym">{selectedCountry.currency} </span>
-                        {safeNumber(formData.sgst)}
-                      </td>
-                      <td>
-                        <span className="currency-sym">{selectedCountry.currency} </span>
-                        {safeNumber(formData.taxtotal)}
-                      </td>
-                    </tr>
-                    <tr className="total-row">
-                      <td>Total</td>
-                      <td>
-                        {safeNumber(formData.base_amount)}
-                        {showConversion && (
-                          <div className="inr-conversion">
-                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
-                          </div>
-                        )}
-                      </td>
-                      <td></td>
-                      <td>
-                        <span className="currency-sym">{selectedCountry.currency} </span>
-                        {safeNumber(formData.cgst)}
-                      </td>
-                      <td></td>
-                      <td>
-                        <span className="currency-sym">{selectedCountry.currency} </span>
-                        {safeNumber(formData.sgst)}
-                      </td>
-                      <td>
-                        <span className="currency-sym">{selectedCountry.currency} </span>
-                        {safeNumber(formData.taxtotal)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                <div>
+                  <strong>Tax Amount (in words):</strong>
+                  <span className="total-tax-in-words">
+                    {currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} {numberToWords(Math.floor(safeNumber(formData.total_with_gst)))} Only
+                  </span>
+
+                </div>
+              </div>
+              <div className="col-xs-12">
+                <div>
+                  <h4>
+                    <strong>Remarks:</strong>
+                  </h4>
+                  <h5 className="html-remark">
+                    <input
+                      name="remark"
+                      type="text"
+                      value={formData.remark}
+                      onChange={handleChange}
+                      className="remark"
+                      style={{ width: "550px" }}
+                      readOnly={isSubmitted}
+                    />
+                  </h5>
+                </div>
               </div>
             </div>
-          )}
+            <div className="row mb-3">
+              <div className="col-x-12 mb-3">
+                <div className="hr">
+                  <strong>Company's Bank Details</strong>
+                  <br />
+                  A/c Holder's Name: {settingsData.bank_account_holder}
+                  <br />
+                  Bank Name:{settingsData.bank_name}
+                  <br />
+                  A/c No.:{settingsData.account_number}
+                  <br />
+                  IFS Code:{settingsData.ifsc_code}
+                  <br />
+                  Branch: {settingsData.branch}
+                  <br />
+                  SWIFT Code:{settingsData.swift_code}
+                </div>
+                <div className="text-right signatory">
+                  {settingsData.logo && (
+                    <img
+                      src={`http://127.0.0.1:8000${settingsData.logo}`}
+                      alt="Company Logo"
+                      className="logo-image"
+                    />
+                  )}
 
-          {selectedCountry.name === "India" && selectedState !== "Gujarat" && (
-            <div className="row">
-              <div className="col-xs-12 outside-gujarat">
-                <table className="table table-bordered invoice-table">
-                  <thead>
-                    <tr>
-                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
-                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
-                      <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Integrated Tax</th>
-                      <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
-                    </tr>
-                    <tr>
-                      <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                      <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>{formData.hsn_code}</td>
-                      <td>
-                        {safeNumber(formData.base_amount)}
-                        {showConversion && (
-                          <div className="inr-conversion">
-                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
-                          </div>
-                        )}
-                      </td>
-                      <td>18%</td>
-                      <td>
-                        <span className="currency-sym">{selectedCountry.currency} </span>
-                        {safeNumber(formData.igst)}
-                      </td>
-                      <td>
-                        <span className="currency-sym">{selectedCountry.currency} </span>
-                        {safeNumber(formData.taxtotal)}
-                      </td>
-                    </tr>
-                    <tr className="total-row">
-                      <td><strong>Total</strong></td>
-                      <td>
-                        <strong>{safeNumber(formData.base_amount)}</strong>
-                        {showConversion && (
-                          <div className="inr-conversion">
-                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.base_amount))))}
-                          </div>
-                        )}
-                      </td>
-                      <td></td>
-                      <td>
-                        <strong>{safeNumber(formData.igst)}</strong>
-                        {showConversion && (
-                          <div className="inr-conversion">
-                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.igst))))}
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        <strong>{safeNumber(formData.taxtotal)}</strong>
-                        {showConversion && (
-                          <div className="inr-conversion">
-                            <span className="currency-text">{selectedCountry.currency}</span> {numberToWords(Math.floor(calculateInrEquivalent(safeNumber(formData.taxtotal))))}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          <div style={{ padding: "0 0 0 10px" }}>
-            <div className="col-xs-12 inside-india">
-              <div>
-                <strong>Tax Amount (in words):</strong>
-                <span className="total-tax-in-words">
-                  {currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} {numberToWords(Math.floor(safeNumber(formData.total_with_gst)))} Only
-                </span>
-
-              </div>
-            </div>
-            <div className="col-xs-12">
-              <div>
-                <h4>
-                  <strong>Remarks:</strong>
-                </h4>
-                <h5 className="html-remark">
-                  <input
-                    name="remark"
-                    type="text"
-                    value={formData.remark}
-                    onChange={handleChange}
-                    className="remark"
-                    style={{ width: "550px" }}
-                   
-                  />
-                </h5>
-              </div>
-            </div>
-          </div>
-          <div className="row mb-3">
-            <div className="col-x-12 mb-3">
-              <div className="hr">
-                <strong>Company's Bank Details</strong>
-                <br />
-                A/c Holder's Name: {settingsData.bank_account_holder}
-                <br />
-                Bank Name:{settingsData.bank_name}
-                <br />
-                A/c No.:{settingsData.account_number}
-                <br />
-                IFS Code:{settingsData.ifsc_code}
-                <br />
-                Branch: {settingsData.branch}
-                <br />
-                SWIFT Code:{settingsData.swift_code}
-              </div>
-              <div className="text-right signatory">
-                {settingsData.logo && (
-                  <img
-                    src={`http://127.0.0.1:8000${settingsData.logo}`}
-                    alt="Company Logo"
-                    className="logo-image"
-                  />
-                )}
-
-                <p>for Grabsolve Infotech</p>
-                <p>Authorized Signatory</p>
+                  <p>for Grabsolve Infotech</p>
+                  <p>Authorized Signatory</p>
+                </div>
               </div>
             </div>
           </div>
           <div className="pdfbutton">
-          <button
-            type="submit"
-            className="bg-blue-500 text-white px-4 py-2 rounded mt-4"
-            disabled={loading}
-          >
-            {loading ? 'Processing...' : 'Update & Download PDF'}
-          </button>
+            <button
+              type="submit"
+              className="bg-blue-500 text-white px-4 py-2 rounded mt-4"
+              disabled={loading}
+            >
+              {loading ? 'Processing...' : 'Update & Download PDF'}
+            </button>
+          </div>
         </div>
-        </div>
-          
-        </div>
-       
       </form>
+      <p className="text-center">This is a Computer Generated Invoice</p>
     </div>
   );
 };

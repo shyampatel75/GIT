@@ -780,3 +780,7 @@ height: 100%;
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.pdf-only {
+  display: none;
+}

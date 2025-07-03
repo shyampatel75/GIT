@@ -125,6 +125,7 @@ const Profile = () => {
             setSuccess(true);
             setShowFileUpload(false);
             fetchProfile(); // Refresh data
+            navigate("/dashboard"); // Save ke baad dashboard par redirect
         } catch (err) {
             console.error("Error updating profile:", err);
             setError(err.message || "Failed to update profile");
