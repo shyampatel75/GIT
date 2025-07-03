@@ -5,7 +5,7 @@ import "react-toastify/dist/ReactToastify.css";
 import './Address.css';
 // import "./Taxinvoice.css";
 
-
+// Force browser cache refresh - country flag and company code display improved
 const ViewsButton = () => {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -310,7 +310,7 @@ const ViewsButton = () => {
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td style={{ padding: "10px", fontFamily: "Arial, sans-serif", whiteSpace: "pre-line" }}>
+                                        <td>
                                             {settings.seller_address}
                                             <br />
                                             Email: {settings.seller_email}
@@ -341,7 +341,6 @@ const ViewsButton = () => {
                                                 maxWidth: "250px",
                                                 overflowWrap: "break-word",
                                                 height: "150px",
-                                                whiteSpace: "pre-line",
                                             }}
                                         >
                                             {invoice.buyer_address}
@@ -369,7 +368,6 @@ const ViewsButton = () => {
                                                 maxWidth: "250px",
                                                 overflowWrap: "break-word",
                                                 height: "150px",
-                                                whiteSpace: "pre-line",
                                             }}
                                         >
                                             {invoice.consignee_address}
@@ -493,7 +491,9 @@ const ViewsButton = () => {
                                             <div className="lut">
                                                 <p style={{ margin: "0px" }}>Declare under LUT</p>
                                             </div>
-                                    
+                                            <div className="lut mt-3">
+                                                <p style={{ margin: "0px" }}>{settings.company_code}</p>
+                                            </div>
                                         </>
                                     )}
                                 </div>

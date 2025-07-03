@@ -1056,9 +1056,7 @@ def bank_account_detail(request, pk):
         return Response(serializer.data)
 
     elif request.method == 'PUT':
-        data = request.data.copy()
-        data['user'] = request.user.id
-        serializer = BankAccountSerializer(account, data=data)
+        serializer = BankAccountSerializer(account, data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)

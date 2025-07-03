@@ -195,10 +195,6 @@ const Taxinvoice = () => {
     return adjusted;
   };
 
-  const formatToTwoDecimals = (value) => {
-    if (value === null || value === undefined || value === "" || isNaN(value)) return "";
-    return Number(value).toFixed(2);
-  };
 
   useEffect(() => {
     if (settingsData?.HSN_codes?.length > 0 && (!formData.hsn_code || formData.hsn_code === "998314")) {
