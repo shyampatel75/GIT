@@ -737,7 +737,7 @@ const EditInvoice = () => {
                       </td>
                     </tr>
                     <tr>
-                      <td style={{ padding: "10px", fontFamily: "Arial, sans-serif",whiteSpace: "pre-line", }}>
+                      <td style={{ padding: "10px", fontFamily: "Arial, sans-serif" }}>
                         {settingsData.seller_address}
                         <br />
                         Email: {settingsData.seller_email}
@@ -771,7 +771,7 @@ const EditInvoice = () => {
                           value={formData.buyer_name}
                           onChange={handleChange}
                           required
-                         
+                          readOnly={isSubmitted}
                         />
                         <br />
                         Address:
@@ -779,21 +779,10 @@ const EditInvoice = () => {
                           type="text"
                           name="buyer_address"
                           className="billToAddress"
-                          style={{
-                            width: "100%",
-                            minHeight: "100px",
-                            height: "auto",
-                            whiteSpace: "pre-line",
-                            border: "1px solid #ccc",
-                            borderRadius: "4px",
-                            padding: "10px",
-                            wordBreak: "break-word",
-                            overflowWrap: "break-word",
-                            boxSizing: "border-box"
-                          }}
+                          style={{ width: "100%", height: "100px" }}
                           value={formData.buyer_address}
                           onChange={handleChange}
-                         
+                          readOnly={isSubmitted}
                         />
                         <br />
                         GSTIN/UIN:{" "}
@@ -804,7 +793,7 @@ const EditInvoice = () => {
                           value={formData.buyer_gst}
                           onChange={handleChange}
                           title="15 digit GST number required"
-                         
+                          readOnly={isSubmitted}
                         />
                         {error && (
                           <div className="toast-error">
@@ -839,28 +828,17 @@ const EditInvoice = () => {
                           className="shipToTitle"
                           value={formData.consignee_name}
                           onChange={handleChange}
-                         
+                          readOnly={isSubmitted}
                         />
                         <br />
                         Address:
                         <textarea
                           name="consignee_address"
                           className="shipToAddress"
-                          style={{
-                            width: "100%",
-                            minHeight: "100px",
-                            height: "auto",
-                            whiteSpace: "pre-line",
-                            border: "1px solid #ccc",
-                            borderRadius: "4px",
-                            padding: "10px",
-                            wordBreak: "break-word",
-                            overflowWrap: "break-word",
-                            boxSizing: "border-box"
-                          }}
+                          style={{ width: "100%", height: "100px" }}
                           value={formData.consignee_address}
                           onChange={handleChange}
-                         
+                          readOnly={isSubmitted}
                         />
                         <br />
                         GSTIN/UIN:{" "}
@@ -871,7 +849,7 @@ const EditInvoice = () => {
                           value={formData.consignee_gst}
                           onChange={handleChange}
                           title="15 digit GST number required"
-                         
+                          readOnly={isSubmitted}
                         />
                       </td>
                     </tr>
@@ -891,28 +869,21 @@ const EditInvoice = () => {
                           name="invoice_number"
                           className="invoice_Number"
                           value={formData.invoice_number || "Will be generated"}
-                          readOnly
+                          readOnly={isSubmitted}
                         />
                       </td>
                     </tr>
                     <tr>
                       <td>Date</td>
                       <td>
-                        {success ? (
-                          <input
-                            type="text"
-                            value={formatDisplayDate(formData.invoice_date)}
-                            readOnly
-                          />
-                        ) : (
-                          <input
-                            type="date"
-                            id="datePicker"
-                            value={formData.invoice_date}
-                            onChange={handleChange}
-                            name="invoice_date"
-                          />
-                        )}
+                        <input
+                          type="date"
+                          id="datePicker"
+                          value={formData.invoice_date}
+                          onChange={handleChange}
+                          name="invoice_date"
+                          readOnly={isSubmitted}
+                        />
                       </td>
                     </tr>
                     <tr>
@@ -924,7 +895,7 @@ const EditInvoice = () => {
                           value={formData.delivery_note}
                           onChange={handleChange}
                           name="delivery_note"
-                         
+                          readOnly={isSubmitted}
                         />
                       </td>
                     </tr>
@@ -937,28 +908,21 @@ const EditInvoice = () => {
                           value={formData.payment_mode}
                           onChange={handleChange}
                           name="payment_mode"
-                         
+                          readOnly={isSubmitted}
                         />
                       </td>
                     </tr>
                     <tr>
                       <td>Delivery Note Date</td>
                       <td>
-                        {success ? (
-                          <input
-                            type="text"
-                            value={formatDisplayDate(formData.delivery_note_date)}
-                            readOnly
-                          />
-                        ) : (
-                          <input
-                            type="date"
-                            name="delivery_note_date"
-                            className="deliveryNote"
-                            value={formData.delivery_note_date}
-                            onChange={handleChange}
-                          />
-                        )}
+                        <input
+                          type="date"
+                          name="delivery_note_date"
+                          className="deliveryNote"
+                          value={formData.delivery_note_date}
+                          onChange={handleChange}
+                          readOnly={isSubmitted}
+                        />
                       </td>
                     </tr>
 
@@ -971,7 +935,7 @@ const EditInvoice = () => {
                           className="deliveryNote"
                           value={formData.destination}
                           onChange={handleChange}
-                         
+                          readOnly={isSubmitted}
                         />
                       </td>
                     </tr>
@@ -993,7 +957,7 @@ const EditInvoice = () => {
                           style={{ width: "100%", height: "100px" }}
                           value={formData.Terms_to_delivery}
                           onChange={handleChange}
-                         
+                          readOnly={isSubmitted}
                         />
                       </td>
                     </tr>
@@ -1024,40 +988,31 @@ const EditInvoice = () => {
                         <div className="absolute bg-white border border-gray-300 w-full mt-1 rounded shadow-lg z-10">
                           <input
                             type="text"
-                            name="buyer_name"
-                            className="billToTitle"
-                            value={formData.buyer_name}
-                            onChange={handleChange}
-                            required
-                            readOnly={isSubmitted}
+                            className="w-full p-2 border-b border-gray-200 focus:outline-none"
+                            placeholder="Search country..."
+                            value={searchCountry}
+                            onChange={(e) => setSearchCountry(e.target.value)}
                           />
-                          <br />
-                          Address:
-                          <textarea
-                            type="text"
-                            name="buyer_address"
-                            className="billToAddress"
-                            style={{ width: "100%", height: "100px" }}
-                            value={formData.buyer_address}
-                            onChange={handleChange}
-                            readOnly={isSubmitted}
-                          />
-                          <br />
-                          GSTIN/UIN:{" "}
-                          <input
-                            type="text"
-                            name="buyer_gst"
-                            className="billToGST"
-                            value={formData.buyer_gst}
-                            onChange={handleChange}
-                            title="15 digit GST number required"
-                            readOnly={isSubmitted}
-                          />
-                          {error && (
-                            <div className="toast-error">
-                              {error}
-                            </div>
-                          )}
+
+                          <ul
+                            className="overflow-y-auto list-group"
+                            style={{ height: "200px" }}
+                          >
+                            {filteredCountries.map((country, index) => (
+                              <li
+                                key={index}
+                                className="p-2 flex items-center hover:bg-gray-100 cursor-pointer"
+                                onClick={() => {
+                                  setSelectedCountry(country);
+                                  setIsOpenCountry(false);
+                                  setSearchCountry("");
+                                }}
+                              >
+                               
+                                {country.name} - {currencySymbols[country.currencyCode] || country.currency || country.currencyCode}
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       )}
                     </div>
@@ -1235,6 +1190,7 @@ const EditInvoice = () => {
                       </tr>
                     )}
 
+                    {/* Render CGST/SGST table for India+Gujarat (with values) and for non-India (with dashes) */}
                     {(selectedCountry.name === "India" && selectedState === "Gujarat") || selectedCountry.name !== "India" ? (
                       <div className="row">
                         <div className="col-xs-12 inside-india">
@@ -1309,6 +1265,7 @@ const EditInvoice = () => {
                                   </tr>
                                 </>
                               ) : (
+                                // For non-India, show dashes (---) in all cells
                                 <>
                                   <tr>
                                     <td>{formData.hsn_code}</td>
@@ -1447,15 +1404,15 @@ const EditInvoice = () => {
               </div>
             </div>
           </div>
-          <div className="pdfbutton">
-            <button
-              type="submit"
-              className="bg-blue-500 text-white px-4 py-2 rounded mt-4"
-              disabled={loading}
-            >
-              {loading ? 'Processing...' : 'Update & Download PDF'}
-            </button>
-          </div>
+        </div>
+        <div className="pdfbutton">
+          <button
+            type="submit"
+            className="bg-blue-500 text-white px-4 py-2 rounded mt-4"
+            disabled={loading}
+          >
+            {loading ? 'Processing...' : 'Update & Download PDF'}
+          </button>
         </div>
       </form>
       <p className="text-center">This is a Computer Generated Invoice</p>

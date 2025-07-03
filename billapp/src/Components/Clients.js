@@ -415,9 +415,9 @@ const Clients = () => {
                     <td>{idx === 0 ? group.serial_number : ''}</td>
                     <td>{group.buyer_name}</td>
                     <td>
-                      <div style={{ whiteSpace: "pre-line" }}>
-                        {group.buyer_address}
-                      </div>
+                      {group.buyer_address.length > 20
+                        ? group.buyer_address.substring(0, 20) + "..."
+                        : group.buyer_address}
                     </td>
                     <td>{invoice.invoice_number}</td>
                     <td>
@@ -481,8 +481,6 @@ const Clients = () => {
                         </button>
                         <span className="tooltip-text">Newbill</span>
                       </div>
-
-                     
                     </td>
                   </tr>
                 ))
@@ -555,7 +553,7 @@ const Clients = () => {
                             height: "120px",
                             padding: "5px"
                           }}>
-                            <div style={{ whiteSpace: "pre-line" }}>
+                            <div style={{ whiteSpace: "pre-wrap" }}>
                               {selectedInvoice.buyer_address}
                             </div>
                           </td>
@@ -582,7 +580,7 @@ const Clients = () => {
                             height: "120px",
                             padding: "5px"
                           }}>
-                            <div style={{ whiteSpace: "pre-line" }}>
+                            <div style={{ whiteSpace: "pre-wrap" }}>
                               {selectedInvoice.consignee_address}
                             </div>
                           </td>
@@ -689,7 +687,9 @@ const Clients = () => {
                             <div className="lut">
                               <p style={{ margin: "0px" }}>Declare under LUT</p>
                             </div>
-                          
+                            <div className="lut mt-3">
+                              <p style={{ margin: "0px" }}>{selectedInvoice.company_code}</p>
+                            </div>
                           </>
                         </div>
                       )}
