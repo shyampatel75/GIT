@@ -763,7 +763,15 @@ const Taxinvoice = () => {
       }
 
       await generatePDF(formData.invoice_number);
-      toast.success('PDF downloaded successfully!');
+
+      toast.success(isSubmitted ? 'PDF downloaded successfully!' : 'Invoice processed successfully!', {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
 
     } catch (err) {
       console.error("Error:", err);
@@ -795,8 +803,12 @@ const Taxinvoice = () => {
       return;
     }
 
-    // Remove the code that shows/hides .pdf-only elements
-    // html2canvas can capture hidden elements
+    // Show .pdf-only before generating PDF
+    const pdfOnlyElements = document.querySelectorAll('.pdf-only');
+    pdfOnlyElements.forEach(el => {
+      el.style.display = 'block';
+    });
+
     try {
       await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -841,6 +853,11 @@ const Taxinvoice = () => {
         pauseOnHover: true,
         draggable: true,
       });
+    } finally {
+      // Hide .pdf-only after generating PDF
+      pdfOnlyElements.forEach(el => {
+        el.style.display = 'none';
+      });
     }
   };
 
@@ -848,9 +865,24 @@ const Taxinvoice = () => {
     try {
       setLoading(true);
       await generatePDF(formData.invoice_number);
-      toast.success('PDF downloaded successfully!');
+      toast.success('PDF downloaded successfully!', {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
     } catch (error) {
-      // ...
+      console.error("PDF download error:", error);
+      toast.error("Failed to download PDF", {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
     } finally {
       setLoading(false);
     }
@@ -1077,11 +1109,11 @@ const Taxinvoice = () => {
                         name="invoice_date"
                         readOnly={isSubmitted}
                       />
-                      {isSubmitted && (
+                      {/* {isSubmitted && (
                         <div style={{ marginTop: '5px', fontWeight: 'bold' }}>
                           {formatDisplayDate(formData.invoice_date)}
                         </div>
-                      )}
+                      )} */}
                     </td>
                   </tr>
                   <tr>
@@ -1121,11 +1153,11 @@ const Taxinvoice = () => {
                         onChange={handleChange}
                         readOnly={isSubmitted}
                       />
-                      {isSubmitted && (
+                      {/* {isSubmitted && (
                         <div style={{ marginTop: '5px', fontWeight: 'bold' }}>
                           {formatDisplayDate(formData.delivery_note_date)}
                         </div>
-                      )}
+                      )} */}
                     </td>
                   </tr>
 
@@ -1477,7 +1509,7 @@ const Taxinvoice = () => {
                     <strong>Amount Chargeable (in words):</strong>
                   </p>
                   <h4 className="total-in-words">
-                     {selectedCountry.currencyCode} {numberToWordsIndian(Math.floor(safeNumber(formData.total_with_gst)))} Only
+                    {selectedCountry.name}  {selectedCountry.currencyCode} {numberToWordsIndian(Math.floor(safeNumber(formData.total_with_gst)))} Only
                   </h4>
 
                   <div className="top-right-corner">
@@ -1578,7 +1610,7 @@ const Taxinvoice = () => {
               <div>
                 <strong>Tax Amount (in words):</strong>
                 <span className="total-tax-in-words">
-                   {selectedCountry.currencyCode} {numberToWordsIndian(Math.floor(safeNumber(formData.total_with_gst)))} Only
+                  {selectedCountry.name} {selectedCountry.currencyCode} {numberToWordsIndian(Math.floor(safeNumber(formData.total_with_gst)))} Only
                 </span>
 
               </div>
@@ -1956,7 +1988,7 @@ const Taxinvoice = () => {
                       <strong>Amount Chargeable (in words):</strong>
                     </p>
                     <h4 className="total-in-words">
-                      {selectedCountry.currencyCode} {numberToWordsIndian(Math.floor(safeNumber(formData.total_with_gst)))} Only
+                      {selectedCountry.name}  {selectedCountry.currencyCode} {numberToWordsIndian(Math.floor(safeNumber(formData.total_with_gst)))} Only
                     </h4>
                     <div className="top-right-corner">
                       <span>E. & O.E</span>
@@ -2056,7 +2088,7 @@ const Taxinvoice = () => {
                 <div>
                   <strong>Tax Amount (in words):</strong>
                   <span className="total-tax-in-words">
-                     {selectedCountry.currencyCode} {numberToWordsIndian(Math.floor(safeNumber(formData.total_with_gst)))} Only
+                    {selectedCountry.name} {selectedCountry.currencyCode} {numberToWordsIndian(Math.floor(safeNumber(formData.total_with_gst)))} Only
                   </span>
                 </div>
               </div>
