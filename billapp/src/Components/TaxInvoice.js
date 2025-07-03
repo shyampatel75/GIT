@@ -1509,7 +1509,7 @@ const Taxinvoice = () => {
                     <strong>Amount Chargeable (in words):</strong>
                   </p>
                   <h4 className="total-in-words">
-                    {selectedCountry.name}  {selectedCountry.currencyCode} {numberToWordsIndian(Math.floor(safeNumber(formData.total_with_gst)))} Only
+                    {selectedCountry.currencyCode} {numberToWordsIndian(Math.floor(safeNumber(formData.total_with_gst)))} Only
                   </h4>
 
                   <div className="top-right-corner">
@@ -1988,7 +1988,7 @@ const Taxinvoice = () => {
                       <strong>Amount Chargeable (in words):</strong>
                     </p>
                     <h4 className="total-in-words">
-                      {selectedCountry.name}  {selectedCountry.currencyCode} {numberToWordsIndian(Math.floor(safeNumber(formData.total_with_gst)))} Only
+                      {selectedCountry.currencyCode} {numberToWordsIndian(Math.floor(safeNumber(formData.total_with_gst)))} Only
                     </h4>
                     <div className="top-right-corner">
                       <span>E. & O.E</span>
