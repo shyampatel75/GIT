@@ -221,44 +221,56 @@ const Dashboard = () => {
           <h4 className="mb-3">Customer Overview</h4>
           <Newscustomerchart />
         </div> */}
-    <div className="stats-container">
-  {/* Clients */}
-  <div className="stat-card bg-grey">
-    {/* <i className="bi bi-people-fill stat-icon"></i> */}
-      <img
-      src="dash-client.gif"
-      alt="Total Bills"
-      className="stat-icon"
-      style={{ height: "80px", marginBottom: "0px" }}
-    />
-    <div className="stat-value"> {clientCount} {error && <p className="text-danger">{error}</p>} </div>
-    <div className="stat-label">Clients</div>
-  </div>
+        <div className="stats-container">
+          {/* Clients */}
+          <div className="stat-card bg-grey">
+            {/* <i className="bi bi-people-fill stat-icon"></i> */}
+            <img
+              src="dash-client.gif"
+              alt="Total Bills"
+              className="stat-icon"
+              style={{ height: "80px", marginBottom: "0px" }}
+            />
+            <div className="stat-value"> {clientCount} {error && <p className="text-danger">{error}</p>} </div>
+            <div className="stat-label">Clients</div>
+          </div>
 
-  {/* Total Bills */}
-  <div className="stat-card bg-green">
-    <img
-      src="https://cdn.dribbble.com/userupload/26806182/file/original-46e1551746edbbe3a03b91edf46663f8.gif"
-      alt="Total Bills"
-      className="stat-icon"
-      style={{ height: "80px", marginBottom: "0px" }}
-    />
-    <div className="stat-value">{totalBillCount}</div>
-    <div className="stat-label">Total Bills</div>
-  </div>
+          {/* Total Bills */}
+          <div className="stat-card bg-green">
+            <img
+              src="https://cdn.dribbble.com/userupload/26806182/file/original-46e1551746edbbe3a03b91edf46663f8.gif"
+              alt="Total Bills"
+              className="stat-icon"
+              style={{ height: "80px", marginBottom: "0px" }}
+            />
+            <div className="stat-value">{totalBillCount}</div>
+            <div className="stat-label">Total Bills</div>
+          </div>
 
-  {/* Employees */}
-  <div className="stat-card bg-yellow">
-  <img
-      src="https://www.xanikainfotech.com/assets/images/shapes/usside.gif"
-      alt="Total Bills"
-      className="stat-icon"
-      style={{ height: "80px", marginBottom: "0px" }}
-    />
-    <div className="stat-value">{totalEmployees}</div>
-    <div className="stat-label">Total Employee</div>
-  </div>
-</div>
+          {/* Employees */}
+          <div className="stat-card bg-yellow">
+            <img
+              src="https://www.xanikainfotech.com/assets/images/shapes/usside.gif"
+              alt="Total Bills"
+              className="stat-icon"
+              style={{ height: "80px", marginBottom: "0px" }}
+            />
+            <div className="stat-value">{totalEmployees}</div>
+            <div className="stat-label">Total Employee</div>
+          </div>
+
+          {/* New Bill */}
+          <div className="stat-card bg-blue" onClick={() => handleButtonClick("/tax-invoice")}>
+            <img
+              src="/2.gif"
+              alt="New Bill"
+              className="stat-icon"
+              style={{ height: "80px", marginBottom: "0px" }}
+            />
+            <div className="stat-value">+</div>
+            <div className="stat-label">New Bill</div>
+          </div>
+        </div>
 
         <div className="dashboard-buttons-container">
           {menuItems.map((item, index) => (

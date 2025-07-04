@@ -87,3 +87,8 @@
     background: linear-gradient(117deg, #f5e861, #f2f3e6f7) !important;
     box-shadow: 9px 11px 10px 0px #b4b5b0;
 }
+
+.bg-blue {
+  background: linear-gradient(135deg, #60a5fa, #e0f2fe) !important;
+  box-shadow: 9px 11px 10px 0px #b4b5b0;
+}
