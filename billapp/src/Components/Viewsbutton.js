@@ -287,30 +287,88 @@ const ViewsButton = () => {
         return <div>Loading data...</div>;
     }
 
+    // Currency symbol map (copied from TaxInvoice.js)
+    const currencySymbols = {
+        INR: "₹",
+        USD: "$",
+        EUR: "€",
+        GBP: "£",
+        JPY: "¥",
+        // add more as needed
+    };
+    // Helper for safe number display
+    const safeNumber = (value) => {
+        if (value === null || value === undefined || isNaN(value) || value === "") return "";
+        return value;
+    };
+    // Helper for date display (copied from TaxInvoice.js)
+    const formatDisplayDate = (dateStr) => {
+        if (!dateStr) return "";
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return dateStr;
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+    };
+    // Indian number to words (copied from TaxInvoice.js)
+    const numberToWordsIndian = (num) => {
+        if (num === 0) return "Zero";
+        const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
+        const teens = ["Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+        const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+        let word = "";
+        function getWords(n) {
+            let str = "";
+            if (n > 19) {
+                str += tens[Math.floor(n / 10)] + (n % 10 ? " " + ones[n % 10] : "");
+            } else if (n > 9) {
+                str += teens[n - 10];
+            } else if (n > 0) {
+                str += ones[n];
+            }
+            return str;
+        }
+        let crore = Math.floor(num / 10000000);
+        num = num % 10000000;
+        let lakh = Math.floor(num / 100000);
+        num = num % 100000;
+        let thousand = Math.floor(num / 1000);
+        num = num % 1000;
+        let hundred = Math.floor(num / 100);
+        let rest = num % 100;
+        if (crore) word += getWords(crore) + " Crore ";
+        if (lakh) word += getWords(lakh) + " Lakh ";
+        if (thousand) word += getWords(thousand) + " Thousand ";
+        if (hundred) word += ones[hundred] + " Hundred ";
+        if (rest) {
+            if (word !== "") word += "and ";
+            word += getWords(rest) + " ";
+        }
+        return word.trim();
+    };
+
+    // --- MAIN RENDER ---
     return (
-        <div style={{ paddingLeft: "100px" }}>
-            <ToastContainer
-                position="top-right"
-                autoClose={3000}
-                limit={1}
-            />
-            <div style={{ paddingRight: "10px" }}>
-                <h2 className="text-center">TAX INVOICE</h2>
-                <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white" }}>
+        <div style={{ paddingLeft: "70px", fontFamily: "Arial, sans-serif" }}>
+            <ToastContainer />
+            <div style={{ paddingRight: "10px" }} >
+                <h1 className="text-center"><strong><b>TAX INVOICE</b></strong></h1>
+                <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white", width: "100%", padding: "0" }} >
                     <div className="row date-tables">
                         <div className="col-6">
                             {/* Seller Info */}
                             <table className="table table-bordered black-bordered">
-                                <tbody style={{ border: "2px solid" }}>
+                                <tbody>
                                     <tr>
                                         <td className="gray-background">
-                                            <strong style={{ fontSize: "15px" }}>
-                                                {settings.company_name}:
+                                            <strong style={{ fontSize: "15px", fontFamily: "Arial, sans-serif" }}>
+                                                {settings.company_name}
                                             </strong>
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td>
+                                        <td style={{ padding: "10px", fontFamily: "Arial, sans-serif", whiteSpace: "pre-line" }}>
                                             {settings.seller_address}
                                             <br />
                                             Email: {settings.seller_email}
@@ -321,288 +379,262 @@ const ViewsButton = () => {
                                     </tr>
                                     <tr>
                                         <td className="gray-background">
-                                            <strong>GSTIN/UIN:</strong> {settings.seller_gstin}
+                                            <strong>GSTIN/UIN:</strong>{settings.seller_gstin}
                                         </td>
                                     </tr>
                                 </tbody>
                             </table>
-
                             {/* Buyer Info */}
                             <table className="table table-bordered black-bordered">
-                                <tbody style={{ border: "2px solid" }}>
+                                <tbody>
                                     <tr>
                                         <td className="gray-background">
-                                            <strong>Buyer (Bill to):</strong> {invoice.buyer_name}
+                                            <strong>Buyer (Bill to):</strong>
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td
-                                            style={{
-                                                maxWidth: "250px",
-                                                overflowWrap: "break-word",
-                                                height: "150px",
-                                            }}
-                                        >
-                                            {invoice.buyer_address}
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td className="gray-background">
-                                            <strong>GSTIN/UIN:</strong> {invoice.buyer_gst}
+                                        <td>
+                                            Name: {invoice.buyer_name}
+                                            <br />
+                                            Address:
+                                            <div className="billToAddress" style={{ width: "100%", minHeight: "100px", height: "auto", whiteSpace: "pre-line", border: "1px solid #ccc", borderRadius: "4px", padding: "10px", wordBreak: "break-word", overflowWrap: "break-word", boxSizing: "border-box" }}>
+                                                {invoice.buyer_address}
+                                            </div>
+                                            <br />
+                                            GSTIN/UIN: {invoice.buyer_gst}
                                         </td>
                                     </tr>
                                 </tbody>
                             </table>
-
                             {/* Consignee Info */}
                             <table className="table table-bordered black-bordered">
-                                <tbody style={{ border: "2px solid" }}>
+                                <tbody>
                                     <tr>
                                         <td className="gray-background">
-                                            <strong>Consignee (Ship to):</strong> {invoice.consignee_name}
+                                            <strong>Consignee (Ship to):</strong>
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td
-                                            style={{
-                                                maxWidth: "250px",
-                                                overflowWrap: "break-word",
-                                                height: "150px",
-                                            }}
-                                        >
-                                            {invoice.consignee_address}
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td className="gray-background">
-                                            <strong>GSTIN/UIN:</strong> {invoice.consignee_gst}
+                                        <td>
+                                            Name: {invoice.consignee_name}
+                                            <br />
+                                            Address:
+                                            <div className="shipToAddress" style={{ width: "100%", minHeight: "100px", height: "auto", whiteSpace: "pre-line", border: "1px solid #ccc", borderRadius: "4px", padding: "10px", wordBreak: "break-word", overflowWrap: "break-word", boxSizing: "border-box" }}>
+                                                {invoice.consignee_address}
+                                            </div>
+                                            <br />
+                                            GSTIN/UIN: {invoice.consignee_gst}
                                         </td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
-
                         <div className="col-6">
                             <table className="table table-bordered black-bordered">
-                                <tbody style={{ border: "2px solid" }}>
+                                <tbody>
                                     <tr>
                                         <td style={{ width: "50%" }}>Invoice No.</td>
-                                        <td>{invoice.invoice_number}</td>
+                                        <td className="invoice-no-td">
+                                            <span>{invoice.invoice_number || "Will be generated"}</span>
+                                        </td>
                                     </tr>
                                     <tr>
                                         <td>Date</td>
-                                        <td>{formatDate(invoice.invoice_date)}</td>
+                                        <td>
+                                            <span>{formatDisplayDate(invoice.invoice_date)}</span>
+                                        </td>
                                     </tr>
                                     <tr>
                                         <td>Delivery Note</td>
-                                        <td>{invoice.delivery_note}</td>
+                                        <td>
+                                            <span>{invoice.delivery_note}</span>
+                                        </td>
                                     </tr>
                                     <tr>
                                         <td>Mode/Terms of Payment</td>
-                                        <td>{invoice.payment_mode}</td>
+                                        <td>
+                                            <span>{invoice.payment_mode}</span>
+                                        </td>
                                     </tr>
                                     <tr>
                                         <td>Delivery Note Date</td>
-                                        <td>{formatDate(invoice.delivery_note_date)}</td>
+                                        <td>
+                                            <span>{formatDisplayDate(invoice.delivery_note_date)}</span>
+                                        </td>
                                     </tr>
                                     <tr>
                                         <td>Destination</td>
-                                        <td>{invoice.destination}</td>
+                                        <td>
+                                            <span>{invoice.destination}</span>
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
-
                             <table className="table table-bordered black-bordered">
-                                <tbody style={{ width: "100%", border: "2px solid" }}>
+                                <tbody>
                                     <tr>
                                         <td className="gray-background">
                                             <strong>Terms to Delivery:</strong>
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td style={{
-                                            maxWidth: "250px",
-                                            overflowWrap: "break-word",
-                                            height: "150px",
-                                        }}>
-                                            {invoice.Terms_to_delivery}
+                                        <td>
+                                            <div className="billToAddress" style={{ width: "100%", minHeight: "100px", height: "auto", whiteSpace: "pre-line", border: "1px solid #ccc", borderRadius: "4px", padding: "10px", wordBreak: "break-word", overflowWrap: "break-word", boxSizing: "border-box" }}>
+                                                {invoice.Terms_to_delivery}
+                                            </div>
                                         </td>
                                     </tr>
                                 </tbody>
                             </table>
-
-                            <div className="relative w-full max-w-4xl mx-auto">
-
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        gap: 24,
-                                        marginBottom: 8,
-                                    }}
-                                >
-                                    {/* Country Section */}
-                                    <div style={{ flex: invoice.country !== "India" ? 0.5 : 1 }}>
+                            <div className="relative w-72">
+                                <div className="d-flex gap-4">
+                                    {/* Country Selector (read-only) */}
+                                    <div style={{ position: "relative", width: "300px" }}>
                                         <p><strong>Country and currency:</strong></p>
-                                        <div
-                                            style={{
-                                                border: "1px solid #ccc",
-                                                borderRadius: 4,
-                                                padding: "4px 12px",
-                                                background: "#f9f9f9",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: 8,
-                                                width: "100%",
-                                            }}
-                                        >
-                                            <span>{selectedCountry?.name}</span>
-                                            <span>-</span>
-                                            <span>
-                                                 ({selectedCountry?.currencyCode})
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* State Section */}
-                                    {invoice.country === "India" && selectedState && (
-                                        <div style={{ flex: 1 }}>
-                                            <p><strong>Select State:</strong></p>
-                                            <div
-                                                style={{
-                                                    border: "1px solid #ccc",
-                                                    borderRadius: 4,
-                                                    padding: "4px 12px",
-                                                    background: "#f9f9f9",
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    width: "100%",
-                                                }}
-                                            >
-                                                <span>
-                                                    <strong></strong> {selectedState}
+                                        <div className="border border-gray-300 p-2 rounded flex items-center justify-between bg-white" style={{ height: "40px" }}>
+                                            <div className="flex items-center" style={{ height: "30px" }}>
+                                                <span className="mr-2">
+                                                    {invoice.country} - {invoice.currency} {/* currency code */}
                                                 </span>
                                             </div>
                                         </div>
+                                    </div>
+                                    {/* State Selector only if India */}
+                                    {invoice.country === "India" && (
+                                        <div style={{ position: "relative", width: "300px" }}>
+                                            <p><strong>Select State:</strong></p>
+                                            <div className="border border-gray-300 p-2 rounded bg-white states">
+                                                {invoice.state || "-- Select State --"}
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
-                                <div className="mt-4">
-                                    {selectedCountry.name !== "India" && (
-                                        <>
-                                            <div className="lut">
-                                                <p style={{ margin: "0px" }}>Declare under LUT</p>
-                                            </div>
-                                            <div className="lut mt-3">
-                                                <p style={{ margin: "0px" }}>{settings.company_code}</p>
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-
-                              
                             </div>
-
-                            <input type="hidden" id="currencyTitle" value="INR" />
-                            <input type="hidden" id="currencySymbol" value="₹" />
+                            <div className="mt-4">
+                                {invoice.country !== "India" && (
+                                    <div className="lut">
+                                        <p style={{ margin: "0px" }}>Declare under LUT</p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
-
-                    {/* Rest of the component remains the same */}
-                    <div className="row">
+                    <div className="row" style={{ marginTop: "20px" }}>
                         <div className="col-xs-12">
-                            <table className="table table-bordered black-bordered">
+                            <table className="table table-bordered black-bordered" style={{ textAlign: "center" }}>
                                 <thead>
-                                    <tr className="trbody" style={{ border: "2px solid" }}>
-                                        <th>SI No.</th>
-                                        <th>Particulars</th>
-                                        <th>HSN/SAC</th>
-                                        <th>Hours</th>
-                                        <th>Rate</th>
-                                        <th>Amount</th>
+                                    <tr className="trbody">
+                                        <th style={{ backgroundColor: "#f1f3f4" }}>SI No.</th>
+                                        <th style={{ backgroundColor: "#f1f3f4" }}>Particulars</th>
+                                        <th style={{ backgroundColor: "#f1f3f4" }}>HSN/SAC</th>
+                                        <th style={{ backgroundColor: "#f1f3f4" }}>Hours</th>
+                                        <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                                        <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
                                     </tr>
                                 </thead>
-                                <tbody style={{ border: "2px solid" }}>
+                                <tbody>
                                     <tr style={{ height: "111px" }}>
                                         <td>1</td>
-                                        <td>{invoice.Particulars}</td>
-                                        <td style={{ width: "130px" }}>{invoice.hsn_code || invoice.hsn_sac_code}</td>
-                                        <td style={{ width: "10%" }}>{isNaN(invoice.total_hours) ? '' : invoice.total_hours}</td>
-                                        <td style={{ width: "10%" }}>{isNaN(invoice.rate) ? '' : invoice.rate}</td>
+                                        <td>
+                                            {invoice.Particulars && invoice.Particulars.split('\n').map((line, idx) => (
+                                                <React.Fragment key={idx}>
+                                                    {line}<br />
+                                                </React.Fragment>
+                                            ))}
+                                        </td>
+                                        <td style={{ width: "130px", paddingTop: "16px" }}>
+                                            <span>{invoice.hsn_code || invoice.hsn_sac_code}</span>
+                                        </td>
+                                        <td style={{ width: "10%" }}>
+                                            <span>{safeNumber(invoice.total_hours)}</span>
+                                        </td>
+                                        <td style={{ width: "10%" }}>
+                                            <span>{safeNumber(invoice.rate)}</span>
+                                        </td>
                                         <td style={{ width: "200px" }}>
-                                            <span className="currency-sym">
-                                                {invoice.currency} {isNaN(invoice.base_amount) ? '' : invoice.base_amount}
+                                            <span className="currency-sym" style={{ marginRight: "4px", fontSize: "18px" }}>
+                                                {currencySymbols[invoice.currency] || invoice.currency || invoice.currencyCode}
                                             </span>
+                                            <span>{safeNumber(invoice.base_amount)}</span>
                                         </td>
                                     </tr>
-                                    {invoice.country === "India" && (
+                                    {invoice.country === "India" && invoice.state !== "Gujarat" && (
+                                        <tr className="inside-india">
+                                            <td></td>
+                                            <td>
+                                                <span style={{ float: "right" }}>IGST @ 18%</span>
+                                            </td>
+                                            <td></td>
+                                            <td></td>
+                                            <td>18%</td>
+                                            <td id="igst">
+                                                <span className="currency-sym">{currencySymbols[invoice.currency] || invoice.currency || invoice.currencyCode} </span>
+                                                {safeNumber(invoice.igst)}
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {invoice.country === "India" && invoice.state === "Gujarat" && (
                                         <>
-                                            {invoice.state === "Gujarat" ? (
-                                                <>
-                                                    {/* CGST Row */}
-                                                    <tr className="inside-india">
-                                                        <td></td>
-                                                        <td><span style={{ float: "right" }}>CGST @ 9%</span></td>
-                                                        <td></td>
-                                                        <td></td>
-                                                        <td>9%</td>
-                                                        <td id="cgst">
-                                                            <span className="currency-sym">{invoice.currency} {isNaN(invoice.cgst) ? '' : invoice.cgst}</span>
-                                                        </td>
-                                                    </tr>
-                                                    {/* SGST Row */}
-                                                    <tr className="inside-india">
-                                                        <td></td>
-                                                        <td><span style={{ float: "right" }}>SGST @ 9%</span></td>
-                                                        <td></td>
-                                                        <td></td>
-                                                        <td>9%</td>
-                                                        <td id="sgst">
-                                                            <span className="currency-sym">{invoice.currency} {isNaN(invoice.sgst) ? '' : invoice.sgst}</span>
-                                                        </td>
-                                                    </tr>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    {/* IGST Row */}
-                                                    <tr className="inside-india">
-                                                        <td></td>
-                                                        <td><span style={{ float: "right" }}>IGST @ 18%</span></td>
-                                                        <td></td>
-                                                        <td></td>
-                                                        <td>18%</td>
-                                                        <td id="igst">
-                                                            <span className="currency-sym">{invoice.currency} {isNaN(invoice.taxtotal) ? '' : invoice.taxtotal}</span>
-                                                        </td>
-                                                    </tr>
-                                                </>
-                                            )}
+                                            <tr className="inside-india">
+                                                <td></td>
+                                                <td>
+                                                    <span style={{ float: "right" }}>CGST @ 9%</span>
+                                                </td>
+                                                <td></td>
+                                                <td></td>
+                                                <td>9%</td>
+                                                <td id="cgst">
+                                                    <span className="currency-sym">{currencySymbols[invoice.currency] || invoice.currency || invoice.currencyCode} </span>
+                                                    {safeNumber(invoice.cgst)}
+                                                </td>
+                                            </tr>
+                                            <tr className="inside-india">
+                                                <td></td>
+                                                <td>
+                                                    <span style={{ float: "right" }}>SGST @ 9%</span>
+                                                </td>
+                                                <td></td>
+                                                <td></td>
+                                                <td>9%</td>
+                                                <td id="sgst">
+                                                    <span className="currency-sym">{currencySymbols[invoice.currency] || invoice.currency || invoice.currencyCode} </span>
+                                                    {safeNumber(invoice.sgst)}
+                                                </td>
+                                            </tr>
                                         </>
                                     )}
-                                    <tr>
-                                        <td colSpan="6">
-                                            <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                {/* Left side: INR Equivalent (if applicable) */}
-                                                {invoice.country !== "India" && invoice.inr_equivalent && (
-                                                    <div style={{ whiteSpace: 'nowrap' }}>
-                                                        INR Equivalent: INR {isNaN(invoice.inr_equivalent) ? '' : invoice.inr_equivalent.toFixed(2)}
-                                                    </div>
-                                                )}
-
-                                                {/* Right side: Total (always right aligned) */}
-                                                <div style={{ whiteSpace: 'nowrap', marginLeft: 'auto', textAlign: 'right' }}>
-                                                    <strong>Total:</strong> &nbsp;
-                                                    <strong id="total-with-gst">
-                                                        <span className="currency-sym">{invoice.currency} </span>
-                                                        {isNaN(invoice.total_with_gst) ? '' : invoice.total_with_gst}
-                                                    </strong>
+                                    {/* Total row always right aligned */}
+                                    {invoice.country === "India" && (
+                                        <tr>
+                                            <td colSpan="6" style={{ textAlign: 'right' }}>
+                                                <strong>Total:</strong> &nbsp;
+                                                <strong id="total-with-gst">
+                                                    <span className="currency-sym">{currencySymbols[invoice.currency] || invoice.currency || invoice.currencyCode} </span>
+                                                    {safeNumber(invoice.total_with_gst)}
+                                                </strong>
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {invoice.country !== "India" && invoice.inr_equivalent && (
+                                        <tr>
+                                            <td colSpan="6">
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', padding: '8px 0' }}>
+                                                    <span>
+                                                        INR {numberToWordsIndian(Math.floor(invoice.inr_equivalent))} Only — ₹{Number(invoice.inr_equivalent).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </span>
+                                                    <span>
+                                                        Total = {currencySymbols[invoice.currency] || invoice.currency || invoice.currencyCode}{safeNumber(invoice.total_with_gst)}
+                                                    </span>
                                                 </div>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
+                            {/* For foreign invoices, show INR and Total in one line below the table */}
+
                         </div>
                     </div>
-
                     <div className="row">
                         <div className="col-xs-12">
                             <div className="table-bordered black-bordered amount-box">
@@ -611,8 +643,7 @@ const ViewsButton = () => {
                                         <strong>Amount Chargeable (in words):</strong>
                                     </p>
                                     <h4 className="total-in-words">
-                                        <span className="currency-text">{invoice.currency} </span>
-                                        {numberToWords(Math.floor(isNaN(invoice.total_with_gst) ? 0 : invoice.total_with_gst))} Only
+                                        {invoice.currency} {numberToWordsIndian(Math.floor(safeNumber(invoice.total_with_gst)))} Only
                                     </h4>
                                     <div className="top-right-corner">
                                         <span>E. & O.E</span>
@@ -621,134 +652,136 @@ const ViewsButton = () => {
                             </div>
                         </div>
                     </div>
-
-                    {invoice.country === "India" && (
+                    {invoice.country !== "India" ? (
+                        <div className="row">
+                            <div className="col-xs-12 inside-india">
+                                <div style={{ fontSize: "24px", textAlign: "center", margin: "0 0 20px 0" }}></div>
+                            </div>
+                        </div>
+                    ) : invoice.state === "Gujarat" ? (
                         <div className="row">
                             <div className="col-xs-12 inside-india">
                                 <table className="table table-bordered invoice-table">
-                                    <thead style={{ border: "2px solid" }}>
-                                        {invoice.state === "Gujarat" ? (
-                                            <>
-                                                <tr>
-                                                    <th rowSpan="2">HSN/SAC</th>
-                                                    <th rowSpan="2">Taxable Value</th>
-                                                    <th colSpan="2">Central Tax</th>
-                                                    <th colSpan="2">State Tax</th>
-                                                    <th rowSpan="2">Total Tax Amount</th>
-                                                </tr>
-                                                <tr>
-                                                    <th>Rate</th>
-                                                    <th>Amount</th>
-                                                    <th>Rate</th>
-                                                    <th>Amount</th>
-                                                </tr>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <tr>
-                                                    <th rowSpan="2">HSN/SAC</th>
-                                                    <th rowSpan="2">Taxable Value</th>
-                                                    <th colSpan="2">Integrated Tax</th>
-                                                    <th rowSpan="2">Total Tax Amount</th>
-                                                </tr>
-                                                <tr>
-                                                    <th>Rate</th>
-                                                    <th>Amount</th>
-                                                </tr>
-                                            </>
-                                        )}
+                                    <thead>
+                                        <tr>
+                                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
+                                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
+                                            <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Central Tax</th>
+                                            <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">State Tax</th>
+                                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
+                                        </tr>
+                                        <tr>
+                                            <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                                            <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                                            <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                                            <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                                        </tr>
                                     </thead>
-                                    <tbody style={{ border: "2px solid" }}>
+                                    <tbody>
                                         <tr>
                                             <td>{invoice.hsn_code || invoice.hsn_sac_code}</td>
-                                            <td>{isNaN(invoice.base_amount) ? '' : invoice.base_amount}</td>
-                                            {invoice.state === "Gujarat" ? (
-                                                <>
-                                                    <td>9%</td>
-                                                    <td>{isNaN(invoice.cgst) ? '' : invoice.cgst}</td>
-                                                    <td>9%</td>
-                                                    <td>{isNaN(invoice.sgst) ? '' : invoice.sgst}</td>
-                                                    <td>{isNaN(invoice.taxtotal) ? '' : invoice.taxtotal}</td>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <td>18%</td>
-                                                    <td>{isNaN(invoice.taxtotal) ? '' : invoice.taxtotal}</td>
-                                                    <td>{isNaN(invoice.taxtotal) ? '' : invoice.taxtotal}</td>
-                                                </>
-                                            )}
+                                            <td>{safeNumber(invoice.base_amount)}</td>
+                                            <td>9%</td>
+                                            <td>{safeNumber(invoice.cgst)}</td>
+                                            <td>9%</td>
+                                            <td>{safeNumber(invoice.sgst)}</td>
+                                            <td>{safeNumber(invoice.taxtotal)}</td>
                                         </tr>
                                         <tr className="total-row">
                                             <td>Total</td>
-                                            <td>{isNaN(invoice.base_amount) ? '' : invoice.base_amount}</td>
-                                            {invoice.state === "Gujarat" ? (
-                                                <>
-                                                    <td></td>
-                                                    <td>{isNaN(invoice.cgst) ? '' : invoice.cgst}</td>
-                                                    <td></td>
-                                                    <td>{isNaN(invoice.sgst) ? '' : invoice.sgst}</td>
-                                                    <td>{isNaN(invoice.taxtotal) ? '' : invoice.taxtotal}</td>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <td></td>
-                                                    <td>{isNaN(invoice.taxtotal) ? '' : invoice.taxtotal}</td>
-                                                    <td>{isNaN(invoice.taxtotal) ? '' : invoice.taxtotal}</td>
-                                                </>
-                                            )}
+                                            <td>{safeNumber(invoice.base_amount)}</td>
+                                            <td></td>
+                                            <td>{safeNumber(invoice.sgst)}</td>
+                                            <td></td>
+                                            <td>{safeNumber(invoice.sgst)}</td>
+                                            <td>{safeNumber(invoice.taxtotal)}</td>
                                         </tr>
                                     </tbody>
                                 </table>
                             </div>
-                            <div style={{ padding: "0 0 0 20px" }}>
-                                <div className="col-xs-12 inside-india">
-                                    <div>
-                                        <strong>Tax Amount (in words):</strong>
-                                        <span className="total-tax-in-words">
-                                            <span className="currency-text">{invoice.currency} </span>
-                                            {numberToWords(Math.floor(isNaN(invoice.total_with_gst) ? 0 : invoice.total_with_gst))} Only
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="col-xs-12">
-                                    <div>
-                                        <h4>
-                                            <strong>Remarks:</strong>
-                                        </h4>
-                                        <h5 className="html-remark">{invoice.remark}</h5>
-                                    </div>
-                                </div>
+                        </div>
+                    ) : (
+                        <div className="row">
+                            <div className="col-xs-12 outside-gujarat">
+                                <table className="table table-bordered invoice-table">
+                                    <thead>
+                                        <tr>
+                                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
+                                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
+                                            <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Integrated Tax</th>
+                                            <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
+                                        </tr>
+                                        <tr>
+                                            <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                                            <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>{invoice.hsn_code || invoice.hsn_sac_code}</td>
+                                            <td>{safeNumber(invoice.base_amount)}</td>
+                                            <td>18%</td>
+                                            <td>{safeNumber(invoice.igst)}</td>
+                                            <td>{safeNumber(invoice.taxtotal)}</td>
+                                        </tr>
+                                        <tr className="total-row">
+                                            <td><strong>Total</strong></td>
+                                            <td><strong>{safeNumber(invoice.base_amount)}</strong></td>
+                                            <td></td>
+                                            <td><strong>{safeNumber(invoice.igst)}</strong></td>
+                                            <td><strong>{safeNumber(invoice.taxtotal)}</strong></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     )}
-
-                    <div className="row">
-                        <div className="col-x-12">
+                    <div style={{ padding: "0 0 0 10px" }}>
+                        <div className="col-xs-12 inside-india">
+                            <div>
+                                <strong>Tax Amount (in words):</strong>
+                                <span className="total-tax-in-words">
+                                    {invoice.currency} {numberToWordsIndian(Math.floor(safeNumber(invoice.total_with_gst)))} Only
+                                </span>
+                            </div>
+                        </div>
+                        <div className="col-xs-12">
+                            <div>
+                                <h4>
+                                    <strong>Remarks:</strong>
+                                </h4>
+                                <h5 className="html-remark">
+                                    {invoice.remark}
+                                </h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="row mb-3">
+                        <div className="col-x-12 mb-3">
                             <div className="hr">
                                 <strong>Company's Bank Details</strong>
                                 <br />
                                 A/c Holder's Name: {settings.bank_account_holder}
                                 <br />
-                                Bank Name: {settings.bank_name}
+                                Bank Name:{settings.bank_name}
                                 <br />
-                                A/c No.: {settings.account_number}
+                                A/c No.:{settings.account_number}
                                 <br />
-                                IFS Code: {settings.ifsc_code}
+                                IFS Code:{settings.ifsc_code}
                                 <br />
                                 Branch: {settings.branch}
                                 <br />
-                                SWIFT Code: {settings.swift_code}
+                                SWIFT Code:{settings.swift_code}
                             </div>
                             <div className="text-right signatory">
                                 {settings.logo && (
                                     <img
+                                        src={`http://127.0.0.1:8000${settings.logo}`}
+                                        alt="Company Logo"
                                         className="logo-image"
-                                        src={`http://localhost:8000${settings.logo}`}
-                                        alt="Logo"
-                                        height={100}
                                     />
                                 )}
-                                <p>for {settings.company_name}</p>
+                                <p>for Grabsolve Infotech</p>
                                 <p>Authorized Signatory</p>
                             </div>
                         </div>

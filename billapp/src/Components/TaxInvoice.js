@@ -1674,7 +1674,7 @@ const Taxinvoice = () => {
           className="bg-blue-500 text-white px-4 py-2 rounded mt-4"
           disabled={loading}
         >
-          {loading ? 'Processing...' : isSubmitted ? 'Download PDF' : 'Generate & Download PDF'}
+          {loading ? 'Processing...' : isSubmitted ? 'Download PDF' : 'Generate PDF'}
         </button>
       </div>
 
@@ -2098,7 +2098,15 @@ const Taxinvoice = () => {
                     <strong>Remarks:</strong>
                   </h4>
                   <h5 className="html-remark">
-                    <span className="remark" style={{ width: "550px" }}>{formData.remark}</span>
+                    <input
+                      name="remark"
+                      type="text"
+                      value={formData.remark}
+                      onChange={handleChange}
+                      className="remark"
+                      style={{ width: "550px" }}
+                      readOnly={isSubmitted}
+                    />
                   </h5>
                 </div>
               </div>
