@@ -116,23 +116,23 @@ const BillManager = () => {
   };
 
   const filteredClients = groupedClients.filter((client) =>
-    client.buyer_name.toLowerCase().includes(filterText.toLowerCase()) ||
-    client.buyer_gst.toLowerCase().includes(filterText.toLowerCase())
+    (client.buyer_name || "").toLowerCase().includes(filterText.toLowerCase()) ||
+    (client.buyer_gst || "").toLowerCase().includes(filterText.toLowerCase())
   );
 
   const filteredOther = otherTransactions.filter((txn, index, self) =>
     index === self.findIndex(t => t.other_type === txn.other_type) &&
     (
-      txn.other_type?.toLowerCase().includes(filterText.toLowerCase()) ||
-      txn.other_amount?.toString().includes(filterText)
+      (txn.other_type || "").toLowerCase().includes(filterText.toLowerCase()) ||
+      (txn.other_amount?.toString() || "").includes(filterText)
     )
   );
 
   const filteredBuyers = groupedBuyers.filter((txn, index, self) =>
     index === self.findIndex(t => t.buyer_name === txn.buyer_name) &&
     (
-      txn.buyer_name?.toLowerCase().includes(filterText.toLowerCase()) ||
-      txn.amount?.toString().includes(filterText)
+      (txn.buyer_name || "").toLowerCase().includes(filterText.toLowerCase()) ||
+      (txn.amount?.toString() || "").includes(filterText)
     )
   );
 
