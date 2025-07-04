@@ -250,8 +250,8 @@ const Address = () => {
         renderWidth = maxHeight * imgAspectRatio;
       }
 
-      const x = (pageWidth - renderWidth) / 2;
-      const y = (pageHeight - renderHeight) / 2;
+      const x = margin;
+      const y = margin;
 
       pdf.addImage(imgData, "PNG", x, y, renderWidth, renderHeight);
 
@@ -365,6 +365,63 @@ const Address = () => {
     return date.toLocaleDateString('en-GB');
   };
 
+  // Helper functions from TaxInvoice.js for PDF rendering
+  const formatDisplayDate = (dateStr) => {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+  const safeNumber = (value) => {
+    if (value === null || value === undefined || isNaN(value) || value === "") return "";
+    return value;
+  };
+  const numberToWordsIndian = (num) => {
+    if (num === 0) return "Zero";
+    const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
+    const teens = ["Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+    const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+    let word = "";
+    function getWords(n) {
+      let str = "";
+      if (n > 19) {
+        str += tens[Math.floor(n / 10)] + (n % 10 ? " " + ones[n % 10] : "");
+      } else if (n > 9) {
+        str += teens[n - 10];
+      } else if (n > 0) {
+        str += ones[n];
+      }
+      return str;
+    }
+    let crore = Math.floor(num / 10000000);
+    num = num % 10000000;
+    let lakh = Math.floor(num / 100000);
+    num = num % 100000;
+    let thousand = Math.floor(num / 1000);
+    num = num % 1000;
+    let hundred = Math.floor(num / 100);
+    let rest = num % 100;
+    if (crore) word += getWords(crore) + " Crore ";
+    if (lakh) word += getWords(lakh) + " Lakh ";
+    if (thousand) word += getWords(thousand) + " Thousand ";
+    if (hundred) word += ones[hundred] + " Hundred ";
+    if (rest) {
+      if (word !== "") word += "and ";
+      word += getWords(rest) + " ";
+    }
+    return word.trim();
+  };
+  const currencySymbols = {
+    INR: "₹",
+    USD: "$",
+    EUR: "€",
+    GBP: "£",
+    JPY: "¥",
+  };
+
   return (
     <div className="year_container">
       <ToastContainer
@@ -393,7 +450,7 @@ const Address = () => {
         <thead>
           <tr>
             <th>No.</th>
-            <th>Buyer</th>
+            <th>Buyers</th>
             <th>Address</th>
             <th>Invoice No.</th>
             <th>Total</th>
@@ -490,512 +547,422 @@ const Address = () => {
 
       {/* Hidden printable invoice for PDF */}
       {selectedInvoice && (
-        <div ref={pdfRef} style={{ position: "absolute", left: "-9999px" }}>
-          <div style={{ paddingLeft: "10px" }}>
-            <div style={{ paddingRight: "10px" }}>
-              <h2 className="text-center">TAX INVOICE</h2>
-              <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white" }}>
-                <div className="row date-tables">
-                  <div className="col-6">
-                    {/* Seller Info */}
-                    <table className="table table-bordered black-bordered">
-                      <tbody style={{ border: "2px solid" }}>
-                        <tr>
-                          <td className="gray-background">
-                            <strong style={{ fontSize: "15px" }}>
-                              {selectedInvoice.company_name}:
-                            </strong>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style={{ padding: "10px", height: "150px" }}>
-                            {selectedInvoice.seller_address}
-                            <br />
-                            Email: {selectedInvoice.seller_email}
-                            <br />
-                            PAN: {selectedInvoice.seller_pan}
-                            <br />
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="gray-background">
-                            <strong>GSTIN/UIN:</strong> {selectedInvoice.seller_gstin}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-
-                    {/* Buyer Info */}
-                    <table className="table table-bordered black-bordered">
-                      <tbody style={{ border: "2px solid" }}>
-                        <tr>
-                          <td className="gray-background">
-                            <strong>Buyer (Bill to):</strong> {selectedInvoice.buyer_name}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style={{
-                            maxWidth: "250px",
-                            overflowWrap: "break-word",
-                            height: "150px"
-                          }}>
-                            <div style={{ whiteSpace: "pre-wrap" }}>
-                              {selectedInvoice.buyer_address}
-                            </div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="gray-background">
-                            <strong>GSTIN/UIN:</strong> {selectedInvoice.buyer_gst || (selectedInvoice.country === "India" ? "Not Provided" : "N/A")}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>
-                            <strong>State:</strong> {selectedInvoice.state || "N/A"}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-
-                    {/* Consignee Info */}
-                    <table className="table table-bordered black-bordered">
-                      <tbody style={{ border: "2px solid" }}>
-                        <tr>
-                          <td className="gray-background">
-                            <strong>Consignee (Ship to):</strong> {selectedInvoice.consignee_name}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style={{
-                            maxWidth: "250px",
-                            overflowWrap: "break-word",
-                            height: "150px"
-                          }}>
-                            <div style={{ whiteSpace: "pre-wrap" }}>
-                              {selectedInvoice.consignee_address}
-                            </div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="gray-background">
-                            <strong>GSTIN/UIN:</strong> {selectedInvoice.consignee_gst || (selectedInvoice.country === "India" ? "Not Provided" : "N/A")}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-
-                    {/* Country and State Row (like web UI) */}
-                    
-                  </div>
-
-                  <div className="col-6">
-                    {/* <div style={{ display: 'flex', gap: '20px', margin: '10px 0' }}>
-                      <div>
-                        <strong>Country and currency helooo:</strong>
-                        <span style={{ marginLeft: 8, display: 'inline-flex', alignItems: 'center' }}>
-                          {(selectedInvoice.country_flag || countryFlags[selectedInvoice.country]) && (
-                            <img
-                              src={selectedInvoice.country_flag || countryFlags[selectedInvoice.country]}
-                              alt={`${selectedInvoice.country} flag`}
-                              style={{
-                                width: 24,
-                                height: 18,
-                                border: "1px solid #ccc",
-                                objectFit: "cover",
-                                marginRight: 6
-                              }}
-                            />
-                          )}
-                          {selectedInvoice.country} - {selectedInvoice.currency === "INR" && "₹"}
-                          {selectedInvoice.currency === "USD" && "$"}
-                          {selectedInvoice.currency === "AUD" && "A$"}
-                          {" "}
-                        </span>
-                      </div>
-                      <div>
-                        <strong>Select State:</strong>
-                        <span style={{ marginLeft: 8 }}>{selectedInvoice.state || "N/A"}</span>
-                      </div>
-                    </div> */}
-
-                    <table className="table table-bordered black-bordered">
-                      <tbody style={{ border: "2px solid" }}>
-                        <tr>
-                          <td style={{ width: "50%" }}>Invoice No.</td>
-                          <td>{selectedInvoice.invoice_number}</td>
-                        </tr>
-                        <tr>
-                          <td>Date</td>
-                          <td>{new Date(selectedInvoice.invoice_date).toLocaleDateString("en-GB")}</td>
-                        </tr>
-                        <tr>
-                          <td>Delivery Note</td>
-                          <td>{selectedInvoice.delivery_note}</td>
-                        </tr>
-                        <tr>
-                          <td>Mode/Terms of Payment</td>
-                          <td>{selectedInvoice.payment_mode}</td>
-                        </tr>
-                        <tr>
-                          <td>Delivery Note Date</td>
-                          <td>{selectedInvoice.delivery_note_date ? new Date(selectedInvoice.delivery_note_date).toLocaleDateString("en-GB") : ''}</td>
-                        </tr>
-                        <tr>
-                          <td>Destination</td>
-                          <td>{selectedInvoice.destination}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-
-                    <table className="table table-bordered black-bordered">
-                      <tbody style={{ border: "2px solid" }}>
-                        <tr>
-                          <td className="gray-background">
-                            <strong>Terms to Delivery:</strong>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style={{
-                            maxWidth: "250px",
-                            overflowWrap: "break-word",
-                            height: "150px"
-                          }}>
+        <div ref={pdfRef}>
+          <div style={{ fontSize: "20px" }}>
+            <h1 className="text-center"><strong><b>TAX INVOICE</b></strong></h1>
+            <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white", padding: "0" }} >
+              <div className="row date-tables" style={{ display: "flex" }}>
+                <div className="col-6" style={{ flex: 1}}>
+                  {/* Seller Info */}
+                  <table className="table table-bordered black-bordered">
+                    <tbody>
+                      <tr>
+                        <td className="gray-background">
+                          <strong style={{ fontfamily: "Arial, sans-serif" }}>
+                            {selectedInvoice.company_name}
+                          </strong>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: "10px", fontFamily: "Arial, sans-serif", whiteSpace: "pre-line" }}>
+                          {selectedInvoice.seller_address}
+                          <br />
+                          Email: {selectedInvoice.seller_email}
+                          <br />
+                          PAN: {selectedInvoice.seller_pan}
+                          <br />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="gray-background">
+                          <strong>GSTIN/UIN:</strong>{selectedInvoice.seller_gstin}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  {/* Buyer Info */}
+                  <table className="table table-bordered black-bordered">
+                    <tbody>
+                      <tr>
+                        <td className="gray-background">
+                          <strong>Buyer (Bill to):</strong> {selectedInvoice.buyer_name}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <div className="billToAddress" style={{ width: "100%", minHeight: "100px", height: "auto", whiteSpace: "pre-line",  wordBreak: "break-word", overflowWrap: "break-word", boxSizing: "border-box" }}>
+                            {selectedInvoice.buyer_address}
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="gray-background">
+                          <strong>GSTIN/UIN:</strong> {selectedInvoice.buyer_gst}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  {/* Consignee Info */}
+                  <table className="table table-bordered black-bordered">
+                    <tbody>
+                      <tr>
+                        <td className="gray-background">
+                          <strong>Consignee (Ship to):</strong>{selectedInvoice.consignee_name}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <div className="shipToAddress" style={{ width: "100%", minHeight: "100px", height: "auto", whiteSpace: "pre-line",  wordBreak: "break-word", overflowWrap: "break-word", boxSizing: "border-box" }}>
+                            {selectedInvoice.consignee_address}
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="gray-background">
+                          <strong>GSTIN/UIN:</strong>{selectedInvoice.consignee_gst}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div className="col-6" style={{ flex: 1, maxWidth: "50%" }}>
+                  <table className="table table-bordered black-bordered">
+                    <tbody>
+                      <tr>
+                        <td style={{ width: "50%" }}>Invoice No.</td>
+                        <td className="invoice-no-td">
+                          <span>{selectedInvoice.invoice_number || "Will be generated"}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Date</td>
+                        <td>
+                          <span>{formatDisplayDate(selectedInvoice.invoice_date)}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Delivery Note</td>
+                        <td>
+                          <span>{selectedInvoice.delivery_note}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Mode/Terms of Payment</td>
+                        <td>
+                          <span>{selectedInvoice.payment_mode}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Delivery Note Date</td>
+                        <td>
+                          <span>{formatDisplayDate(selectedInvoice.delivery_note_date)}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Destination</td>
+                        <td>
+                          <span>{selectedInvoice.destination}</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <table className="table table-bordered black-bordered">
+                    <tbody>
+                      <tr>
+                        <td className="gray-background">
+                          <strong>Terms to Delivery:</strong>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <div className="billToAddress" style={{ width: "100%", minHeight: "100px", height: "auto", whiteSpace: "pre-line", border: "1px solid #ccc", borderRadius: "4px", padding: "10px", wordBreak: "break-word", overflowWrap: "break-word", boxSizing: "border-box" }}>
                             {selectedInvoice.Terms_to_delivery}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                    {/* Country and State Row (like web UI, for PDF) */}
-                    <div className="relative w-full max-w-4xl mx-auto">
-
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        gap: 24,
-                                        marginBottom: 8,
-                                    }}
-                                >
-                                    {/* Country Section */}
-                                    <div style={{ flex: selectedInvoice.country !== "India" ? 0.5 : 1 }}>
-                                        <p><strong>Country and currency:</strong></p>
-                                        <div
-                                            style={{
-                                                border: "1px solid #ccc",
-                                                borderRadius: 4,
-                                                padding: "4px 12px",
-                                                background: "#f9f9f9",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: 8,
-                                                width: "100%",
-                                            }}
-                                        >
-                                            <span>{selectedInvoice.country || "India"}</span>
-                                            <span>-</span>
-                                            <span>
-                                                ({selectedInvoice.currency || "INR"})
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* State Section */}
-                                    {selectedInvoice.country === "India" && selectedInvoice.state && (
-                                        <div style={{ flex: 1 }}>
-                                            <p><strong>Select State:</strong></p>
-                                            <div
-                                                style={{
-                                                    border: "1px solid #ccc",
-                                                    borderRadius: 4,
-                                                    padding: "4px 12px",
-                                                    background: "#f9f9f9",
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    width: "100%",
-                                                }}
-                                            >
-                                                <span>
-                                                    {selectedInvoice.state}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="mt-4">
-                                    {selectedInvoice.country !== "India" && (
-                                        <>
-                                            <div className="lut">
-                                                <p style={{ margin: "0px" }}>Declare under LUT</p>
-                                            </div>
-                                            <div className="lut mt-3">
-                                                <p style={{ margin: "0px" }}>{selectedInvoice.company_code || ""}</p>
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-
-                              
-                            </div>
-
-                    <input type="hidden" id="currencyTitle" value={selectedInvoice.currency || "INR"} />
-                    <input type="hidden" id="currencySymbol" value={selectedInvoice.currency === "USD" ? "$" : "₹"} />
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div className="relative w-72">
+                    <div className="d-flex gap-4">
+                      <div style={{ position: "relative", width: "300px" }}>
+                        <p><strong>Country and currency:</strong></p>
+                        <div className="border border-gray-300 p-2 rounded flex items-center justify-between bg-white" style={{ height: "40px" }}>
+                          <div className="flex items-center" style={{ height: "30px" }}>
+                            <span className="mr-2">
+                              {selectedInvoice.country} - {selectedInvoice.currency} 
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    {selectedInvoice.country !== "India" && (
+                      <div className="lut">
+                        <p style={{ margin: "0px" }}>Declare under LUT</p>
+                      </div>
+                    )}
                   </div>
                 </div>
-
+              </div>
+              <div className="row" style={{ marginTop: "20px" }}>
+                <div className="col-xs-12">
+                  <table className="table table-bordered black-bordered" style={{ textAlign: "center" }}>
+                    <thead>
+                      <tr className="trbody">
+                        <th style={{ backgroundColor: "#f1f3f4" }}>SI No.</th>
+                        <th style={{ backgroundColor: "#f1f3f4" }}>Particulars</th>
+                        <th style={{ backgroundColor: "#f1f3f4" }}>HSN/SAC</th>
+                        <th style={{ backgroundColor: "#f1f3f4" }}>Hours</th>
+                        <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                        <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr style={{ height: "111px" }}>
+                        <td>1</td>
+                        <td>
+                          {selectedInvoice.Particulars && selectedInvoice.Particulars.split('\n').map((line, idx) => (
+                            <React.Fragment key={idx}>
+                              {line}
+                              <br />
+                            </React.Fragment>
+                          ))}
+                        </td>
+                        <td style={{ width: "130px", paddingTop: "16px" }}>
+                          <span>{selectedInvoice.hsn_code || selectedInvoice.hsn_sac_code}</span>
+                        </td>
+                        <td style={{ width: "10%" }}>
+                          <span>{safeNumber(selectedInvoice.total_hours)}</span>
+                        </td>
+                        <td style={{ width: "10%" }}>
+                          <span>{safeNumber(selectedInvoice.rate)}</span>
+                        </td>
+                        <td style={{ width: "200px" }}>
+                          <span className="currency-sym" style={{ marginRight: "4px", fontSize: "18px" }}>
+                            {currencySymbols[selectedInvoice.currency] || selectedInvoice.currency}
+                          </span>
+                          <span>{safeNumber(selectedInvoice.base_amount)}</span>
+                        </td>
+                      </tr>
+                      {selectedInvoice.country === "India" && selectedInvoice.state !== "Gujarat" && (
+                        <tr className="inside-india">
+                          <td></td>
+                          <td>
+                            <span style={{ float: "right" }}>IGST @ 18%</span>
+                          </td>
+                          <td></td>
+                          <td></td>
+                          <td>18%</td>
+                          <td id="igst">
+                            <span className="currency-sym">{currencySymbols[selectedInvoice.currency] || selectedInvoice.currency} </span>
+                            {safeNumber(selectedInvoice.igst)}
+                          </td>
+                        </tr>
+                      )}
+                      {selectedInvoice.country === "India" && selectedInvoice.state === "Gujarat" && (
+                        <>
+                          <tr className="inside-india">
+                            <td></td>
+                            <td>
+                              <span style={{ float: "right" }}>CGST @ 9%</span>
+                            </td>
+                            <td></td>
+                            <td></td>
+                            <td>9%</td>
+                            <td id="cgst">
+                              <span className="currency-sym">{currencySymbols[selectedInvoice.currency] || selectedInvoice.currency} </span>
+                              {safeNumber(selectedInvoice.cgst)}
+                            </td>
+                          </tr>
+                          <tr className="inside-india">
+                            <td></td>
+                            <td>
+                              <span style={{ float: "right" }}>SGST @ 9%</span>
+                            </td>
+                            <td></td>
+                            <td></td>
+                            <td>9%</td>
+                            <td id="sgst">
+                              <span className="currency-sym">{currencySymbols[selectedInvoice.currency] || selectedInvoice.currency} </span>
+                              {safeNumber(selectedInvoice.sgst)}
+                            </td>
+                          </tr>
+                        </>
+                      )}
+                      <tr>
+                        <td colSpan="6">
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ whiteSpace: 'nowrap' }}>
+                              {/* If you want INR conversion for foreign invoices, add here */}
+                            </div>
+                            <div style={{ whiteSpace: 'nowrap', textAlign: 'center', width: "200px" }}>
+                              <strong>Total:</strong> &nbsp;
+                              <strong id="total-with-gst">
+                                <span className="currency-sym">{currencySymbols[selectedInvoice.currency] || selectedInvoice.currency} </span>
+                                {safeNumber(selectedInvoice.total_with_gst)}
+                              </strong>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-xs-12">
+                  <div className="table-bordered black-bordered amount-box">
+                    <div>
+                      <p>
+                        <strong>Amount Chargeable (in words):</strong>
+                      </p>
+                      <h4 className="total-in-words">
+                        {selectedInvoice.currency} {numberToWordsIndian(Math.floor(safeNumber(selectedInvoice.total_with_gst)))} Only
+                      </h4>
+                      <div className="top-right-corner">
+                        <span>E. & O.E</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {selectedInvoice.country !== "India" ? (
                 <div className="row">
-                  <div className="col-xs-12">
-                    <table className="table table-bordered black-bordered" style={{ textAlign: "center" }}>
+                  <div className="col-xs-12 inside-india">
+                    <div style={{ fontSize: "24px", textAlign: "center", margin: "0 0 20px 0" }}></div>
+                  </div>
+                </div>
+              ) : selectedInvoice.state === "Gujarat" ? (
+                <div className="row">
+                  <div className="col-xs-12 inside-india">
+                    <table className="table table-bordered invoice-table">
                       <thead>
-                        <tr className="trbody">
-                          <th style={{ backgroundColor: "#f1f3f4" }}>SI No.</th>
-                          <th style={{ backgroundColor: "#f1f3f4" }}>Particulars</th>
-                          <th style={{ backgroundColor: "#f1f3f4" }}>HSN/SAC</th>
-                          <th style={{ backgroundColor: "#f1f3f4" }}>Hours</th>
+                        <tr>
+                          <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Central Tax</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">State Tax</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
+                        </tr>
+                        <tr>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
                           <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
                           <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
                         </tr>
                       </thead>
                       <tbody>
-                        <tr style={{ height: "111px" }}>
-                          <td>1</td>
-                          <td style={{ width: "526px" }}>{selectedInvoice.Particulars}</td>
-                          <td style={{ width: "130px", paddingTop: "16px" }}>{selectedInvoice.hsn_code || selectedInvoice.hsn_sac_code}</td>
-                          <td style={{ width: "10%" }}>{isNaN(selectedInvoice.total_hours) ? '' : selectedInvoice.total_hours}</td>
-                          <td style={{ width: "10%" }}>{isNaN(selectedInvoice.rate) ? '' : selectedInvoice.rate}</td>
-                          <td style={{ width: "200px" }}>
-                            <span className="currency-sym">
-                              {selectedInvoice.currency} {isNaN(selectedInvoice.base_amount) ? '' : selectedInvoice.base_amount}
-                            </span>
-                          </td>
-                        </tr>
-
-                        {/* IGST for other states */}
-                        {selectedInvoice.country === "India" && selectedInvoice.state !== "Gujarat" && (
-                          <tr className="inside-india">
-                            <td></td>
-                            <td>
-                              <span style={{ float: "right" }}>IGST @ 18%</span>
-                            </td>
-                            <td></td>
-                            <td></td>
-                            <td>18%</td>
-                            <td id="igst">
-                              <span className="currency-sym">{selectedInvoice.currency} {isNaN(selectedInvoice.taxtotal) ? '' : selectedInvoice.taxtotal}</span>
-                            </td>
-                          </tr>
-                        )}
-
-                        {/* CGST/SGST for Gujarat */}
-                        {selectedInvoice.country === "India" && selectedInvoice.state === "Gujarat" && (
-                          <>
-                            <tr className="inside-india">
-                              <td></td>
-                              <td>
-                                <span style={{ float: "right" }}>CGST @ 9%</span>
-                              </td>
-                              <td></td>
-                              <td></td>
-                              <td>9%</td>
-                              <td id="cgst">
-                                <span className="currency-sym">{selectedInvoice.currency} {isNaN(selectedInvoice.cgst) ? '' : selectedInvoice.cgst}</span>
-                              </td>
-                            </tr>
-                            <tr className="inside-india">
-                              <td></td>
-                              <td>
-                                <span style={{ float: "right" }}>SGST @ 9%</span>
-                              </td>
-                              <td></td>
-                              <td></td>
-                              <td>9%</td>
-                              <td id="sgst">
-                                <span className="currency-sym">{selectedInvoice.currency} {isNaN(selectedInvoice.sgst) ? '' : selectedInvoice.sgst}</span>
-                              </td>
-                            </tr>
-                          </>
-                        )}
-
-                        {/* Total row */}
                         <tr>
-                          <td colSpan="6">
-                            <div style={{ display: 'flex', alignItems: 'center' }}>
-                              {/* Left side: INR Equivalent (if applicable) */}
-                              {selectedInvoice.country !== "India" && selectedInvoice.inr_equivalent && (
-                                <div style={{ whiteSpace: 'nowrap' }}>
-                                  INR Equivalent: INR {isNaN(selectedInvoice.inr_equivalent) ? '' : selectedInvoice.inr_equivalent.toFixed(2)}
-                                </div>
-                              )}
-
-
-                              {/* Right side: Total (always right aligned) */}
-                              <div style={{ whiteSpace: 'nowrap', marginLeft: 'auto', textAlign: 'right' }}>
-                                <strong>Total:</strong> &nbsp;
-                                <strong id="total-with-gst">
-                                  <span className="currency-sym">{selectedInvoice.currency} </span>
-                                  {isNaN(selectedInvoice.total_with_gst) ? '' : selectedInvoice.total_with_gst}
-                                </strong>
-                              </div>
-                            </div>
-                          </td>
+                          <td>{selectedInvoice.hsn_code}</td>
+                          <td>{safeNumber(selectedInvoice.base_amount)}</td>
+                          <td>9%</td>
+                          <td>{safeNumber(selectedInvoice.cgst)}</td>
+                          <td>9%</td>
+                          <td>{safeNumber(selectedInvoice.sgst)}</td>
+                          <td>{safeNumber(selectedInvoice.taxtotal)}</td>
                         </tr>
-
-
+                        <tr className="total-row">
+                          <td>Total</td>
+                          <td>{safeNumber(selectedInvoice.base_amount)}</td>
+                          <td></td>
+                          <td>{safeNumber(selectedInvoice.sgst)}</td>
+                          <td></td>
+                          <td>{safeNumber(selectedInvoice.sgst)}</td>
+                          <td>{safeNumber(selectedInvoice.taxtotal)}</td>
+                        </tr>
                       </tbody>
                     </table>
                   </div>
                 </div>
-
+              ) : (
                 <div className="row">
-                  <div className="col-xs-12">
-                    <div className="table-bordered black-bordered amount-box">
-                      <div>
-                        <p>
-                          <strong>Amount Chargeable (in words):</strong>
-                        </p>
-                        <h4 className="total-in-words">
-                          <span className="currency-text">{selectedInvoice.currency} </span>
-                          {numberToWords(Math.floor(isNaN(selectedInvoice.total_with_gst) ? 0 : selectedInvoice.total_with_gst))} Only
-                        </h4>
-                        <div className="top-right-corner">
-                          <span>E. & O.E</span>
-                        </div>
-                      </div>
-                    </div>
+                  <div className="col-xs-12 outside-gujarat">
+                    <table className="table table-bordered invoice-table">
+                      <thead>
+                        <tr>
+                          <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Integrated Tax</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
+                        </tr>
+                        <tr>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
+                          <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>{selectedInvoice.hsn_code}</td>
+                          <td>{safeNumber(selectedInvoice.base_amount)}</td>
+                          <td>18%</td>
+                          <td>{safeNumber(selectedInvoice.igst)}</td>
+                          <td>{safeNumber(selectedInvoice.taxtotal)}</td>
+                        </tr>
+                        <tr className="total-row">
+                          <td><strong>Total</strong></td>
+                          <td><strong>{safeNumber(selectedInvoice.base_amount)}</strong></td>
+                          <td></td>
+                          <td><strong>{safeNumber(selectedInvoice.igst)}</strong></td>
+                          <td><strong>{safeNumber(selectedInvoice.taxtotal)}</strong></td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-
-                {selectedInvoice.country === "India" && (
-                  <div className="row">
-                    <div className="col-xs-12 inside-india">
-                      <table className="table table-bordered invoice-table">
-                        <thead>
-                          {selectedInvoice.state === "Gujarat" ? (
-                            <>
-                              <tr>
-                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Central Tax</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">State Tax</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
-                              </tr>
-                              <tr>
-                                <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                              </tr>
-                            </>
-                          ) : (
-                            <>
-                              <tr>
-                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">HSN/SAC</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Taxable Value</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }} colSpan="2">Integrated Tax</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }} rowSpan="2">Total Tax Amount</th>
-                              </tr>
-                              <tr>
-                                <th style={{ backgroundColor: "#f1f3f4" }}>Rate</th>
-                                <th style={{ backgroundColor: "#f1f3f4" }}>Amount</th>
-                              </tr>
-                            </>
-                          )}
-                        </thead>
-                        <tbody style={{ border: "2px solid" }}>
-                          <tr>
-                            <td>{selectedInvoice.hsn_code}</td>
-                            <td>{isNaN(selectedInvoice.base_amount) ? '' : selectedInvoice.base_amount}</td>
-                            {selectedInvoice.state === "Gujarat" ? (
-                              <>
-                                <td>9%</td>
-                                <td>{isNaN(selectedInvoice.cgst) ? '' : selectedInvoice.cgst}</td>
-                                <td>9%</td>
-                                <td>{isNaN(selectedInvoice.sgst) ? '' : selectedInvoice.sgst}</td>
-                                <td>{isNaN(selectedInvoice.taxtotal) ? '' : selectedInvoice.taxtotal}</td>
-                              </>
-                            ) : (
-                              <>
-                                <td>18%</td>
-                                <td>{isNaN(selectedInvoice.taxtotal) ? '' : selectedInvoice.taxtotal}</td>
-                                <td>{isNaN(selectedInvoice.taxtotal) ? '' : selectedInvoice.taxtotal}</td>
-                              </>
-                            )}
-                          </tr>
-                          <tr className="total-row">
-                            <td>Total</td>
-                            <td>{isNaN(selectedInvoice.base_amount) ? '' : selectedInvoice.base_amount}</td>
-                            {selectedInvoice.state === "Gujarat" ? (
-                              <>
-                                <td></td>
-                                <td>{isNaN(selectedInvoice.cgst) ? '' : selectedInvoice.cgst}</td>
-                                <td></td>
-                                <td>{isNaN(selectedInvoice.sgst) ? '' : selectedInvoice.sgst}</td>
-                                <td>{isNaN(selectedInvoice.taxtotal) ? '' : selectedInvoice.taxtotal}</td>
-                              </>
-                            ) : (
-                              <>
-                                <td></td>
-                                <td>{isNaN(selectedInvoice.igst) ? '' : selectedInvoice.igst}</td>
-                                <td>{isNaN(selectedInvoice.taxtotal) ? '' : selectedInvoice.taxtotal}</td>
-                              </>
-                            )}
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                    <div style={{ padding: "0 0 0 20px" }}>
-                      <div className="col-xs-12 inside-india">
-                        <div>
-                          <strong>Tax Amount (in words):</strong>
-                          <span className="total-tax-in-words">
-                            <span className="currency-text">{selectedInvoice.currency} </span>
-                            {numberToWords(Math.floor(isNaN(selectedInvoice.total_with_gst) ? 0 : selectedInvoice.total_with_gst))} Only
-                          </span>
-                        </div>
-                      </div>
-                      <div className="col-xs-12">
-                        <div>
-                          <h4>
-                            <strong>Remarks:</strong>
-                          </h4>
-                          <h5 className="html-remark">{selectedInvoice.remark}</h5>
-                        </div>
-                      </div>
-                    </div>
+              )}
+              <div style={{ padding: "0 0 0 10px" }}>
+                <div className="col-xs-12 inside-india">
+                  <div>
+                    <strong>Tax Amount (in words):</strong>
+                    <span className="total-tax-in-words">
+                      {selectedInvoice.country} {selectedInvoice.currency} {numberToWordsIndian(Math.floor(safeNumber(selectedInvoice.total_with_gst)))} Only
+                    </span>
                   </div>
-                )}
-
-                <div className="row mb-3">
-                  <div className="col-x-12 mb-3">
-                    <div className="hr">
-                      <strong>Company's Bank Details</strong>
-                      <br />
-                      A/c Holder's Name: {selectedInvoice.bank_account_holder}
-                      <br />
-                      Bank Name: {selectedInvoice.bank_name}
-                      <br />
-                      A/c No.: {selectedInvoice.account_number}
-                      <br />
-                      IFS Code: {selectedInvoice.ifsc_code}
-                      <br />
-                      Branch: {selectedInvoice.branch}
-                      <br />
-                      SWIFT Code: {selectedInvoice.swift_code}
-                    </div>
-                    <div className="text-right signatory">
-                      {selectedInvoice.logo && (
-                        <img
-                          src={`http://localhost:8000${selectedInvoice.logo}`}
-                          alt="Company Logo"
-                          className="logo-image"
-                        />
-                      )}
-                      <p>for {selectedInvoice.company_name || 'Grabsolve Infotech'}</p>
-                      <p>Authorized Signatory</p>
-                    </div>
+                </div>
+                <div className="col-xs-12">
+                  <div>
+                    <h4>
+                      <strong>Remarks:</strong>
+                    </h4>
+                    <h5 className="html-remark">
+                      <span className="remark" style={{ width: "550px" }}>{selectedInvoice.remark}</span>
+                    </h5>
                   </div>
                 </div>
               </div>
-              <p className="text-center" style={{ marginBottom: "0px" }}>This is a Computer Generated Invoice</p>
+              <div className="row mb-3">
+                <div className="col-x-12 mb-3">
+                  <div className="hr">
+                    <strong>Company's Bank Details</strong>
+                    <br />
+                    A/c Holder's Name: {selectedInvoice.bank_account_holder}
+                    <br />
+                    Bank Name:{selectedInvoice.bank_name}
+                    <br />
+                    A/c No.:{selectedInvoice.account_number}
+                    <br />
+                    IFS Code:{selectedInvoice.ifsc_code}
+                    <br />
+                    Branch: {selectedInvoice.branch}
+                    <br />
+                    SWIFT Code:{selectedInvoice.swift_code}
+                  </div>
+                  <div className="text-right signatory">
+                    {selectedInvoice.logo && (
+                      <img
+                        src={`http://localhost:8000${selectedInvoice.logo}`}
+                        alt="Company Logo"
+                        className="logo-image"
+                      />
+                    )}
+                    <p>for {selectedInvoice.company_name || 'Grabsolve Infotech'}</p>
+                    <p>Authorized Signatory</p>
+                  </div>
+                </div>
+              </div>
             </div>
+            <p className="text-center">This is a Computer Generated Invoice</p>
           </div>
         </div>
       )}
