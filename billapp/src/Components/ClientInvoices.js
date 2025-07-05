@@ -190,21 +190,25 @@ const Clientinvoices = () => {
       });
       return;
     }
+    
+    // Show the PDF section for generation
+    input.style.display = 'block';
+    
     try {
       await new Promise(resolve => setTimeout(resolve, 100));
-        const canvas = await html2canvas(input, {
-          useCORS: true,
-          allowTaint: true,
-          scale: 2,
+      const canvas = await html2canvas(input, {
+        useCORS: true,
+        allowTaint: true,
+        scale: 2,
         scrollY: -window.scrollY,
-        });
-        const imgData = canvas.toDataURL("image/png");
-        const pdf = new jsPDF("p", "mm", "a4");
+      });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
       const margin = 10;
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        const maxWidth = pageWidth - 2 * margin;
-        const maxHeight = pageHeight - 2 * margin;
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const maxWidth = pageWidth - 2 * margin;
+      const maxHeight = pageHeight - 2 * margin;
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;
       const imgAspectRatio = imgWidth / imgHeight;
@@ -229,6 +233,13 @@ const Clientinvoices = () => {
         position: "top-right",
         autoClose: 3000,
       });
+    } finally {
+      // Hide the PDF section after 1 second
+      setTimeout(() => {
+        if (input) {
+          input.style.display = 'none';
+        }
+      }, 1000);
     }
   };
 
@@ -772,15 +783,15 @@ const Clientinvoices = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          <tr>
-                            <td>{selectedInvoice.hsn_code}</td>
-                            <td>{safeNumber(selectedInvoice.base_amount)}</td>
-                            <td>9%</td>
-                            <td>{safeNumber(selectedInvoice.cgst)}</td>
-                            <td>9%</td>
-                            <td>{safeNumber(selectedInvoice.sgst)}</td>
-                            <td>{safeNumber(selectedInvoice.taxtotal)}</td>
-                          </tr>
+                                              <tr>
+                      <td>{selectedInvoice.hsn_code || selectedInvoice.hsn_sac_code}</td>
+                      <td>{safeNumber(selectedInvoice.base_amount)}</td>
+                      <td>9%</td>
+                      <td>{safeNumber(selectedInvoice.cgst)}</td>
+                      <td>9%</td>
+                      <td>{safeNumber(selectedInvoice.sgst)}</td>
+                      <td>{safeNumber(selectedInvoice.taxtotal)}</td>
+                    </tr>
                           <tr className="total-row">
                             <td>Total</td>
                             <td>{safeNumber(selectedInvoice.base_amount)}</td>
@@ -811,13 +822,13 @@ const Clientinvoices = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          <tr>
-                            <td>{selectedInvoice.hsn_code}</td>
-                            <td>{safeNumber(selectedInvoice.base_amount)}</td>
-                            <td>18%</td>
-                            <td>{safeNumber(selectedInvoice.igst)}</td>
-                            <td>{safeNumber(selectedInvoice.taxtotal)}</td>
-                          </tr>
+                                              <tr>
+                      <td>{selectedInvoice.hsn_code || selectedInvoice.hsn_sac_code}</td>
+                      <td>{safeNumber(selectedInvoice.base_amount)}</td>
+                      <td>18%</td>
+                      <td>{safeNumber(selectedInvoice.igst)}</td>
+                      <td>{safeNumber(selectedInvoice.taxtotal)}</td>
+                    </tr>
                           <tr className="total-row">
                             <td><strong>Total</strong></td>
                             <td><strong>{safeNumber(selectedInvoice.base_amount)}</strong></td>
@@ -831,14 +842,16 @@ const Clientinvoices = () => {
                   </div>
               )}
               <div style={{ padding: "0 0 0 10px" }}>
-                <div className="col-xs-12 inside-india">
-                  <div>
-                    <strong>Tax Amount (in words):</strong>
-                    <span className="total-tax-in-words">
-                      {selectedInvoice.country} {selectedInvoice.currency} {numberToWordsIndian(Math.floor(safeNumber(selectedInvoice.total_with_gst)))} Only
-                    </span>
+                {selectedInvoice.country === "India" && (
+                  <div className="col-xs-12 inside-india">
+                    <div>
+                      <strong>Tax Amount (in words):</strong>
+                      <span className="total-tax-in-words">
+                        {selectedInvoice.country} {selectedInvoice.currency} {numberToWordsIndian(Math.floor(safeNumber(selectedInvoice.total_with_gst)))} Only
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
                 <div className="col-xs-12">
                   <div>
                     <h4>

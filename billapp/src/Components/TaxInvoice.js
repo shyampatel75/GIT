@@ -1468,32 +1468,48 @@ const Taxinvoice = () => {
                   )}
 
                   <tr>
-                    <td colSpan="6">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <td colSpan="12" style={{ height: "50px" }}>
 
-                        {/* Left side: INR conversion (words + number) */}
-                        <div style={{ whiteSpace: 'nowrap' }}>
-                          {showConversion && (
-                           <>
-                           <span className="currency-text">INR</span> {numberToWordsIndian(Math.floor(calculateInrEquivalent(safeNumber(formData.total_with_gst))))} Only —
-                           <span className="currency-text">₹</span> {Number(calculateInrEquivalent(safeNumber(formData.total_with_gst))).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                         </>
-                         
-                          )}
-                        </div>
 
-                        {/* Right side: Total */}
-                        <div style={{ whiteSpace: 'nowrap', textAlign: 'center', width: "200px" }}>
-                          <strong>Total:</strong> &nbsp;
-                          <strong id="total-with-gst">
-                            <span className="currency-sym">{currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode} </span>
-                            {safeNumber(formData.total_with_gst)}
-                          </strong>
-                        </div>
 
+                      {/* Right side: Total */}
+                      <div style={{
+                        whiteSpace: 'nowrap',
+                        textAlign: 'center',
+                        width: "100%",
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <strong>Total:</strong>&nbsp;
+                        <strong id="total-with-gst">
+                          <span className="currency-sym">
+                            {currencySymbols[selectedCountry.currencyCode] || selectedCountry.currency || selectedCountry.currencyCode}
+                          </span>&nbsp;
+                          {safeNumber(formData.total_with_gst)}
+                        </strong>
                       </div>
+
                     </td>
                   </tr>
+
+                  {/* Show INR conversion if not India */}
+                  {selectedCountry.name !== "India" && showConversion && (
+                    <tr>
+                      <td colSpan="6" style={{ height: "50px" }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          height: '100%',
+                          textAlign: 'left'
+                        }}>
+                          <span className="currency-text">INR</span> {numberToWordsIndian(Math.floor(calculateInrEquivalent(safeNumber(formData.total_with_gst))))} Only —
+                          <span className="currency-text">₹</span> {Number(calculateInrEquivalent(safeNumber(formData.total_with_gst))).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+
 
 
                 </tbody>
@@ -1503,7 +1519,10 @@ const Taxinvoice = () => {
 
           <div className="row">
             <div className="col-xs-12">
-              <div className="table-bordered black-bordered amount-box">
+              <div className="table-bordered black-bordered amount-box" style={{
+                marginTop: selectedCountry.name !== "India" ? "20px" : "0px",
+                marginBottom: selectedCountry.name !== "India" ? "20px" : "0px"
+              }}>
                 <div>
                   <p>
                     <strong>Amount Chargeable (in words):</strong>
@@ -1606,21 +1625,23 @@ const Taxinvoice = () => {
           )}
 
           <div style={{ padding: "0 0 0 10px" }}>
-            <div className="col-xs-12 inside-india">
-              <div>
-                <strong>Tax Amount (in words):</strong>
-                <span className="total-tax-in-words">
-                  {selectedCountry.name} {selectedCountry.currencyCode} {numberToWordsIndian(Math.floor(safeNumber(formData.total_with_gst)))} Only
-                </span>
+            {selectedCountry.name === "India" && (
+              <div className="col-xs-12 inside-india">
+                <div>
+                  <strong>Tax Amount (in words):</strong>
+                  <span className="total-tax-in-words">
+                    {selectedCountry.name} {selectedCountry.currencyCode} {numberToWordsIndian(Math.floor(safeNumber(formData.total_with_gst)))} Only
+                  </span>
 
+                </div>
               </div>
-            </div>
+            )}
             <div className="col-xs-12">
               <div>
                 <h4>
                   <strong>Remarks:</strong>
                 </h4>
-                <h5 className="html-remark">
+                <h5 className="html-remark" style={{ marginTop: selectedCountry.name !== "India" ? "10px" : "0px" }}>
                   <input
                     name="remark"
                     type="text"
@@ -1682,10 +1703,10 @@ const Taxinvoice = () => {
       {/* pdf  */}
 
       <div className="pdf-only" ref={pdfRef} style={{ margin: "0 auto", padding: 0, width: "100%" }}>
-        <div style={{fontSize: "20px"}}>
-        <h1 className="text-center"><strong><b>TAX INVOICE</b></strong></h1>
+        <div style={{ fontSize: "20px" }}>
+          <h1 className="text-center" style={{ marginBottom: selectedCountry.name !== "India" ? "50px" : "0px" }}><strong><b>TAX INVOICE</b></strong></h1>
 
-          <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white", width: "100%", padding: "0" }} >
+          <div className="table-bordered black-bordered main-box" style={{ backgroundColor: "white", width: "100%", padding: "100px" }} >
             <div className="row date-tables">
               <div className="col-6">
                 {/* Seller Info */}
@@ -1726,10 +1747,10 @@ const Taxinvoice = () => {
                     </tr>
                     <tr>
                       <td>
-                        <div className="billToAddress" style={{ width: "100%", minHeight: "100px", height: "auto", whiteSpace: "pre-line",  wordBreak: "break-word", overflowWrap: "break-word", boxSizing: "border-box" }}>
+                        <div className="billToAddress" style={{ width: "100%", minHeight: "100px", height: "auto", whiteSpace: "pre-line", wordBreak: "break-word", overflowWrap: "break-word", boxSizing: "border-box" }}>
                           {formData.buyer_address}
                         </div>
-                       
+
                         {error && (
                           <div className="toast-error">
                             {error}
@@ -1755,7 +1776,7 @@ const Taxinvoice = () => {
                     </tr>
                     <tr>
                       <td>
-                        <div className="shipToAddress"style={{ width: "100%", minHeight: "100px", height: "auto", whiteSpace: "pre-line",  wordBreak: "break-word", overflowWrap: "break-word", boxSizing: "border-box" }}>
+                        <div className="shipToAddress" style={{ width: "100%", minHeight: "100px", height: "auto", whiteSpace: "pre-line", wordBreak: "break-word", overflowWrap: "break-word", boxSizing: "border-box" }}>
                           {formData.consignee_address}
                         </div>
                       </td>
@@ -1958,12 +1979,12 @@ const Taxinvoice = () => {
                       <td colSpan="6">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div style={{ whiteSpace: 'nowrap' }}>
-                            {showConversion && (
+                            {/* {showConversion && (
                               <>
-                              <span className="currency-text">INR</span> {numberToWordsIndian(Math.floor(calculateInrEquivalent(safeNumber(formData.total_with_gst))))} Only —
-                              <span className="currency-text">₹</span> {Number(calculateInrEquivalent(safeNumber(formData.total_with_gst))).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </>
-                            )}
+                                <span className="currency-text">INR</span> {numberToWordsIndian(Math.floor(calculateInrEquivalent(safeNumber(formData.total_with_gst))))} Only —
+                                <span className="currency-text">₹</span> {Number(calculateInrEquivalent(safeNumber(formData.total_with_gst))).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </>
+                            )} */}
                           </div>
                           <div style={{ whiteSpace: 'nowrap', textAlign: 'center', width: "200px" }}>
                             <strong>Total:</strong> &nbsp;
@@ -1975,6 +1996,16 @@ const Taxinvoice = () => {
                         </div>
                       </td>
                     </tr>
+                    {selectedCountry.name !== "India" && showConversion && (
+                      <tr>
+                        <td colSpan="6" style={{ height: "80px" }}>
+                          <div style={{ textAlign: 'left' }}>
+                            <span className="currency-text">INR</span> {numberToWordsIndian(Math.floor(calculateInrEquivalent(safeNumber(formData.total_with_gst))))} Only —
+                            <span className="currency-text">₹</span> {Number(calculateInrEquivalent(safeNumber(formData.total_with_gst))).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -1982,7 +2013,15 @@ const Taxinvoice = () => {
 
             <div className="row">
               <div className="col-xs-12">
-                <div className="table-bordered black-bordered amount-box">
+                <div
+                  className="table-bordered black-bordered amount-box"
+                  style={{
+                    marginTop: selectedCountry.name !== "India" ? "20px" : "0px",
+                    marginBottom: selectedCountry.name !== "India" ? "20px" : "0px",
+                    height: selectedCountry.name !== "India" ? "150px" : "auto", // or some fixed value like "150px"
+                  }}
+                >
+
                   <div>
                     <p>
                       <strong>Amount Chargeable (in words):</strong>
@@ -2024,24 +2063,24 @@ const Taxinvoice = () => {
                       </tr>
                     </thead>
                     <tbody>
-                    <tr>
-                      <td>{formData.hsn_code}</td>
-                      <td>{safeNumber(formData.base_amount)}</td>
-                      <td>9%</td>
-                      <td>{safeNumber(formData.cgst)}</td>
-                      <td>9%</td>
-                      <td>{safeNumber(formData.sgst)}</td>
-                      <td>{safeNumber(formData.taxtotal)}</td>
-                    </tr>
-                    <tr className="total-row">
-                      <td>Total</td>
-                      <td>{safeNumber(formData.base_amount)}</td>
-                      <td></td>
-                      <td>{safeNumber(formData.sgst)}</td>
-                      <td></td>
-                      <td>{safeNumber(formData.sgst)}</td>
-                      <td>{safeNumber(formData.taxtotal)}</td>
-                    </tr> 
+                      <tr>
+                        <td>{formData.hsn_code}</td>
+                        <td>{safeNumber(formData.base_amount)}</td>
+                        <td>9%</td>
+                        <td>{safeNumber(formData.cgst)}</td>
+                        <td>9%</td>
+                        <td>{safeNumber(formData.sgst)}</td>
+                        <td>{safeNumber(formData.taxtotal)}</td>
+                      </tr>
+                      <tr className="total-row">
+                        <td>Total</td>
+                        <td>{safeNumber(formData.base_amount)}</td>
+                        <td></td>
+                        <td>{safeNumber(formData.sgst)}</td>
+                        <td></td>
+                        <td>{safeNumber(formData.sgst)}</td>
+                        <td>{safeNumber(formData.taxtotal)}</td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
@@ -2084,29 +2123,23 @@ const Taxinvoice = () => {
             )}
 
             <div style={{ padding: "0 0 0 10px" }}>
-              <div className="col-xs-12 inside-india">
-                <div>
-                  <strong>Tax Amount (in words):</strong>
-                  <span className="total-tax-in-words">
-                    {selectedCountry.name} {selectedCountry.currencyCode} {numberToWordsIndian(Math.floor(safeNumber(formData.total_with_gst)))} Only
-                  </span>
+              {selectedCountry.name === "India" && (
+                <div className="col-xs-12 inside-india">
+                  <div>
+                    <strong>Tax Amount (in words):</strong>
+                    <span className="total-tax-in-words">
+                      {selectedCountry.name} {selectedCountry.currencyCode} {numberToWordsIndian(Math.floor(safeNumber(formData.total_with_gst)))} Only
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="col-xs-12">
                 <div>
                   <h4>
                     <strong>Remarks:</strong>
                   </h4>
-                  <h5 className="html-remark">
-                    <input
-                      name="remark"
-                      type="text"
-                      value={formData.remark}
-                      onChange={handleChange}
-                      className="remark"
-                      style={{ width: "550px" }}
-                      readOnly={isSubmitted}
-                    />
+                  <h5 className="html-remark" style={{ marginTop: selectedCountry.name !== "India" ? "10px" : "0px" }}>
+                    <span>{formData.remark}</span>
                   </h5>
                 </div>
               </div>
@@ -2143,7 +2176,7 @@ const Taxinvoice = () => {
             </div>
           </div>
           <p className="text-center">This is a Computer Generated Invoice</p>
-        
+
         </div>
       </div>
 
