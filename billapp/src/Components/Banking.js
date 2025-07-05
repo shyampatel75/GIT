@@ -62,6 +62,7 @@ const Banking = () => {
   const [companies, setCompanies] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState('');
   const [showNewNameInput, setShowNewNameInput] = useState(false);
+  const [groupedCompanies, setGroupedCompanies] = useState([]);
 
   // Helper functions
   const handleResponse = (response) => {
@@ -211,13 +212,18 @@ const Banking = () => {
       return;
     }
 
+    // Extract company name from selectedBuyer (remove address if present)
+    const companyName = selectedBuyer && selectedBuyer.includes(' (') 
+      ? selectedBuyer.split(' (')[0] 
+      : selectedBuyer;
+
     try {
       // First submit the company bill
       const response = await fetch("http://localhost:8000/api/banking/company/", {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          company_name: selectedBuyer,
+          company_name: companyName,
           invoice_id: selectedInvoice,
           transaction_date: selectedDate,
           notice: buyerNotice,
@@ -607,9 +613,62 @@ const Banking = () => {
       })
         .then(handleResponse)
         .then((data) => {
-          const names = data.map(item => item.buyer_name);
-          const uniqueNames = [...new Set(names)];
-          setBuyerNames(uniqueNames);
+          // Group invoices by buyer_name, buyer_address, and buyer_gst
+          const groupedCompanies = {};
+          
+          data.forEach(item => {
+            if (item.buyer_name) {
+              // Create a unique key based on name, address, and GST
+              const name = (item.buyer_name || "").trim().toLowerCase();
+              const address = (item.buyer_address || "").trim().toLowerCase();
+              const gst = (item.buyer_gst || "").trim().toLowerCase();
+              
+              // Create composite key
+              const key = `${name}__${address}__${gst}`;
+              
+              if (!groupedCompanies[key]) {
+                groupedCompanies[key] = {
+                  buyer_name: item.buyer_name,
+                  buyer_address: item.buyer_address,
+                  buyer_gst: item.buyer_gst,
+                  displayName: item.buyer_name,
+                  key: key
+                };
+              }
+            }
+          });
+          
+          console.log('Grouped companies:', groupedCompanies);
+          
+          // Convert grouped data to array and create display names
+          const groupedArray = Object.values(groupedCompanies).map(item => {
+            // If same name exists with different addresses, append address info
+            const sameNameCompanies = Object.values(groupedCompanies).filter(
+              company => company.buyer_name.toLowerCase() === item.buyer_name.toLowerCase()
+            );
+            
+            if (sameNameCompanies.length > 1) {
+              // Multiple companies with same name, include address in display
+              const address = item.buyer_address ? ` (${item.buyer_address})` : '';
+              return {
+                ...item,
+                displayName: `${item.buyer_name}${address}`
+              };
+            } else {
+              // Single company with this name, use just the name
+              return {
+                ...item,
+                displayName: item.buyer_name
+              };
+            }
+          });
+          
+          console.log('Final grouped array:', groupedArray);
+          
+          // Extract display names for the dropdown
+          const displayNames = groupedArray.map(item => item.displayName);
+          setBuyerNames(displayNames);
+          setGroupedCompanies(groupedArray);
           setAllInvoices(data);
         })
         .catch(handleError);
@@ -626,7 +685,26 @@ const Banking = () => {
   }, [visibleButton]);
 
   useEffect(() => {
-    const filtered = allInvoices.filter(inv => inv.buyer_name === selectedBuyer);
+    // Filter invoices based on selected company
+    // Handle both simple names and names with addresses
+    const filtered = allInvoices.filter(inv => {
+      const selectedName = selectedBuyer;
+      const invoiceName = inv.buyer_name;
+      const invoiceAddress = inv.buyer_address;
+      
+      // If selected name contains address info (has parentheses), extract both name and address
+      if (selectedName && selectedName.includes(' (')) {
+        const nameOnly = selectedName.split(' (')[0];
+        const addressOnly = selectedName.split(' (')[1].replace(')', '');
+        
+        // Match both name and address
+        return invoiceName === nameOnly && invoiceAddress === addressOnly;
+      } else {
+        // Simple name comparison
+        return invoiceName === selectedName;
+      }
+    });
+    
     setBuyerInvoices(filtered);
     setSelectedInvoice("");
   }, [selectedBuyer, allInvoices]);
