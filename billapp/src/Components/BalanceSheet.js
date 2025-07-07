@@ -271,16 +271,48 @@ const BalanceSheet = () => {
           }
         });
         const data = await response.json();
-        // Only keep buyer_name and base_amount, and only if base_amount > 0
-        const filtered = data
-          .filter(item => item.buyer_name && item.base_amount > 0)
-          .map(item => [item.buyer_name, item.base_amount]);
-        setInvoiceDebits(filtered);
-        // Aggregate invoice totals by buyer_name
+        
+        // Group invoices by buyer_name, buyer_address, and buyer_gst
+        const groupedInvoices = {};
+        
+        data.forEach(item => {
+          if (item.buyer_name && item.base_amount > 0) {
+            // Create a unique key based on name, address, and GST
+            const name = (item.buyer_name || "").trim().toLowerCase();
+            const address = (item.buyer_address || "").trim().toLowerCase();
+            const gst = (item.buyer_gst || "").trim().toLowerCase();
+            
+            // Create composite key
+            const key = `${name}__${address}__${gst}`;
+            
+            if (!groupedInvoices[key]) {
+              groupedInvoices[key] = {
+                buyer_name: item.buyer_name,
+                buyer_address: item.buyer_address,
+                buyer_gst: item.buyer_gst,
+                total_amount: 0
+              };
+            }
+            
+            groupedInvoices[key].total_amount += parseFloat(item.base_amount);
+          }
+        });
+        
+        // Convert grouped data to array format for display
+        const groupedArray = Object.values(groupedInvoices).map(item => {
+          // Remove GST part if present in buyer_name
+          let displayName = item.buyer_name.split(' GST')[0].trim();
+          return [displayName, item.total_amount];
+        });
+        
+        setInvoiceDebits(groupedArray);
+        
+        // Aggregate invoice totals by the grouped key for company comparison
         const totals = {};
-        filtered.forEach(([name, amt]) => {
+        Object.values(groupedInvoices).forEach(item => {
+          const name = item.buyer_name;
           if (!totals[name]) totals[name] = 0;
-          totals[name] += amt;
+          totals[name] += item.total_amount;
         });
         setInvoiceTotalsByCompany(totals);
       } catch (error) {
@@ -341,11 +373,11 @@ const BalanceSheet = () => {
   }, [invoiceTotalsByCompany, companyAmounts]);
 
   // Calculate remaining invoice debits (invoice total - company amount)
-  const invoiceDebitsRemaining = Object.entries(invoiceTotalsByCompany)
-    .map(([name, invoiceTotal]) => {
-      const paid = companyAmounts[name] || 0;
-      const remaining = invoiceTotal - paid;
-      return [name, remaining];
+  const invoiceDebitsRemaining = invoiceDebits
+    .map(([buyerName, amount]) => {
+      const paid = companyAmounts[buyerName] || 0;
+      const remaining = amount - paid;
+      return [buyerName, remaining];
     })
     .filter(([_, remaining]) => remaining > 0);
 
@@ -447,23 +479,26 @@ const BalanceSheet = () => {
         <div className="balance-sheet-sections">
           {/* LEFT: Capital and Loan Credit */}
           <div className="left">
-            <div className="balance-sheet-box-left" >
-              <h4 style={{ textAlign: 'left', borderBottom: '1px solid #aaa' }}>Capital</h4>
-              <table className="balance-sheet-table" style={{ width: '100%' }}>
-                <tbody>
-                  {capital.map(([name, amt]) => (
-                    <tr key={name}>
-                      <td style={{ textAlign: 'center', width: '50%' }}>{amt}</td>
-                      <td style={{ textAlign: 'center', width: '50%' }}>{name}</td>
+            {/* Capital section - only show if there are entries */}
+            {capital.length > 0 && (
+              <div className="balance-sheet-box-left" >
+                <h4 style={{ textAlign: 'left', borderBottom: '1px solid #aaa' }}>Capital</h4>
+                <table className="balance-sheet-table" style={{ width: '100%' }}>
+                  <tbody>
+                    {capital.map(([name, amt]) => (
+                      <tr key={name}>
+                        <td style={{ textAlign: 'center', width: '50%' }}>{amt}</td>
+                        <td style={{ textAlign: 'center', width: '50%' }}>{name}</td>
+                      </tr>
+                    ))}
+                    <tr className="balance-sheet-total"> 
+                      <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>{capitalTotal}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 'bold' }}>Total</td>
                     </tr>
-                  ))}
-                  <tr className="balance-sheet-total"> 
-                    <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>{capitalTotal}</td>
-                    <td style={{ textAlign: 'center', fontWeight: 'bold' }}>Total</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+                  </tbody>
+                </table>
+              </div>
+            )}
             {/* Loan (Credit) section: only show if there are entries */}
             {loanCredit.length > 0 && (
               <div className="balance-sheet-box-left" style={{ marginTop: '30px' }}>
@@ -532,23 +567,26 @@ const BalanceSheet = () => {
 
           {/* RIGHT: Fixed Assets, Loan Debit, Salary, and Buyer */}
           <div className="right">
-            <div className="balance-sheet-box-right">
-              <h4 style={{ textAlign: 'left', borderBottom: '1px solid #aaa' }}>Fixed Assets</h4>
-              <table className="balance-sheet-table" style={{ width: '100%' }}>
-                <tbody>
-                  {fixedAssets.map(([name, amt]) => (
-                    <tr key={name}>
-                      <td style={{ textAlign: 'center', width: '50%' }}>{amt}</td>
-                      <td style={{ textAlign: 'center', width: '50%' }}>{name}</td>
+            {/* Fixed Assets section - only show if there are entries */}
+            {fixedAssets.length > 0 && (
+              <div className="balance-sheet-box-right">
+                <h4 style={{ textAlign: 'left', borderBottom: '1px solid #aaa' }}>Fixed Assets</h4>
+                <table className="balance-sheet-table" style={{ width: '100%' }}>
+                  <tbody>
+                    {fixedAssets.map(([name, amt]) => (
+                      <tr key={name}>
+                        <td style={{ textAlign: 'center', width: '50%' }}>{amt}</td>
+                        <td style={{ textAlign: 'center', width: '50%' }}>{name}</td>
+                      </tr>
+                    ))}
+                    <tr className="balance-sheet-total">
+                      <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>{fixedAssetsTotal}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 'bold' }}>Total</td>
                     </tr>
-                  ))}
-                  <tr className="balance-sheet-total">
-                    <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>{fixedAssetsTotal}</td>
-                    <td style={{ textAlign: 'center', fontWeight: 'bold' }}>Total</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+                  </tbody>
+                </table>
+              </div>
+            )}
             {/* Loan (Debit) section: only show if there are entries */}
             {loanDebit.length > 0 && (
               <div className="balance-sheet-box-right" style={{ marginTop: '30px' }}>
@@ -569,40 +607,46 @@ const BalanceSheet = () => {
                 </table>
               </div>
             )}
-            <div className="balance-sheet-box-right" style={{ marginTop: '30px' }}>
-              <h4 style={{ textAlign: 'left', borderBottom: '1px solid #aaa' }}>Salary</h4>
-              <table className="balance-sheet-table" style={{ width: '100%' }}>
-                <tbody>
-                  {salary.map(([name, amt]) => (
-                    <tr key={name}>
-                      <td style={{ textAlign: 'center', width: '50%' }}>{amt}</td>
-                      <td style={{ textAlign: 'center', width: '50%' }}>{name}</td>
+            {/* Salary section - only show if there are entries */}
+            {salary.length > 0 && (
+              <div className="balance-sheet-box-right" style={{ marginTop: '30px' }}>
+                <h4 style={{ textAlign: 'left', borderBottom: '1px solid #aaa' }}>Salary</h4>
+                <table className="balance-sheet-table" style={{ width: '100%' }}>
+                  <tbody>
+                    {salary.map(([name, amt]) => (
+                      <tr key={name}>
+                        <td style={{ textAlign: 'center', width: '50%' }}>{amt}</td>
+                        <td style={{ textAlign: 'center', width: '50%' }}>{name}</td>
+                      </tr>
+                    ))}
+                    <tr className="balance-sheet-total">
+                      <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>{salaryTotal}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 'bold' }}>Total</td>
                     </tr>
-                  ))}
-                  <tr className="balance-sheet-total">
-                    <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>{salaryTotal}</td>
-                    <td style={{ textAlign: 'center', fontWeight: 'bold' }}>Total</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div className="balance-sheet-box-right" style={{ marginTop: '30px' }}>
-              <h4 style={{ textAlign: 'left', borderBottom: '1px solid #aaa' }}>Buyer</h4>
-              <table className="balance-sheet-table" style={{ width: '100%' }}>
-                <tbody>
-                  {buyer.map(([name, amt]) => (
-                    <tr key={name}>
-                      <td style={{ textAlign: 'center', width: '50%' }}>{amt}</td>
-                      <td style={{ textAlign: 'center', width: '50%' }}>{name}</td>
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {/* Buyer section - only show if there are entries */}
+            {buyer.length > 0 && (
+              <div className="balance-sheet-box-right" style={{ marginTop: '30px' }}>
+                <h4 style={{ textAlign: 'left', borderBottom: '1px solid #aaa' }}>Buyer</h4>
+                <table className="balance-sheet-table" style={{ width: '100%' }}>
+                  <tbody>
+                    {buyer.map(([name, amt]) => (
+                      <tr key={name}>
+                        <td style={{ textAlign: 'center', width: '50%' }}>{amt}</td>
+                        <td style={{ textAlign: 'center', width: '50%' }}>{name}</td>
+                      </tr>
+                    ))}
+                    <tr className="balance-sheet-total">
+                      <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>{buyerTotal}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 'bold' }}>Total</td>
                     </tr>
-                  ))}
-                  <tr className="balance-sheet-total">
-                    <td style={{ textAlign: 'center', borderTop: '3px double #000', fontWeight: 'bold' }}>{buyerTotal}</td>
-                    <td style={{ textAlign: 'center', fontWeight: 'bold' }}>Total</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+                  </tbody>
+                </table>
+              </div>
+            )}
             
             {/* Custom Types Debit Sections */}
             {Object.entries(customTypesDebit).map(([customType, entries]) => {

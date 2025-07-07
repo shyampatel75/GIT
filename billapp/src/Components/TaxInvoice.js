@@ -1475,11 +1475,11 @@ const Taxinvoice = () => {
                       {/* Right side: Total */}
                       <div style={{
                         whiteSpace: 'nowrap',
-                        textAlign: 'center',
+                        textAlign: 'end',
                         width: "100%",
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center'
+                        justifyContent: 'end'
                       }}>
                         <strong>Total:</strong>&nbsp;
                         <strong id="total-with-gst">
